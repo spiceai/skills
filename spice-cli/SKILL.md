@@ -56,29 +56,7 @@ When running `spice run`, these endpoints are available:
 | Metrics (Prometheus)  | `127.0.0.1:9090`       |
 | OpenTelemetry         | `127.0.0.1:50052`      |
 
-## Documentation References
+## Documentation
 
-Fetch these docs for detailed command usage and flags:
-
-**CLI Overview:**
-- [CLI Reference Index](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/index.md)
-- [Command Reference](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/index.md)
-
-**Core Commands:**
-- [spice init](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/init.md)
-- [spice run](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/run.md)
-- [spice sql](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/sql.md)
-- [spice chat](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/chat.md)
-- [spice add](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/add.md)
-
-**Dataset Commands:**
-- [spice datasets](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/datasets.md)
-- [spice dataset](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/dataset.md)
-- [spice refresh](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/refresh.md)
-
-**Other Commands:**
-- [spice models](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/models.md)
-- [spice status](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/status.md)
-- [spice search](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/search.md)
-- [spice catalogs](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/catalogs.md)
-- [spice connect](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/cli/reference/connect.md)
+- [CLI Overview](https://spiceai.org/docs/cli)
+- [Command Reference](https://spiceai.org/docs/cli/reference)

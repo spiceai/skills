@@ -6,29 +6,21 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
-### spice-install
-
-Install the Spice CLI and runtime.
-
-**Use when:** "install Spice", "set up Spice", "get started with Spice"
-
-### spicepod-config
-
-Create and configure Spicepod manifests (`spicepod.yaml`).
-
-**Use when:** "create a spicepod", "configure spicepod.yaml", "set up a Spice app", "initialize Spice project"
-
-### spice-data-connector
-
-Connect Spice to data sources like PostgreSQL, MySQL, S3, Databricks, Snowflake, and more.
-
-**Use when:** "add a dataset", "connect to a database", "load data from S3", "configure a data source"
-
-### spice-cli
-
-Use the Spice CLI to manage Spicepods and interact with the runtime.
-
-**Use when:** "run Spice", "query data", "start the runtime", "use spice commands", "check spice status"
+| Skill | Description | Triggers |
+|-------|-------------|----------|
+| [spice-install](spice-install/) | Install the Spice CLI and runtime | "install Spice", "set up Spice", "get started with Spice" |
+| [spicepod-config](spicepod-config/) | Create and configure Spicepod manifests | "create a spicepod", "configure spicepod.yaml", "set up a Spice app" |
+| [spice-cli](spice-cli/) | Use the Spice CLI to manage Spicepods | "run Spice", "query data", "start the runtime", "spice commands" |
+| [spice-data-connector](spice-data-connector/) | Connect to PostgreSQL, MySQL, S3, Databricks, Snowflake, etc. | "add a dataset", "connect to a database", "load data from S3" |
+| [spice-models](spice-models/) | Configure LLM providers (OpenAI, Anthropic, Azure, local) | "add a model", "configure LLM", "set up OpenAI" |
+| [spice-embeddings](spice-embeddings/) | Configure embedding models for vector search | "add embeddings", "configure vector search", "set up semantic search" |
+| [spice-accelerators](spice-accelerators/) | Configure data acceleration engines | "accelerate dataset", "enable caching", "configure DuckDB engine" |
+| [spice-catalogs](spice-catalogs/) | Connect to Unity Catalog, Databricks, Iceberg catalogs | "add a catalog", "connect to Unity Catalog" |
+| [spice-secrets](spice-secrets/) | Configure secret stores for credentials | "configure secrets", "add secret store", "use env secrets" |
+| [spice-tools](spice-tools/) | Configure LLM tools for function calling | "add tools", "enable SQL tool", "configure MCP" |
+| [spice-views](spice-views/) | Create SQL views as virtual tables | "create a view", "add SQL view" |
+| [spice-vectors](spice-vectors/) | Configure vector search engines | "add vector engine", "configure S3 Vectors" |
+| [spice-workers](spice-workers/) | Configure model load balancing and fallback | "add worker", "configure model routing" |
 
 ## Installation
 

@@ -41,9 +41,7 @@ export PATH="$PATH:$HOME/.spice/bin"
 spice upgrade
 ```
 
-## Documentation References
+## Documentation
 
-For detailed installation instructions, build from source, and hardware acceleration (CUDA/Metal):
-
-- [Installation Guide](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/installation.md)
-- [Getting Started](https://github.com/spiceai/docs/raw/refs/heads/trunk/website/docs/getting-started/index.mdx)
+- [Installation Guide](https://spiceai.org/docs/installation)
+- [Getting Started](https://spiceai.org/docs/getting-started)
