@@ -6,15 +6,15 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
-| Skill | Description |
-|---|---|
-| [spice-setup](spice-setup/) | Install Spice, initialize a project, and run the runtime |
-| [spice-connect-data](spice-connect-data/) | Connect to data sources and query across them with federated SQL |
-| [spice-acceleration](spice-acceleration/) | Accelerate data locally for sub-second query performance |
-| [spice-search](spice-search/) | Search with vector similarity, full-text keywords, or hybrid RRF |
-| [spice-ai](spice-ai/) | Add AI capabilities — chat, text-to-SQL, tools, memory, model routing |
-| [spice-caching](spice-caching/) | Cache query and search results with TTL and stale-while-revalidate |
-| [spice-secrets](spice-secrets/) | Manage credentials with secret stores |
+| Skill                                     | Description                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| [spice-setup](spice-setup/)               | Install Spice, initialize a project, and run the runtime              |
+| [spice-connect-data](spice-connect-data/) | Connect to data sources and query across them with federated SQL      |
+| [spice-acceleration](spice-acceleration/) | Accelerate data locally for sub-second query performance              |
+| [spice-search](spice-search/)             | Search with vector similarity, full-text keywords, or hybrid RRF      |
+| [spice-ai](spice-ai/)                     | Add AI capabilities — chat, text-to-SQL, tools, memory, model routing |
+| [spice-caching](spice-caching/)           | Cache query and search results with TTL and stale-while-revalidate    |
+| [spice-secrets](spice-secrets/)           | Manage credentials with secret stores                                 |
 
 ## Installation
 

@@ -24,13 +24,13 @@ runtime:
   caching:
     sql_results:
       enabled: true
-      max_size: 1GiB       # Default 128MiB
-      item_ttl: 1m          # Default 1s
-      eviction_policy: lru  # lru | tiny_lfu
+      max_size: 1GiB # Default 128MiB
+      item_ttl: 1m # Default 1s
+      eviction_policy: lru # lru | tiny_lfu
       hashing_algorithm: xxh3
-      cache_key_type: plan  # plan | sql
-      encoding: none        # none | zstd
-      stale_while_revalidate_ttl: 30s  # Default 0s (disabled)
+      cache_key_type: plan # plan | sql
+      encoding: none # none | zstd
+      stale_while_revalidate_ttl: 30s # Default 0s (disabled)
     search_results:
       enabled: true
       max_size: 1GiB
@@ -44,37 +44,41 @@ runtime:
 
 ## Common Parameters (All Cache Types)
 
-| Parameter | Default | Description |
-|---|---|---|
-| `enabled` | `true` | Enable/disable the cache |
-| `max_size` | `128MiB` | Maximum cache size |
-| `eviction_policy` | `lru` | `lru` (Least Recently Used) or `tiny_lfu` (higher hit rate for skewed access) |
-| `item_ttl` | `1s` | Cache entry TTL (Time to Live) |
-| `hashing_algorithm` | `xxh3` | Hash for cache keys: `xxh3`, `ahash`, `siphash`, `blake3`, `xxh32`, `xxh64`, `xxh128` |
+| Parameter           | Default  | Description                                                                           |
+| ------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `enabled`           | `true`   | Enable/disable the cache                                                              |
+| `max_size`          | `128MiB` | Maximum cache size                                                                    |
+| `eviction_policy`   | `lru`    | `lru` (Least Recently Used) or `tiny_lfu` (higher hit rate for skewed access)         |
+| `item_ttl`          | `1s`     | Cache entry TTL (Time to Live)                                                        |
+| `hashing_algorithm` | `xxh3`   | Hash for cache keys: `xxh3`, `ahash`, `siphash`, `blake3`, `xxh32`, `xxh64`, `xxh128` |
 
 ## SQL Results Extra Parameters
 
-| Parameter | Default | Description |
-|---|---|---|
-| `cache_key_type` | `plan` | `plan` = logical plan (matches semantically equivalent queries); `sql` = raw SQL string (faster, exact match only) |
-| `encoding` | `none` | `none` or `zstd` (compresses cached results, 50-90% reduction) |
-| `stale_while_revalidate_ttl` | `0s` | Serve stale entries while refreshing in background. `0s` = disabled |
+| Parameter                    | Default | Description                                                                                                        |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `cache_key_type`             | `plan`  | `plan` = logical plan (matches semantically equivalent queries); `sql` = raw SQL string (faster, exact match only) |
+| `encoding`                   | `none`  | `none` or `zstd` (compresses cached results, 50-90% reduction)                                                     |
+| `stale_while_revalidate_ttl` | `0s`    | Serve stale entries while refreshing in background. `0s` = disabled                                                |
 
 ## Choosing Parameters
 
 ### `cache_key_type`
+
 - **`plan`** (default): Matches semantically equivalent queries even with different SQL syntax. Requires query parsing overhead.
 - **`sql`**: Faster lookups, exact string match. Avoid with dynamic functions like `NOW()`.
 
 ### `eviction_policy`
+
 - **`lru`** (default): Good general-purpose policy.
 - **`tiny_lfu`**: Better hit rate when some queries are accessed much more frequently than others.
 
 ### `encoding`
+
 - **`none`** (default): Zero compression overhead, uses more memory.
 - **`zstd`**: High compression (50-90% reduction) with fast decompression. Use for large result sets.
 
 ### `hashing_algorithm`
+
 - **`xxh3`** (default): Fastest general-purpose.
 - **`ahash`** / **`xxh64`** / **`xxh128`**: Lower collision probability for many cached queries.
 - **`blake3`**: Cryptographic security required.
@@ -107,13 +111,13 @@ runtime:
 
 Use the standard `Cache-Control` header with `/v1/sql` and `/v1/search`:
 
-| Directive | Description |
-|---|---|
-| `no-cache` | Skip cache for this request; cache the result for future requests |
-| `min-fresh=N` | Require cached entry to remain fresh for at least N seconds |
-| `max-stale=N` | Accept stale responses up to N seconds old |
-| `only-if-cached` | Return only cached responses; error on cache miss |
-| `stale-if-error=N` | Serve stale cache (up to N seconds) if fetching fresh data fails |
+| Directive          | Description                                                       |
+| ------------------ | ----------------------------------------------------------------- |
+| `no-cache`         | Skip cache for this request; cache the result for future requests |
+| `min-fresh=N`      | Require cached entry to remain fresh for at least N seconds       |
+| `max-stale=N`      | Accept stale responses up to N seconds old                        |
+| `only-if-cached`   | Return only cached responses; error on cache miss                 |
+| `stale-if-error=N` | Serve stale cache (up to N seconds) if fetching fresh data fails  |
 
 ```bash
 # Skip cache for this query
@@ -149,6 +153,7 @@ request.metadata_mut().insert("cache-control", "no-cache");
 ```
 
 JDBC:
+
 ```java
 Properties props = new Properties();
 props.setProperty("cache-control", "no-cache");
@@ -177,32 +182,32 @@ curl -XPOST http://localhost:8090/v1/sql \
 
 Responses include a header indicating cache status:
 
-| Cache Type | Response Header |
-|---|---|
-| `sql_results` | `Results-Cache-Status` |
+| Cache Type       | Response Header               |
+| ---------------- | ----------------------------- |
+| `sql_results`    | `Results-Cache-Status`        |
 | `search_results` | `Search-Results-Cache-Status` |
 
-| Status | Meaning |
-|---|---|
-| `HIT` | Served from cache |
-| `MISS` | Cache checked, result not found |
-| `BYPASS` | Cache bypassed (e.g., `cache-control: no-cache`) |
-| `STALE` | Stale entry served while revalidating |
-| *(absent)* | Cache did not apply (disabled or system table query) |
+| Status     | Meaning                                              |
+| ---------- | ---------------------------------------------------- |
+| `HIT`      | Served from cache                                    |
+| `MISS`     | Cache checked, result not found                      |
+| `BYPASS`   | Cache bypassed (e.g., `cache-control: no-cache`)     |
+| `STALE`    | Stale entry served while revalidating                |
+| _(absent)_ | Cache did not apply (disabled or system table query) |
 
 ## Monitoring / Metrics
 
 Cache metrics are available at the Prometheus-compatible metrics endpoint. Prefix by cache type: `results_*`, `search_results_*`, `embeddings_*`.
 
-| Metric | Type | Description |
-|---|---|---|
-| `*_cache_max_size_bytes` | Gauge | Configured max cache size |
-| `*_cache_requests` | Counter | Total cache lookups |
-| `*_cache_hits` | Counter | Total cache hits |
-| `*_cache_items_count` | Gauge | Current items in cache |
-| `*_cache_size_bytes` | Gauge | Current cache size |
-| `*_cache_evictions` | Counter | Total evictions |
-| `*_cache_hit_ratio` | Gauge | Hit ratio (hits / total) |
+| Metric                   | Type    | Description               |
+| ------------------------ | ------- | ------------------------- |
+| `*_cache_max_size_bytes` | Gauge   | Configured max cache size |
+| `*_cache_requests`       | Counter | Total cache lookups       |
+| `*_cache_hits`           | Counter | Total cache hits          |
+| `*_cache_items_count`    | Gauge   | Current items in cache    |
+| `*_cache_size_bytes`     | Gauge   | Current cache size        |
+| `*_cache_evictions`      | Counter | Total evictions           |
+| `*_cache_hit_ratio`      | Gauge   | Hit ratio (hits / total)  |
 
 ## Common Recipes
 
@@ -245,10 +250,10 @@ runtime:
 
 ## Troubleshooting
 
-| Issue | Solution |
-|---|---|
-| Always getting `MISS` | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings) |
-| Cache filling up quickly | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl` |
-| Stale data being served | Reduce `item_ttl` or `stale_while_revalidate_ttl`; use `cache-control: no-cache` for specific queries |
-| Dynamic functions (`NOW()`) returning cached results | Switch to `cache_key_type: plan` or use `cache-control: no-cache` |
-| SWR conflict error | Don't set both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset |
+| Issue                                                | Solution                                                                                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings)                                |
+| Cache filling up quickly                             | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl`                                                                                         |
+| Stale data being served                              | Reduce `item_ttl` or `stale_while_revalidate_ttl`; use `cache-control: no-cache` for specific queries                                                     |
+| Dynamic functions (`NOW()`) returning cached results | Switch to `cache_key_type: plan` or use `cache-control: no-cache`                                                                                         |
+| SWR conflict error                                   | Don't set both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset |

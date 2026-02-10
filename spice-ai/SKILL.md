@@ -15,26 +15,26 @@ models:
     name: <model_name>
     params:
       <provider>_api_key: ${ secrets:API_KEY }
-      tools: auto                    # optional: enable runtime tools
-      system_prompt: |               # optional: default system prompt
+      tools: auto # optional: enable runtime tools
+      system_prompt: | # optional: default system prompt
         You are a helpful assistant.
 ```
 
 ## Supported Providers
 
-| Provider | From Format | Status |
-|----------|-------------|--------|
-| OpenAI (or compatible) | `openai:gpt-4o` | Stable |
-| Anthropic | `anthropic:claude-sonnet-4-5` | Alpha |
-| Azure OpenAI | `azure:my-deployment` | Alpha |
-| Google AI | `google:gemini-pro` | Alpha |
-| xAI | `xai:grok-beta` | Alpha |
-| Perplexity | `perplexity:sonar-pro` | Alpha |
-| Amazon Bedrock | `bedrock:anthropic.claude-3` | Alpha |
-| Databricks | `databricks:llama-3-70b` | Alpha |
-| Spice.ai | `spiceai:llama3` | Release Candidate |
-| HuggingFace | `hf:meta-llama/Llama-3-8B-Instruct` | Release Candidate |
-| Local file | `file:./models/llama.gguf` | Release Candidate |
+| Provider               | From Format                         | Status            |
+| ---------------------- | ----------------------------------- | ----------------- |
+| OpenAI (or compatible) | `openai:gpt-4o`                     | Stable            |
+| Anthropic              | `anthropic:claude-sonnet-4-5`       | Alpha             |
+| Azure OpenAI           | `azure:my-deployment`               | Alpha             |
+| Google AI              | `google:gemini-pro`                 | Alpha             |
+| xAI                    | `xai:grok-beta`                     | Alpha             |
+| Perplexity             | `perplexity:sonar-pro`              | Alpha             |
+| Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
+| Databricks             | `databricks:llama-3-70b`            | Alpha             |
+| Spice.ai               | `spiceai:llama3`                    | Release Candidate |
+| HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct` | Release Candidate |
+| Local file             | `file:./models/llama.gguf`          | Release Candidate |
 
 ## Using Models
 
@@ -74,18 +74,18 @@ Tools extend LLM capabilities with runtime functions:
 
 ### Built-in Tools
 
-| Tool | Description | Group |
-|------|-------------|-------|
-| `list_datasets` | List available datasets | auto |
-| `sql` | Execute SQL queries | auto |
-| `table_schema` | Get table schema | auto |
-| `search` | Vector similarity search | auto |
-| `sample_distinct_columns` | Sample distinct column values | auto |
-| `random_sample` | Random row sampling | auto |
-| `top_n_sample` | Top N rows by ordering | auto |
-| `memory:load` | Load stored memories | memory |
-| `memory:store` | Store new memories | memory |
-| `websearch` | Search the web | — |
+| Tool                      | Description                   | Group  |
+| ------------------------- | ----------------------------- | ------ |
+| `list_datasets`           | List available datasets       | auto   |
+| `sql`                     | Execute SQL queries           | auto   |
+| `table_schema`            | Get table schema              | auto   |
+| `search`                  | Vector similarity search      | auto   |
+| `sample_distinct_columns` | Sample distinct column values | auto   |
+| `random_sample`           | Random row sampling           | auto   |
+| `top_n_sample`            | Top N rows by ordering        | auto   |
+| `memory:load`             | Load stored memories          | memory |
+| `memory:store`            | Store new memories            | memory |
+| `websearch`               | Search the web                | —      |
 
 ### Enable Tools
 
@@ -95,7 +95,7 @@ models:
     name: analyst
     params:
       openai_api_key: ${ secrets:OPENAI_API_KEY }
-      tools: auto               # all default tools
+      tools: auto # all default tools
       # tools: sql, search      # or specific tools only
 ```
 
@@ -149,7 +149,7 @@ models:
   - from: openai:gpt-4o
     name: my_model
     params:
-      tool_recursion_limit: 3   # default: 10
+      tool_recursion_limit: 3 # default: 10
 ```
 
 ## Model Routing (Workers)
@@ -194,9 +194,9 @@ workers:
     load_balance:
       routing:
         - from: fast_model
-          weight: 4     # 80%
+          weight: 4 # 80%
         - from: slow_model
-          weight: 1     # 20%
+          weight: 1 # 20%
 ```
 
 ## Model Examples

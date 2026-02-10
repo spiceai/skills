@@ -81,20 +81,20 @@ embeddings:
 
 ### All Sections
 
-| Section | Purpose | Skill |
-|---------|---------|-------|
-| `datasets` | Data sources for SQL queries | spice-connect-data |
-| `models` | LLM/ML models for inference | spice-ai |
-| `embeddings` | Embedding models for vector search | spice-search |
-| `secrets` | Secure credential management | spice-secrets |
-| `catalogs` | External data catalog connections | spice-connect-data |
-| `views` | Virtual tables from SQL queries | spice-connect-data |
-| `tools` | LLM function calling capabilities | spice-ai |
-| `workers` | Model load balancing and routing | spice-ai |
-| `runtime` | Server ports, caching, telemetry | spice-caching |
-| `snapshots` | Acceleration snapshot management | spice-acceleration |
-| `evals` | Model evaluation definitions | spice-ai |
-| `dependencies` | Dependent Spicepods | (below) |
+| Section        | Purpose                            | Skill              |
+| -------------- | ---------------------------------- | ------------------ |
+| `datasets`     | Data sources for SQL queries       | spice-connect-data |
+| `models`       | LLM/ML models for inference        | spice-ai           |
+| `embeddings`   | Embedding models for vector search | spice-search       |
+| `secrets`      | Secure credential management       | spice-secrets      |
+| `catalogs`     | External data catalog connections  | spice-connect-data |
+| `views`        | Virtual tables from SQL queries    | spice-connect-data |
+| `tools`        | LLM function calling capabilities  | spice-ai           |
+| `workers`      | Model load balancing and routing   | spice-ai           |
+| `runtime`      | Server ports, caching, telemetry   | spice-caching      |
+| `snapshots`    | Acceleration snapshot management   | spice-acceleration |
+| `evals`        | Model evaluation definitions       | spice-ai           |
+| `dependencies` | Dependent Spicepods                | (below)            |
 
 ### Dependencies
 
@@ -106,67 +106,67 @@ dependencies:
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `spice init <name>` | Initialize a new Spicepod |
-| `spice run` | Start the Spice runtime |
-| `spice sql` | Start interactive SQL REPL |
-| `spice chat` | Start chat REPL (requires model) |
-| `spice search` | Perform embeddings-based search |
-| `spice add <spicepod>` | Add a Spicepod dependency |
-| `spice datasets` | List loaded datasets |
-| `spice models` | List loaded models |
-| `spice catalogs` | List loaded catalogs |
-| `spice status` | Show runtime status |
-| `spice refresh <dataset>` | Refresh an accelerated dataset |
-| `spice login` | Login to the Spice.ai Platform |
-| `spice version` | Show CLI and runtime version |
-| `spice upgrade` | Upgrade CLI to latest version |
+| Command                   | Description                      |
+| ------------------------- | -------------------------------- |
+| `spice init <name>`       | Initialize a new Spicepod        |
+| `spice run`               | Start the Spice runtime          |
+| `spice sql`               | Start interactive SQL REPL       |
+| `spice chat`              | Start chat REPL (requires model) |
+| `spice search`            | Perform embeddings-based search  |
+| `spice add <spicepod>`    | Add a Spicepod dependency        |
+| `spice datasets`          | List loaded datasets             |
+| `spice models`            | List loaded models               |
+| `spice catalogs`          | List loaded catalogs             |
+| `spice status`            | Show runtime status              |
+| `spice refresh <dataset>` | Refresh an accelerated dataset   |
+| `spice login`             | Login to the Spice.ai Platform   |
+| `spice version`           | Show CLI and runtime version     |
+| `spice upgrade`           | Upgrade CLI to latest version    |
 
 ## Runtime Endpoints
 
-| Service | Default Address | Protocol |
-|---------|----------------|----------|
-| HTTP API | `http://127.0.0.1:8090` | REST, OpenAI-compatible |
-| Arrow Flight | `127.0.0.1:50051` | Arrow Flight / Flight SQL |
-| Metrics | `127.0.0.1:9090` | Prometheus |
-| OpenTelemetry | `127.0.0.1:50052` | OTLP gRPC |
+| Service       | Default Address         | Protocol                  |
+| ------------- | ----------------------- | ------------------------- |
+| HTTP API      | `http://127.0.0.1:8090` | REST, OpenAI-compatible   |
+| Arrow Flight  | `127.0.0.1:50051`       | Arrow Flight / Flight SQL |
+| Metrics       | `127.0.0.1:9090`        | Prometheus                |
+| OpenTelemetry | `127.0.0.1:50052`       | OTLP gRPC                 |
 
 ## HTTP API Paths
 
-| Path | Description |
-|------|-------------|
-| `POST /v1/sql` | Execute SQL query |
-| `POST /v1/search` | Embeddings-based search |
-| `POST /v1/nsql` | Natural language to SQL |
-| `POST /v1/chat/completions` | OpenAI-compatible chat |
-| `POST /v1/embeddings` | Generate embeddings |
-| `GET /v1/datasets` | List datasets |
-| `GET /v1/models` | List models |
-| `GET /health` | Health check |
+| Path                        | Description             |
+| --------------------------- | ----------------------- |
+| `POST /v1/sql`              | Execute SQL query       |
+| `POST /v1/search`           | Embeddings-based search |
+| `POST /v1/nsql`             | Natural language to SQL |
+| `POST /v1/chat/completions` | OpenAI-compatible chat  |
+| `POST /v1/embeddings`       | Generate embeddings     |
+| `GET /v1/datasets`          | List datasets           |
+| `GET /v1/models`            | List models             |
+| `GET /health`               | Health check            |
 
 ## Deployment Models
 
 Spice ships as a single ~140MB binary with no external dependencies.
 
-| Model | Best For |
-|-------|----------|
-| Standalone | Development, edge devices, simple workloads |
-| Sidecar | Low-latency access, microservices |
-| Microservice | Heavy or varying traffic behind a load balancer |
-| Cluster | Large-scale data, horizontal scaling |
-| Cloud | Auto-scaling, built-in observability (Spice.ai Cloud) |
+| Model        | Best For                                              |
+| ------------ | ----------------------------------------------------- |
+| Standalone   | Development, edge devices, simple workloads           |
+| Sidecar      | Low-latency access, microservices                     |
+| Microservice | Heavy or varying traffic behind a load balancer       |
+| Cluster      | Large-scale data, horizontal scaling                  |
+| Cloud        | Auto-scaling, built-in observability (Spice.ai Cloud) |
 
 ## Use Cases
 
-| Use Case | How Spice Helps |
-|----------|-----------------|
+| Use Case                   | How Spice Helps                                                              |
+| -------------------------- | ---------------------------------------------------------------------------- |
 | Operational Data Lakehouse | Serve real-time workloads from Iceberg/Delta/Parquet with sub-second latency |
-| Data Lake Accelerator | Accelerate queries from seconds to milliseconds locally |
-| Enterprise Search | Combine semantic and full-text search across data |
-| RAG Pipelines | Federated data + vector search + LLMs |
-| Agentic AI | Tool-augmented LLMs with fast data access |
-| Real-Time Analytics | Stream from Kafka/DynamoDB with sub-second latency |
+| Data Lake Accelerator      | Accelerate queries from seconds to milliseconds locally                      |
+| Enterprise Search          | Combine semantic and full-text search across data                            |
+| RAG Pipelines              | Federated data + vector search + LLMs                                        |
+| Agentic AI                 | Tool-augmented LLMs with fast data access                                    |
+| Real-Time Analytics        | Stream from Kafka/DynamoDB with sub-second latency                           |
 
 ## Full Example
 

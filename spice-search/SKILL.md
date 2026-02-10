@@ -9,12 +9,12 @@ Spice provides integrated search capabilities: vector (semantic) search, full-te
 
 ## Search Methods
 
-| Method | When to Use | Requires |
-|---|---|---|
-| **Vector search** | Semantic similarity, RAG, recommendations | Embedding model + column embeddings |
-| **Full-text search** | Keyword/phrase matching, exact terms | `full_text_search.enabled: true` on columns |
-| **Hybrid (RRF)** | Best of both — combines rankings from multiple methods | Multiple search methods configured |
-| **Lexical (LIKE/=)** | Exact pattern or value matching | Nothing extra |
+| Method               | When to Use                                            | Requires                                    |
+| -------------------- | ------------------------------------------------------ | ------------------------------------------- |
+| **Vector search**    | Semantic similarity, RAG, recommendations              | Embedding model + column embeddings         |
+| **Full-text search** | Keyword/phrase matching, exact terms                   | `full_text_search.enabled: true` on columns |
+| **Hybrid (RRF)**     | Best of both — combines rankings from multiple methods | Multiple search methods configured          |
+| **Lexical (LIKE/=)** | Exact pattern or value matching                        | Nothing extra                               |
 
 ## Set Up Vector Search
 
@@ -33,16 +33,16 @@ embeddings:
 
 ### Supported Embedding Providers
 
-| Provider | From Format | Status |
-|----------|-------------|--------|
-| OpenAI | `openai:text-embedding-3-large` | Release Candidate |
-| HuggingFace | `huggingface:huggingface.co/sentence-transformers/all-MiniLM-L6-v2` | Release Candidate |
-| Local file | `file:model.safetensors` | Release Candidate |
-| Azure OpenAI | `azure:my-deployment` | Alpha |
-| Google AI | `google:text-embedding-004` | Alpha |
-| Amazon Bedrock | `bedrock:amazon.titan-embed-text-v1` | Alpha |
-| Databricks | `databricks:endpoint` | Alpha |
-| Model2Vec | `model2vec:model-name` | Alpha |
+| Provider       | From Format                                                         | Status            |
+| -------------- | ------------------------------------------------------------------- | ----------------- |
+| OpenAI         | `openai:text-embedding-3-large`                                     | Release Candidate |
+| HuggingFace    | `huggingface:huggingface.co/sentence-transformers/all-MiniLM-L6-v2` | Release Candidate |
+| Local file     | `file:model.safetensors`                                            | Release Candidate |
+| Azure OpenAI   | `azure:my-deployment`                                               | Alpha             |
+| Google AI      | `google:text-embedding-004`                                         | Alpha             |
+| Amazon Bedrock | `bedrock:amazon.titan-embed-text-v1`                                | Alpha             |
+| Databricks     | `databricks:endpoint`                                               | Alpha             |
+| Model2Vec      | `model2vec:model-name`                                              | Alpha             |
 
 ### 2. Configure Dataset Columns for Embeddings
 
@@ -65,11 +65,11 @@ datasets:
 
 ### Embedding Methods
 
-| Method | Description | When to Use |
-|--------|-------------|-------------|
-| **Accelerated** | Precomputed and stored | Faster queries, frequently searched datasets |
-| **JIT (Just-in-Time)** | Computed at query time (no acceleration) | Large or rarely queried datasets |
-| **Passthrough** | Pre-existing embeddings used directly | Source already has `<col>_embedding` columns |
+| Method                 | Description                              | When to Use                                  |
+| ---------------------- | ---------------------------------------- | -------------------------------------------- |
+| **Accelerated**        | Precomputed and stored                   | Faster queries, frequently searched datasets |
+| **JIT (Just-in-Time)** | Computed at query time (no acceleration) | Large or rarely queried datasets             |
+| **Passthrough**        | Pre-existing embeddings used directly    | Source already has `<col>_embedding` columns |
 
 ### 3. Query via HTTP API
 
@@ -85,13 +85,13 @@ curl -X POST http://localhost:8090/v1/search \
   }'
 ```
 
-| Field | Required | Description |
-|---|---|---|
-| `text` | Yes | Search text |
-| `datasets` | No | Datasets to search (null = all searchable) |
-| `additional_columns` | No | Extra columns to return |
-| `where` | No | SQL filter predicate |
-| `limit` | No | Max results per dataset |
+| Field                | Required | Description                                |
+| -------------------- | -------- | ------------------------------------------ |
+| `text`               | Yes      | Search text                                |
+| `datasets`           | No       | Datasets to search (null = all searchable) |
+| `additional_columns` | No       | Extra columns to return                    |
+| `where`              | No       | SQL filter predicate                       |
+| `limit`              | No       | Max results per dataset                    |
 
 To retrieve full documents (not just chunks), include the embedding column name in `additional_columns`.
 
@@ -244,17 +244,17 @@ ORDER BY fused_score DESC LIMIT 15;
 
 ### `rrf` Parameters
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `query_1`, `query_2`, ... | Search UDTF | Yes (2+) | `vector_search` or `text_search` calls (variadic) |
-| `join_key` | String | No | Column for joining results (default: auto-hash) |
-| `k` | Float | No | Smoothing parameter (default: 60.0, lower = more aggressive) |
-| `time_column` | String | No | Timestamp column for recency boosting |
-| `recency_decay` | String | No | `'exponential'` (default) or `'linear'` |
-| `decay_constant` | Float | No | Rate for exponential decay (default: 0.01) |
-| `decay_scale_secs` | Float | No | Time scale for exponential decay (default: 86400) |
-| `decay_window_secs` | Float | No | Window for linear decay (default: 86400) |
-| `rank_weight` | Float | No | Per-query weight (specified inside search calls) |
+| Parameter                 | Type        | Required | Description                                                  |
+| ------------------------- | ----------- | -------- | ------------------------------------------------------------ |
+| `query_1`, `query_2`, ... | Search UDTF | Yes (2+) | `vector_search` or `text_search` calls (variadic)            |
+| `join_key`                | String      | No       | Column for joining results (default: auto-hash)              |
+| `k`                       | Float       | No       | Smoothing parameter (default: 60.0, lower = more aggressive) |
+| `time_column`             | String      | No       | Timestamp column for recency boosting                        |
+| `recency_decay`           | String      | No       | `'exponential'` (default) or `'linear'`                      |
+| `decay_constant`          | Float       | No       | Rate for exponential decay (default: 0.01)                   |
+| `decay_scale_secs`        | Float       | No       | Time scale for exponential decay (default: 86400)            |
+| `decay_window_secs`       | Float       | No       | Window for linear decay (default: 86400)                     |
+| `rank_weight`             | Float       | No       | Per-query weight (specified inside search calls)             |
 
 ## Vector Engines
 
@@ -275,7 +275,7 @@ datasets:
           vectors: non-filterable
       - name: category
         metadata:
-          vectors: filterable       # enable filtering on this column
+          vectors: filterable # enable filtering on this column
     vectors:
       enabled: true
       engine: s3_vectors
@@ -353,13 +353,13 @@ LIMIT 10;
 
 ## Troubleshooting
 
-| Issue | Solution |
-|---|---|
-| `vector_search` returns no results | Verify embeddings configured on column and model is loaded |
-| `text_search` returns no results | Check `full_text_search.enabled: true`; acceleration must be enabled |
-| Poor hybrid search relevance | Tune `rank_weight` per query and adjust `k` |
-| Results missing recent content | Add `time_column` and `recency_decay` to RRF |
-| Chunked vector search not working via SQL | Use HTTP API instead (UDTF doesn't support chunked columns yet) |
+| Issue                                     | Solution                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| `vector_search` returns no results        | Verify embeddings configured on column and model is loaded           |
+| `text_search` returns no results          | Check `full_text_search.enabled: true`; acceleration must be enabled |
+| Poor hybrid search relevance              | Tune `rank_weight` per query and adjust `k`                          |
+| Results missing recent content            | Add `time_column` and `recency_decay` to RRF                         |
+| Chunked vector search not working via SQL | Use HTTP API instead (UDTF doesn't support chunked columns yet)      |
 
 ## Documentation
 
