@@ -6,21 +6,15 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
-| Skill | Description | Triggers |
-|-------|-------------|----------|
-| [spice-install](spice-install/) | Install the Spice CLI and runtime | "install Spice", "set up Spice", "get started with Spice" |
-| [spicepod-config](spicepod-config/) | Create and configure Spicepod manifests | "create a spicepod", "configure spicepod.yaml", "set up a Spice app" |
-| [spice-cli](spice-cli/) | Use the Spice CLI to manage Spicepods | "run Spice", "query data", "start the runtime", "spice commands" |
-| [spice-data-connector](spice-data-connector/) | Connect to PostgreSQL, MySQL, S3, Databricks, Snowflake, etc. | "add a dataset", "connect to a database", "load data from S3" |
-| [spice-models](spice-models/) | Configure LLM providers (OpenAI, Anthropic, Azure, local) | "add a model", "configure LLM", "set up OpenAI" |
-| [spice-embeddings](spice-embeddings/) | Configure embedding models for vector search | "add embeddings", "configure vector search", "set up semantic search" |
-| [spice-accelerators](spice-accelerators/) | Configure data acceleration engines | "accelerate dataset", "enable caching", "configure DuckDB engine" |
-| [spice-catalogs](spice-catalogs/) | Connect to Unity Catalog, Databricks, Iceberg catalogs | "add a catalog", "connect to Unity Catalog" |
-| [spice-secrets](spice-secrets/) | Configure secret stores for credentials | "configure secrets", "add secret store", "use env secrets" |
-| [spice-tools](spice-tools/) | Configure LLM tools for function calling | "add tools", "enable SQL tool", "configure MCP" |
-| [spice-views](spice-views/) | Create SQL views as virtual tables | "create a view", "add SQL view" |
-| [spice-vectors](spice-vectors/) | Configure vector search engines | "add vector engine", "configure S3 Vectors" |
-| [spice-workers](spice-workers/) | Configure model load balancing and fallback | "add worker", "configure model routing" |
+| Skill | Description |
+|---|---|
+| [spice-setup](spice-setup/) | Install Spice, initialize a project, and run the runtime |
+| [spice-connect-data](spice-connect-data/) | Connect to data sources and query across them with federated SQL |
+| [spice-acceleration](spice-acceleration/) | Accelerate data locally for sub-second query performance |
+| [spice-search](spice-search/) | Search with vector similarity, full-text keywords, or hybrid RRF |
+| [spice-ai](spice-ai/) | Add AI capabilities — chat, text-to-SQL, tools, memory, model routing |
+| [spice-caching](spice-caching/) | Cache query and search results with TTL and stale-while-revalidate |
+| [spice-secrets](spice-secrets/) | Manage credentials with secret stores |
 
 ## Installation
 
