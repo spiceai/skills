@@ -1,15 +1,15 @@
 ---
-name: spice-data-connector
-description: Connect Spice to data sources like PostgreSQL, MySQL, S3, Databricks, Snowflake, DuckDB, GitHub, and more. Use when asked to "add a dataset", "connect to a database", "load data from S3", "configure a data source", "read files", "query external data", or "set up federated queries".
+name: spice-connect-data
+description: Connect Spice to data sources and query across them with federated SQL. Use when connecting to databases (Postgres, MySQL, DynamoDB), data lakes (S3, Delta Lake, Iceberg), warehouses (Snowflake, Databricks), files, APIs, or catalogs; configuring datasets; creating views; writing data; or setting up cross-source queries.
 ---
 
-# Spice Data Connectors
+# Connect to Data Sources
 
-Data Connectors enable federated SQL queries across databases, data warehouses, data lakes, and files. Spice connects directly to your existing data sources and provides a unified SQL interface — no ETL pipelines required. The query planner (built on Apache DataFusion) optimizes and routes queries, including filter pushdown and column projection.
+Spice federates SQL queries across 30+ data sources without ETL. Connect databases, data lakes, warehouses, and APIs, then query across them with standard SQL.
 
-## Cross-Source Federation
+## How Federation Works
 
-Query across multiple heterogeneous sources in one SQL statement:
+Configure datasets pointing to different sources. Spice's query planner (built on Apache DataFusion) optimizes and routes queries with filter pushdown and column projection:
 
 ```yaml
 datasets:
@@ -35,9 +35,7 @@ FROM customers c
 WHERE s.region = 'EMEA';
 ```
 
-Without acceleration, each query fetches data directly from the underlying sources with optimized filter pushdown.
-
-## Basic Dataset Configuration
+## Dataset Configuration
 
 ```yaml
 datasets:
@@ -46,7 +44,7 @@ datasets:
     params:
       # connector-specific parameters
     acceleration:
-      enabled: true # optional: enable local materialization
+      enabled: true # optional: materialize locally (see spice-acceleration)
 ```
 
 ## Supported Connectors
@@ -59,9 +57,9 @@ datasets:
 | MySQL         | `mysql:schema.table`    | Stable                        |
 | DuckDB        | `duckdb:database.table` | Stable                        |
 | MS SQL Server | `mssql:db.table`        | Beta                          |
+| DynamoDB      | `dynamodb:table`        | Release Candidate             |
 | MongoDB       | `mongodb:collection`    | Alpha                         |
 | ClickHouse    | `clickhouse:db.table`   | Alpha                         |
-| DynamoDB      | `dynamodb:table`        | Release Candidate             |
 
 ### Data Warehouses
 
@@ -154,20 +152,18 @@ datasets:
 
 ## File Formats
 
-Connectors reading from object stores (S3, ABFS, GCS) or network storage (FTP, SFTP) support:
+Connectors reading from object stores (S3, ABFS) or network storage (FTP, SFTP) support:
 
-| Format         | `file_format` | Status | Type       |
-| -------------- | ------------- | ------ | ---------- |
-| Apache Parquet | `parquet`     | Stable | Structured |
-| CSV            | `csv`         | Stable | Structured |
-| Markdown       | `md`          | Stable | Document   |
-| Text           | `txt`         | Stable | Document   |
-| PDF            | `pdf`         | Alpha  | Document   |
-| Microsoft Word | `docx`        | Alpha  | Document   |
+| Format         | `file_format` | Type       |
+| -------------- | ------------- | ---------- |
+| Apache Parquet | `parquet`     | Structured |
+| CSV            | `csv`         | Structured |
+| Markdown       | `md`          | Document   |
+| Text           | `txt`         | Document   |
+| PDF            | `pdf`         | Document   |
+| Microsoft Word | `docx`        | Document   |
 
-### Document Formats
-
-Document files (md, txt, pdf, docx) produce a table with `location` and `content` columns:
+Document files produce a table with `location` and `content` columns:
 
 ```yaml
 datasets:
@@ -175,10 +171,6 @@ datasets:
     name: my_documents
     params:
       file_format: md
-```
-
-```sql
-SELECT location, content FROM my_documents LIMIT 5;
 ```
 
 ### Hive Partitioning
@@ -198,13 +190,118 @@ SELECT * FROM partitioned_data WHERE year = '2024' AND month = '01';
 
 ## Dataset Naming
 
-- `name: foo` creates `spice.public.foo`
-- `name: myschema.foo` creates `spice.myschema.foo`
+- `name: foo` → `spice.public.foo`
+- `name: myschema.foo` → `spice.myschema.foo`
 - Use `.` to organize datasets into schemas
+
+## Catalogs
+
+Catalog connectors expose external data catalogs, preserving the source schema hierarchy. Tables are accessed as `<catalog>.<schema>.<table>`.
+
+> **Note:** Acceleration is not supported for catalog tables. Use datasets for accelerated access.
+
+```yaml
+catalogs:
+  - from: <connector>
+    name: <catalog_name>
+    params:
+      # connector-specific parameters
+    include:
+      - 'schema.*' # optional: filter with glob patterns
+```
+
+### Supported Catalogs
+
+| Connector     | From Value      | Status |
+| ------------- | --------------- | ------ |
+| Unity Catalog | `unity_catalog` | Stable |
+| Databricks    | `databricks`    | Beta   |
+| Iceberg       | `iceberg`       | Beta   |
+| Spice.ai      | `spice.ai`      | Beta   |
+| AWS Glue      | `glue`          | Alpha  |
+
+### Catalog Example
+
+```yaml
+catalogs:
+  - from: unity_catalog
+    name: unity
+    params:
+      unity_catalog_endpoint: https://my-workspace.cloud.databricks.com
+      databricks_token: ${ secrets:DATABRICKS_TOKEN }
+    include:
+      - 'my_schema.*'
+```
+
+```sql
+SELECT * FROM unity.my_schema.customers LIMIT 10;
+```
+
+## Views
+
+Views are virtual tables defined by SQL queries — useful for pre-aggregations, transformations, and simplified access:
+
+```yaml
+views:
+  - name: daily_sales
+    sql: |
+      SELECT DATE(created_at) as date, SUM(amount) as total, COUNT(*) as orders
+      FROM orders
+      GROUP BY DATE(created_at)
+
+  - name: order_details
+    sql: |
+      SELECT o.id, c.name as customer, p.name as product, o.quantity
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      JOIN products p ON o.product_id = p.id
+```
+
+Views can be accelerated:
+
+```yaml
+views:
+  - name: rankings
+    sql: |
+      SELECT product_id, SUM(quantity) as total_sold
+      FROM orders GROUP BY product_id ORDER BY total_sold DESC LIMIT 100
+    acceleration:
+      enabled: true
+      refresh_check_interval: 1h
+```
+
+Views are read-only and queried like regular tables: `SELECT * FROM daily_sales`.
+
+## Writing Data
+
+Spice supports writing to Apache Iceberg tables and Amazon S3 Tables via `INSERT INTO`:
+
+```yaml
+datasets:
+  - from: iceberg:https://catalog.example.com/v1/namespaces/sales/tables/transactions
+    name: transactions
+    access: read_write # required for writes
+```
+
+```sql
+INSERT INTO transactions SELECT * FROM staging_transactions;
+```
+
+## Referencing Secrets
+
+Use `${ store_name:KEY }` syntax in params. See spice-secrets for full configuration:
+
+```yaml
+params:
+  pg_user: ${ env:PG_USER }
+  pg_pass: ${ secrets:PG_PASSWORD }
+```
 
 ## Documentation
 
 - [Data Connectors](https://spiceai.org/docs/components/data-connectors)
 - [Datasets Reference](https://spiceai.org/docs/reference/spicepod/datasets)
-- [File Formats](https://spiceai.org/docs/reference/file_format)
-- [Data Accelerators](https://spiceai.org/docs/components/data-accelerators)
+- [Catalogs](https://spiceai.org/docs/components/catalogs)
+- [Views](https://spiceai.org/docs/components/views)
+- [Query Federation](https://spiceai.org/docs/features/query-federation)
+- [Data Ingestion / Writes](https://spiceai.org/docs/features/data-ingestion)

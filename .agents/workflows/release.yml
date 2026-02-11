@@ -1,0 +1,33 @@
+name: Release Skills
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Package skills
+        run: |
+          for skill_dir in */; do
+            skill_name="${skill_dir%/}"
+            # Only package directories containing a SKILL.md
+            if [ -f "${skill_dir}SKILL.md" ]; then
+              zip -r "${skill_name}.zip" "${skill_dir}"
+              echo "Packaged ${skill_name}.zip"
+            fi
+          done
+
+      - name: Upload skill artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: skills
+          path: '*.zip'

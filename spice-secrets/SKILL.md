@@ -1,11 +1,11 @@
 ---
 name: spice-secrets
-description: Configure secret stores in Spice (environment variables, Kubernetes, AWS Secrets Manager, keyring). Use when asked to "configure secrets", "add API keys", "set up credentials", or "manage passwords".
+description: Configure secret stores in Spice (environment variables, Kubernetes, AWS Secrets Manager, keyring). Use when asked to "configure secrets", "add API keys", "set up credentials", "manage passwords", "use environment variables", or "configure .env file".
 ---
 
 # Spice Secret Stores
 
-Secret stores securely manage sensitive data like API keys, passwords, and tokens.
+Secret stores manage sensitive data like API keys, passwords, and tokens. The `env` store is loaded by default.
 
 ## Basic Configuration
 
@@ -17,16 +17,16 @@ secrets:
 
 ## Supported Secret Stores
 
-| Store                  | From Format                | Description                      |
-|------------------------|----------------------------|----------------------------------|
-| `env`                  | `env`                      | Environment variables (default)  |
-| `kubernetes`           | `kubernetes:<secret_name>` | Kubernetes secrets               |
-| `aws_secrets_manager`  | `aws_secrets_manager`      | AWS Secrets Manager              |
-| `keyring`              | `keyring`                  | OS keyring (macOS/Linux/Windows) |
+| Store | From Format | Description |
+|-------|-------------|-------------|
+| Environment | `env` | Environment variables + `.env` / `.env.local` files (default) |
+| Kubernetes | `kubernetes:<secret_name>` | Kubernetes secrets |
+| AWS Secrets Manager | `aws_secrets_manager` | AWS Secrets Manager |
+| Keyring | `keyring` | OS keyring (macOS Keychain, Linux, Windows) |
 
 ## Default: Environment Variables
 
-The `env` store is loaded automatically. It reads from environment variables and `.env` / `.env.local` files.
+Loaded automatically. Reads from environment variables and any `.env.local` or `.env` files in the project directory.
 
 ```yaml
 secrets:
@@ -34,9 +34,9 @@ secrets:
     name: env
 ```
 
-## Using Secrets
+## Referencing Secrets
 
-Reference secrets in component parameters with `${ store_name:KEY }`:
+Use `${ store_name:KEY_NAME }` syntax in component parameters:
 
 ```yaml
 datasets:
@@ -53,9 +53,16 @@ models:
       openai_api_key: ${ secrets:OPENAI_API_KEY }
 ```
 
-## Multiple Secret Stores
+Also works within strings:
 
-Configure multiple stores with precedence (last defined wins):
+```yaml
+params:
+  mysql_connection_string: mysql://${env:USER}:${env:PASSWORD}@localhost:3306/db
+```
+
+## Searching All Stores
+
+Use `${ secrets:KEY }` to search all configured stores in precedence order (last defined wins):
 
 ```yaml
 secrets:
@@ -63,17 +70,21 @@ secrets:
     name: env
   - from: keyring
     name: keyring
+
+datasets:
+  - from: postgres:my_table
+    name: my_table
+    params:
+      pg_user: ${ secrets:pg_user }     # checks keyring first, then env
+      pg_pass: ${ secrets:pg_pass }
 ```
 
-Use `${ secrets:KEY }` to search all stores in precedence order:
-```yaml
-params:
-  api_key: ${ secrets:API_KEY }  # checks keyring first, then env
-```
+The `<key_name>` is automatically uppercased for the `env` secret store.
 
 ## Examples
 
 ### Kubernetes Secrets
+
 ```yaml
 secrets:
   - from: kubernetes:my-app-secrets
@@ -81,6 +92,7 @@ secrets:
 ```
 
 ### AWS Secrets Manager
+
 ```yaml
 secrets:
   - from: aws_secrets_manager
@@ -89,12 +101,20 @@ secrets:
       aws_region: us-east-1
 ```
 
-### Within Connection Strings
+### Override Order (env overrides keyring)
+
 ```yaml
-params:
-  mysql_connection_string: mysql://${env:USER}:${env:PASSWORD}@localhost:3306/db
+secrets:
+  - from: keyring
+    name: keyring
+  - from: env
+    name: env
 ```
 
 ## Documentation
 
-- [Secret Stores Overview](https://spiceai.org/docs/components/secret-stores)
+- [Secret Stores](https://spiceai.org/docs/components/secret-stores)
+- [Environment Secret Store](https://spiceai.org/docs/components/secret-stores/env)
+- [Kubernetes Secret Store](https://spiceai.org/docs/components/secret-stores/kubernetes)
+- [AWS Secrets Manager](https://spiceai.org/docs/components/secret-stores/aws-secrets-manager)
+- [Keyring Secret Store](https://spiceai.org/docs/components/secret-stores/keyring)

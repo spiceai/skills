@@ -1,13 +1,15 @@
 ---
-name: spice-accelerators
-description: Configure data accelerators for local materialization and caching in Spice (Arrow, DuckDB, SQLite, Cayenne, PostgreSQL, Turso). Use when asked to "accelerate data", "enable caching", "materialize dataset", "configure refresh", "set up local storage", "improve query performance", "choose an accelerator", or "configure snapshots".
+name: spice-acceleration
+description: Accelerate data locally for sub-second query performance. Use when enabling data acceleration, choosing an engine (Arrow, DuckDB, SQLite, Cayenne), configuring refresh modes, setting up retention policies, creating snapshots, adding indexes, or materializing datasets.
 ---
 
-# Spice Data Accelerators
+# Accelerate Data
 
-Accelerators materialize data locally from connected sources for faster queries and reduced load on source systems.
+Data acceleration materializes working sets of data locally, reducing query latency from seconds to milliseconds. Hot data gets materialized for instant access while cold data remains federated.
 
-## Basic Configuration
+Unlike traditional caches that store query results, Spice accelerates entire datasets with configurable refresh strategies and the flexible compute of an embedded database.
+
+## Enable Acceleration
 
 ```yaml
 datasets:
@@ -20,7 +22,7 @@ datasets:
       refresh_check_interval: 1h
 ```
 
-## Choosing an Accelerator
+## Choosing an Engine
 
 | Use Case                                 | Engine     | Why                                                     |
 | ---------------------------------------- | ---------- | ------------------------------------------------------- |
@@ -107,24 +109,22 @@ datasets:
       refresh_data_window: 7d
 ```
 
-### With Retention Policy
+## Retention Policies
 
-Retention policies prevent unbounded growth of accelerated datasets. Spice supports time-based and custom SQL-based retention strategies:
+Prevent unbounded growth of accelerated datasets. Spice supports time-based and custom SQL-based retention:
+
+### Time-Based Retention
 
 ```yaml
-datasets:
-  - from: postgres:events
-    name: events
-    time_column: created_at
-    acceleration:
-      enabled: true
-      engine: duckdb
-      retention_check_enabled: true
-      retention_period: 30d
-      retention_check_interval: 1h
+acceleration:
+  enabled: true
+  engine: duckdb
+  retention_check_enabled: true
+  retention_period: 30d
+  retention_check_interval: 1h
 ```
 
-### With SQL-Based Retention
+### SQL-Based Retention
 
 ```yaml
 acceleration:
@@ -133,17 +133,47 @@ acceleration:
   retention_sql: "DELETE FROM logs WHERE status = 'archived'"
 ```
 
-### With Indexes (DuckDB, SQLite, Turso)
+## Constraints and Indexes
 
 ```yaml
 acceleration:
   enabled: true
-  engine: sqlite
+  engine: duckdb
+  primary_key: order_id # Creates non-null unique index
   indexes:
-    user_id: enabled
-    '(created_at, status)': unique
-  primary_key: id
+    customer_id: enabled # Single column index
+    '(created_at, status)': unique # Multi-column unique index
 ```
+
+## Snapshots
+
+Bootstrap file-based accelerations from S3 or filesystem snapshots on startup. Dramatically reduces cold-start latency in distributed deployments.
+
+```yaml
+snapshots:
+  enabled: true
+  location: s3://my_bucket/snapshots/
+  bootstrap_on_failure_behavior: warn # warn | retry | fallback
+  params:
+    s3_auth: iam_role
+```
+
+Per-dataset opt-in:
+
+```yaml
+acceleration:
+  enabled: true
+  engine: duckdb
+  mode: file
+  snapshots:
+    enabled: true
+```
+
+Snapshot triggers vary by refresh mode:
+
+- `refresh_complete`: After each refresh (full and batch-append modes)
+- `time_interval`: On a fixed schedule (all refresh modes)
+- `stream_batches`: After every N batches (streaming modes: Kafka, Debezium, DynamoDB Streams)
 
 ## Engine-Specific Parameters
 
@@ -167,59 +197,16 @@ acceleration:
     sqlite_file: ./data/cache.sqlite
 ```
 
-## Constraints and Indexes
-
-Accelerated datasets support primary key constraints and indexes:
-
-```yaml
-acceleration:
-  enabled: true
-  engine: duckdb
-  primary_key: order_id # Creates non-null unique index
-  indexes:
-    customer_id: enabled # Single column index
-    '(created_at, status)': unique # Multi-column unique index
-```
-
-## Snapshots (DuckDB, SQLite & Cayenne file mode)
-
-Bootstrap file-based accelerations from S3 or filesystem snapshots on startup. This dramatically reduces cold-start latency in distributed deployments.
-
-Snapshot triggers vary by refresh mode:
-
-- `refresh_complete`: Creates snapshots after each refresh (full and batch-append modes)
-- `time_interval`: Creates snapshots on a fixed schedule (all refresh modes)
-- `stream_batches`: Creates snapshots after every N batches (streaming modes: Kafka, Debezium, DynamoDB Streams)
-
-```yaml
-snapshots:
-  enabled: true
-  location: s3://my_bucket/snapshots/
-  bootstrap_on_failure_behavior: warn # warn | retry | fallback
-  params:
-    s3_auth: iam_role
-```
-
-Per-dataset opt-in:
-
-```yaml
-acceleration:
-  enabled: true
-  engine: duckdb
-  mode: file
-  snapshots:
-    enabled: true
-```
-
 ## Memory Considerations
 
-When using `mode: memory` (default), the dataset is loaded into RAM. Ensure sufficient memory including overhead for queries and the runtime. Mitigate with `mode: file` for duckdb, sqlite, turso, or cayenne accelerators.
+When using `mode: memory` (default), the dataset is loaded into RAM. Ensure sufficient memory including overhead for queries and the runtime. Use `mode: file` for duckdb, sqlite, turso, or cayenne to avoid memory pressure.
 
 ## Documentation
 
+- [Data Acceleration](https://spiceai.org/docs/features/data-acceleration)
 - [Data Accelerators](https://spiceai.org/docs/components/data-accelerators)
-- [Datasets Reference](https://spiceai.org/docs/reference/spicepod/datasets)
-- [Data Refresh](https://spiceai.org/docs/features/data-acceleration/data-refresh)
+- [Refresh Modes](https://spiceai.org/docs/features/data-acceleration/data-refresh)
+- [Retention](https://spiceai.org/docs/features/data-acceleration/data-refresh#retention-policy)
+- [Constraints](https://spiceai.org/docs/features/data-acceleration/constraints)
 - [Indexes](https://spiceai.org/docs/features/data-acceleration/indexes)
-- [Performance Tuning](https://spiceai.org/docs/reference/performance-tuning)
-- [Memory Management](https://spiceai.org/docs/reference/memory)
+- [Snapshots](https://spiceai.org/docs/components/data-accelerators/snapshots)
