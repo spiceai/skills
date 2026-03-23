@@ -1,0 +1,16 @@
+{
+  "name": "spiceai-skills",
+  "owner": {
+    "name": "Spice AI"
+  },
+  "metadata": {
+    "description": "Skills for the Spice.ai runtime — data federation, acceleration, search, and AI capabilities"
+  },
+  "plugins": [
+    {
+      "name": "spice",
+      "source": "./",
+      "description": "Skills for working with the Spice.ai runtime — data federation, acceleration, search, AI/LLM, and cloud management"
+    }
+  ]
+}

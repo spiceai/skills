@@ -18,6 +18,19 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Installation
 
+### Claude Code (Plugin)
+
+Add the marketplace and install the plugin:
+
+```
+/plugin marketplace add spiceai/skills
+/plugin install spice@spiceai-skills
+```
+
+Skills are available as `/spice:spice-setup`, `/spice:spice-ai`, `/spice:spicepod-config`, etc.
+
+### Other Agents
+
 ```bash
 npx skills add spiceai/skills
 ```
