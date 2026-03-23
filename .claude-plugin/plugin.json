@@ -1,13 +1,22 @@
 {
-  "name": "spice",
-  "description": "Skills for working with the Spice.ai runtime — data federation, acceleration, search, AI/LLM, and cloud management",
-  "version": "1.0.0",
-  "author": {
-    "name": "Spice AI"
-  },
-  "homepage": "https://github.com/spiceai/skills",
-  "repository": "https://github.com/spiceai/skills",
-  "license": "MIT",
-  "keywords": ["spice", "spiceai", "data", "sql", "ai", "llm", "search", "federation"],
-  "skills": "./"
+    "name": "spice",
+    "description": "Skills for working with the Spice.ai runtime — data federation, acceleration, search, AI/LLM, and cloud management",
+    "version": "1.0.0",
+    "author": {
+        "name": "Spice AI"
+    },
+    "homepage": "https://github.com/spiceai/skills",
+    "repository": "https://github.com/spiceai/skills",
+    "license": "MIT",
+    "keywords": [
+        "spice",
+        "spiceai",
+        "data",
+        "sql",
+        "ai",
+        "llm",
+        "search",
+        "federation"
+    ],
+    "skills": "./"
 }
