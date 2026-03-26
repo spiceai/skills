@@ -89,13 +89,17 @@ If your `spicepod.yaml` defines column `description` or `metadata`, include thos
 
 ### Random sample (3–5 rows to show value shapes)
 
+> **Only sample from accelerated datasets or tables known to be small.** Sampling from large, non-accelerated federated sources (e.g. a full Snowflake table or S3 data lake) can be slow and expensive. Check `spicepod.yaml` for `acceleration.enabled: true` before sampling. For non-accelerated datasets, rely on schema + column descriptions alone.
+
 ```sql
 SELECT * FROM my_table LIMIT 3;
 ```
 
 ### Distinct column values (shows cardinality and vocabulary)
 
-This is a key trick from Spice's nsql implementation — for each column, sample a few distinct values so the LLM knows what values are possible:
+This is a key trick from Spice's nsql implementation — for each column, sample a few distinct values so the LLM knows what values are possible.
+
+> **Same rule: only on accelerated or known-small tables.** `SELECT DISTINCT` can trigger a full table scan on non-accelerated federated sources.
 
 ```sql
 -- Per-column distinct sampling (repeat for important columns)
@@ -117,8 +121,8 @@ Include the following sections in the system/context prompt sent to your LLM. A 
 | **Engine**              | "Spice.ai uses Apache DataFusion with PostgreSQL dialect"                    |
 | **Schema**              | Table names, column names, SQL type, Arrow type, nullability, metadata       |
 | **Column descriptions** | Semantic descriptions from spicepod.yaml `columns[].description`             |
-| **Sample rows**         | 3–5 random rows per table so the model sees real value shapes                |
-| **Distinct values**     | 3 distinct values per low-cardinality column (status, category, region, etc) |
+| **Sample rows**          | 3–5 random rows per accelerated/small table (skip for large federated sources) |
+| **Distinct values**      | 3 distinct values per low-cardinality column (accelerated/small tables only)   |
 | **Dialect rules**       | The gotchas and rules below                                                  |
 | **Available functions** | Only Spice-specific UDFs/UDTFs confirmed in spicepod.yaml                    |
 
