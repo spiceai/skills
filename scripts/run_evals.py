@@ -45,8 +45,7 @@ def run_single_eval(skill_name, eval_entry, workspace, with_skill=True):
 
     cmd = ["claude", "-p", prompt, "--output-format", "text"]
     if with_skill:
-        skill_path = str(SKILLS_DIR / skill_name)
-        cmd.extend(["--skill", skill_path])
+        cmd.extend(["--plugin-dir", str(ROOT)])
 
     start = time.time()
     try:
