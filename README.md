@@ -1,4 +1,4 @@
-# Spice.ai Plugin for Claude Code
+# Spice.ai Skills for Claude Code
 
 A Claude Code plugin with skills for working with the [Spice.ai OSS](https://spiceai.org) runtime — data federation, acceleration, search, AI/LLM, and cloud management.
 
