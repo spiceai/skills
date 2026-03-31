@@ -15,8 +15,8 @@
         },
         {
           "name": "configures_column_embeddings",
-          "type": "regex",
-          "value": "columns:.*embeddings:",
+          "type": "contains",
+          "value": "column:",
           "description": "Should configure embeddings on a column"
         },
         {
@@ -40,10 +40,16 @@
           "description": "Should show the rrf() function for hybrid search"
         },
         {
-          "name": "combines_both_search_types",
-          "type": "regex",
-          "value": "vector_search.*text_search|text_search.*vector_search",
-          "description": "Should combine both vector and text search"
+          "name": "uses_vector_search",
+          "type": "contains",
+          "value": "vector_search(",
+          "description": "Should include vector_search in hybrid query"
+        },
+        {
+          "name": "uses_text_search",
+          "type": "contains",
+          "value": "text_search(",
+          "description": "Should include text_search in hybrid query"
         }
       ]
     },

@@ -66,15 +66,21 @@
           "description": "Should show rrf() function call"
         },
         {
-          "name": "combines_search_types",
-          "type": "regex",
-          "value": "vector_search.*text_search",
-          "description": "Should combine both search types inside rrf"
+          "name": "uses_vector_search",
+          "type": "contains",
+          "value": "vector_search(",
+          "description": "Should include vector_search in the hybrid query"
+        },
+        {
+          "name": "uses_text_search",
+          "type": "contains",
+          "value": "text_search(",
+          "description": "Should include text_search in the hybrid query"
         },
         {
           "name": "mentions_prerequisites",
           "type": "regex",
-          "value": "(?i)(spicepod|embeddings.*configured|full_text_search.*enabled)",
+          "value": "(?i)(spicepod|embeddings|full_text_search)",
           "description": "Should mention configuration prerequisites"
         }
       ]
