@@ -46,6 +46,12 @@ def run_single_eval(skill_name, eval_entry, workspace, with_skill=True):
     cmd = ["claude", "-p", prompt, "--output-format", "text"]
     if with_skill:
         cmd.extend(["--plugin-dir", str(ROOT)])
+    else:
+        # Disable skills so baseline doesn't pick up the plugin via auto-discovery
+        cmd.append("--disable-slash-commands")
+
+    # Run baseline from /tmp so it doesn't auto-discover CLAUDE.md or plugins
+    run_cwd = "/tmp" if not with_skill else None
 
     start = time.time()
     try:
@@ -54,6 +60,7 @@ def run_single_eval(skill_name, eval_entry, workspace, with_skill=True):
             capture_output=True,
             text=True,
             timeout=120,
+            cwd=run_cwd,
         )
         duration_ms = int((time.time() - start) * 1000)
         response = result.stdout
