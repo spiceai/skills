@@ -28,7 +28,7 @@ README.md
 ```markdown
 ---
 name: {skill-name}
-description: {One sentence describing when to use this skill. Include trigger phrases.}
+description: {Concise description (may be multiple short sentences) of when to use this skill, with trigger phrases.}
 ---
 
 # {Skill Title}
