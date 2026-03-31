@@ -1,0 +1,65 @@
+{
+  "skill_name": "spice-secrets",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to pass my PostgreSQL password to Spice without hardcoding it in spicepod.yaml. I'm using a .env file. How do I set this up?",
+      "expected_output": "Configure env secret store, reference with ${ env:PG_PASSWORD } syntax, explain .env file loading",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_env_store",
+          "type": "contains",
+          "value": "from: env",
+          "description": "Should configure the env secret store"
+        },
+        {
+          "name": "shows_reference_syntax",
+          "type": "regex",
+          "value": "\\$\\{\\s*env:",
+          "description": "Should show the secret reference syntax"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're running Spice in Kubernetes. How do I reference K8s secrets in my spicepod.yaml?",
+      "expected_output": "Configure kubernetes secret store with secret name, reference keys with ${ k8s:KEY }",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_kubernetes_store",
+          "type": "contains",
+          "value": "kubernetes:",
+          "description": "Should configure a Kubernetes secret store"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I have secrets in both AWS Secrets Manager and environment variables. How do I use both and control which one takes priority?",
+      "expected_output": "Configure both stores, explain precedence order (last defined wins), show ${ secrets:KEY } to search all stores",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_both_stores",
+          "type": "regex",
+          "value": "aws_secrets_manager",
+          "description": "Should configure AWS Secrets Manager"
+        },
+        {
+          "name": "explains_precedence",
+          "type": "regex",
+          "value": "(?i)(precedence|priority|order|last.*wins)",
+          "description": "Should explain the precedence order"
+        },
+        {
+          "name": "shows_generic_reference",
+          "type": "regex",
+          "value": "\\$\\{\\s*secrets:",
+          "description": "Should show the generic secrets: reference that searches all stores"
+        }
+      ]
+    }
+  ]
+}

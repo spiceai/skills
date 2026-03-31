@@ -1,0 +1,89 @@
+{
+  "skill_name": "spice-text-to-sql",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to build a text-to-SQL feature in my app using Spice and GPT-4o. Walk me through the workflow — from schema introspection to prompt construction to executing the generated SQL.",
+      "expected_output": "Full workflow: read spicepod.yaml, introspect schema with SHOW TABLES/COLUMNS, sample data, build prompt with dialect rules, call LLM, execute SQL with error retry",
+      "files": [],
+      "assertions": [
+        {
+          "name": "introspects_schema",
+          "type": "regex",
+          "value": "(?i)(SHOW TABLES|information_schema|introspect)",
+          "description": "Should show schema introspection steps"
+        },
+        {
+          "name": "includes_dialect_rules",
+          "type": "regex",
+          "value": "(?i)(DataFusion|PostgreSQL dialect|INTERVAL)",
+          "description": "Should include DataFusion SQL dialect rules"
+        },
+        {
+          "name": "shows_prompt_template",
+          "type": "regex",
+          "value": "(?i)(prompt|system.*message|template)",
+          "description": "Should show how to construct the LLM prompt"
+        },
+        {
+          "name": "includes_error_retry",
+          "type": "regex",
+          "value": "(?i)(retry|error.*feedback|failed.*fix)",
+          "description": "Should include error retry with feedback pattern"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I'm trying to write a SQL query in Spice to get orders from the last 7 days but I keep getting cast errors with timestamps. The column is created_at. What's the right syntax?",
+      "expected_output": "Use now() - INTERVAL '7 days', explain DataFusion timestamps are Nanosecond precision, show CAST syntax",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_interval_syntax",
+          "type": "contains",
+          "value": "INTERVAL",
+          "description": "Should use INTERVAL syntax for date math"
+        },
+        {
+          "name": "mentions_now_function",
+          "type": "contains",
+          "value": "now()",
+          "description": "Should use now() function"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "How do I use vector_search and text_search together in a SQL query? I want hybrid search with RRF over my documents table.",
+      "expected_output": "Show rrf() wrapping vector_search and text_search, explain join_key parameter, note that spicepod.yaml must have embeddings and full_text_search configured",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_rrf_syntax",
+          "type": "contains",
+          "value": "rrf(",
+          "description": "Should show rrf() function call"
+        },
+        {
+          "name": "uses_vector_search",
+          "type": "contains",
+          "value": "vector_search(",
+          "description": "Should include vector_search in the hybrid query"
+        },
+        {
+          "name": "uses_text_search",
+          "type": "contains",
+          "value": "text_search(",
+          "description": "Should include text_search in the hybrid query"
+        },
+        {
+          "name": "mentions_prerequisites",
+          "type": "regex",
+          "value": "(?i)(spicepod|embeddings|full_text_search)",
+          "description": "Should mention configuration prerequisites"
+        }
+      ]
+    }
+  ]
+}

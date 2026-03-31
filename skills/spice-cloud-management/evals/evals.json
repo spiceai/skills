@@ -1,0 +1,51 @@
+{
+  "skill_name": "spice-cloud-management",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to create a new Spice.ai Cloud app called 'analytics-prod' in the US West region, add a database secret, and deploy it. Walk me through the API calls.",
+      "expected_output": "Step-by-step: list regions, POST /v1/apps, POST secrets, POST deployments, check status",
+      "files": [],
+      "assertions": [
+        {
+          "name": "creates_app",
+          "type": "regex",
+          "value": "POST.*(/v1/apps|create-app)",
+          "description": "Should show creating the app via API"
+        },
+        {
+          "name": "adds_secret",
+          "type": "regex",
+          "value": "(?i)(secrets|add-secret)",
+          "description": "Should show adding a secret"
+        },
+        {
+          "name": "triggers_deployment",
+          "type": "regex",
+          "value": "(?i)(deployment|deploy)",
+          "description": "Should show triggering a deployment"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "How do I rotate my Spice.ai Cloud API keys without any downtime for my clients?",
+      "expected_output": "Use the dual-key system: regenerate secondary, update clients, then regenerate primary",
+      "files": [],
+      "assertions": [
+        {
+          "name": "explains_dual_key",
+          "type": "regex",
+          "value": "(?i)(primary|secondary|key_number)",
+          "description": "Should explain the dual-key rotation system"
+        },
+        {
+          "name": "shows_zero_downtime",
+          "type": "regex",
+          "value": "(?i)(zero.downtime|without.downtime|no.downtime)",
+          "description": "Should emphasize zero-downtime approach"
+        }
+      ]
+    }
+  ]
+}

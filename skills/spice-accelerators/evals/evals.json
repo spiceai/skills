@@ -1,0 +1,71 @@
+{
+  "skill_name": "spice-accelerators",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a 50GB analytics dataset with complex window function queries. Should I use Arrow or DuckDB as my acceleration engine?",
+      "expected_output": "Recommend DuckDB for medium datasets with complex SQL. Explain Arrow is better for small datasets, DuckDB for complex SQL with memory management.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "recommends_duckdb",
+          "type": "regex",
+          "value": "(?i)duckdb",
+          "description": "Should recommend DuckDB for this use case"
+        },
+        {
+          "name": "explains_reasoning",
+          "type": "regex",
+          "value": "(?i)(complex SQL|window|memory)",
+          "description": "Should explain why DuckDB is better for complex queries"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're running Spice on an edge device with limited RAM (2GB). We need to accelerate a 5GB dataset. What engine and mode should I use?",
+      "expected_output": "Use file mode with DuckDB or SQLite to avoid loading everything into RAM",
+      "files": [],
+      "assertions": [
+        {
+          "name": "recommends_file_mode",
+          "type": "contains",
+          "value": "mode: file",
+          "description": "Should recommend file mode for limited RAM"
+        },
+        {
+          "name": "mentions_suitable_engine",
+          "type": "regex",
+          "value": "(?i)(duckdb|sqlite|cayenne)",
+          "description": "Should recommend an engine that supports file mode"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I need to configure DuckDB file-based acceleration and point it at a specific database file path. How do I set that up?",
+      "expected_output": "Show DuckDB engine config with mode: file and duckdb_file parameter",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_engine_duckdb",
+          "type": "contains",
+          "value": "engine: duckdb",
+          "description": "Should configure DuckDB engine"
+        },
+        {
+          "name": "shows_duckdb_file_param",
+          "type": "contains",
+          "value": "duckdb_file:",
+          "description": "Should show the duckdb_file parameter"
+        },
+        {
+          "name": "shows_file_mode",
+          "type": "contains",
+          "value": "mode: file",
+          "description": "Should use file mode"
+        }
+      ]
+    }
+  ]
+}

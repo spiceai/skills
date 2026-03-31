@@ -1,0 +1,77 @@
+{
+  "skill_name": "spice-search",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to add semantic search to my articles dataset so users can search by meaning, not just keywords. I'm using OpenAI for embeddings. Walk me through the full setup.",
+      "expected_output": "Configure OpenAI embedding model, add embeddings config to the content column, show vector_search SQL and /v1/search API usage",
+      "files": [],
+      "assertions": [
+        {
+          "name": "configures_embedding_model",
+          "type": "contains",
+          "value": "embeddings:",
+          "description": "Should configure an embedding model"
+        },
+        {
+          "name": "configures_column_embeddings",
+          "type": "contains",
+          "value": "column:",
+          "description": "Should configure embeddings on a column"
+        },
+        {
+          "name": "shows_vector_search",
+          "type": "contains",
+          "value": "vector_search",
+          "description": "Should show how to use vector_search"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I want to combine keyword search and semantic search for better results. How do I set up hybrid search with RRF in Spice?",
+      "expected_output": "Set up both vector_search and text_search, combine with rrf() function, show rank_weight tuning",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_rrf_function",
+          "type": "contains",
+          "value": "rrf(",
+          "description": "Should show the rrf() function for hybrid search"
+        },
+        {
+          "name": "uses_vector_search",
+          "type": "contains",
+          "value": "vector_search(",
+          "description": "Should include vector_search in hybrid query"
+        },
+        {
+          "name": "uses_text_search",
+          "type": "contains",
+          "value": "text_search(",
+          "description": "Should include text_search in hybrid query"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My search results aren't great — recent articles should rank higher than old ones. How can I boost recent content in hybrid search?",
+      "expected_output": "Add time_column and recency_decay parameters to rrf(), explain exponential vs linear decay",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_recency_decay",
+          "type": "contains",
+          "value": "recency_decay",
+          "description": "Should mention recency_decay parameter"
+        },
+        {
+          "name": "mentions_time_column",
+          "type": "contains",
+          "value": "time_column",
+          "description": "Should mention time_column for recency boosting"
+        }
+      ]
+    }
+  ]
+}
