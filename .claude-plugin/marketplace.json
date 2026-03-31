@@ -8,7 +8,7 @@
   },
   "plugins": [
     {
-      "name": "spiceai",
+      "name": "skills",
       "source": ".",
       "description": "Skills for working with the Spice.ai runtime — data federation, acceleration, search, AI/LLM, and cloud management",
       "version": "1.0.0",

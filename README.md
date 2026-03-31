@@ -27,10 +27,10 @@ Add the marketplace and install the plugin:
 
 ```
 /plugin marketplace add spiceai/skills
-/plugin install spiceai@spiceai
+/plugin install skills@spiceai
 ```
 
-Skills are then available as `/spiceai:spice-setup`, `/spiceai:spice-ai`, `/spiceai:spicepod-config`, etc.
+Skills are then available as `/skills:spice-setup`, `/skills:spice-ai`, `/skills:spicepod-config`, etc.
 
 ### Project-level auto-discovery
 
@@ -47,7 +47,7 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
     }
   },
   "enabledPlugins": {
-    "spiceai@spiceai": true
+    "skills@spiceai": true
   }
 }
 ```
