@@ -1,0 +1,61 @@
+name: Release Plugin
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from plugin.json
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          NAME=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['name'])")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Package plugin
+        run: |
+          ARCHIVE_NAME="${{ steps.version.outputs.name }}-plugin-${{ steps.version.outputs.version }}"
+          STAGING=$(mktemp -d)
+          STAGE_DIR="$STAGING/$ARCHIVE_NAME"
+
+          # Plugin metadata
+          mkdir -p "$STAGE_DIR/.claude-plugin"
+          cp .claude-plugin/plugin.json "$STAGE_DIR/.claude-plugin/"
+          cp .claude-plugin/marketplace.json "$STAGE_DIR/.claude-plugin/"
+
+          # Skills
+          mkdir -p "$STAGE_DIR/skills"
+          for skill_dir in skills/*/; do
+            skill_name=$(basename "$skill_dir")
+            dest="$STAGE_DIR/skills/$skill_name"
+            mkdir -p "$dest"
+            [ -f "$skill_dir/SKILL.md" ] && cp "$skill_dir/SKILL.md" "$dest/"
+            [ -d "$skill_dir/scripts" ] && cp -r "$skill_dir/scripts" "$dest/"
+            [ -d "$skill_dir/references" ] && cp -r "$skill_dir/references" "$dest/"
+            [ -d "$skill_dir/examples" ] && cp -r "$skill_dir/examples" "$dest/"
+            [ -d "$skill_dir/evals" ] && cp -r "$skill_dir/evals" "$dest/"
+          done
+
+          # Top-level files
+          [ -f README.md ] && cp README.md "$STAGE_DIR/"
+          [ -f CLAUDE.md ] && cp CLAUDE.md "$STAGE_DIR/"
+
+          # Create zip
+          cd "$STAGING"
+          zip -r "$GITHUB_WORKSPACE/$ARCHIVE_NAME.zip" "$ARCHIVE_NAME"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ARCHIVE_NAME="${{ steps.version.outputs.name }}-plugin-${{ steps.version.outputs.version }}.zip"
+          gh release upload "${{ github.event.release.tag_name }}" "$ARCHIVE_NAME" --clobber

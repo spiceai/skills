@@ -5,6 +5,9 @@
   "author": {
     "name": "Spice AI"
   },
+  "homepage": "https://spiceai.org",
+  "repository": "https://github.com/spiceai/skills",
+  "license": "MIT",
   "keywords": [
     "spice",
     "spiceai",
