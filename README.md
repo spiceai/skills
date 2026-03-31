@@ -23,11 +23,34 @@ A Claude Code plugin with skills for working with the [Spice.ai OSS](https://spi
 
 ## Installation
 
+Add the marketplace and install the plugin:
+
 ```
-/install spiceai
+/plugin marketplace add spiceai/skills
+/plugin install skills@spiceai
 ```
 
-Skills are available as `/spiceai:spice-setup`, `/spiceai:spice-ai`, `/spiceai:spicepod-config`, etc.
+Skills are then available as `/skills:spice-setup`, `/skills:spice-ai`, `/skills:spicepod-config`, etc.
+
+### Project-level auto-discovery
+
+To auto-suggest the plugin for all contributors, add this to your project's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "spiceai": {
+      "source": {
+        "source": "github",
+        "repo": "spiceai/skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "skills@spiceai": true
+  }
+}
+```
 
 ## References
 

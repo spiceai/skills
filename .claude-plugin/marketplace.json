@@ -1,0 +1,22 @@
+{
+  "name": "spiceai",
+  "owner": {
+    "name": "Spice AI"
+  },
+  "metadata": {
+    "description": "Skills for working with the Spice.ai runtime"
+  },
+  "plugins": [
+    {
+      "name": "skills",
+      "source": ".",
+      "description": "Skills for working with the Spice.ai runtime — data federation, acceleration, search, AI/LLM, and cloud management",
+      "version": "1.0.0",
+      "homepage": "https://spiceai.org",
+      "repository": "https://github.com/spiceai/skills",
+      "license": "MIT",
+      "keywords": ["spice", "spiceai", "data", "sql", "ai", "llm", "search", "federation"],
+      "category": "development"
+    }
+  ]
+}
