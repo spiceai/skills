@@ -1,0 +1,65 @@
+{
+  "skill_name": "spice-acceleration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My Spice queries against Postgres are taking 2-3 seconds each. How can I speed them up? The table is about 500MB and updates a few times per hour.",
+      "expected_output": "Enable acceleration with appropriate engine, set refresh_check_interval to match update frequency",
+      "files": [],
+      "assertions": [
+        {
+          "name": "enables_acceleration",
+          "type": "contains",
+          "value": "acceleration:",
+          "description": "Should show acceleration configuration"
+        },
+        {
+          "name": "sets_refresh_interval",
+          "type": "contains",
+          "value": "refresh_check_interval",
+          "description": "Should configure a refresh interval"
+        },
+        {
+          "name": "shows_enabled_true",
+          "type": "contains",
+          "value": "enabled: true",
+          "description": "Should explicitly enable acceleration"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I'm streaming events from Kafka into Spice. What refresh mode should I use? The events are append-only and I never need to update old ones.",
+      "expected_output": "Use refresh_mode: append for streaming, no time_column needed for continuous streaming",
+      "files": [],
+      "assertions": [
+        {
+          "name": "recommends_append_mode",
+          "type": "contains",
+          "value": "refresh_mode: append",
+          "description": "Should recommend append refresh mode for streaming"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My accelerated dataset keeps growing and I'm running out of disk space. It's an events table and I only need the last 30 days. How do I set up automatic cleanup?",
+      "expected_output": "Configure retention policy with retention_period: 30d and retention_check_enabled: true",
+      "files": [],
+      "assertions": [
+        {
+          "name": "enables_retention",
+          "type": "contains",
+          "value": "retention_check_enabled: true",
+          "description": "Should enable retention checking"
+        },
+        {
+          "name": "sets_retention_period",
+          "type": "contains",
+          "value": "retention_period:",
+          "description": "Should set a retention period"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "skill_name": "spice-terraform",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to manage my Spice.ai Cloud infrastructure with Terraform. Write me a complete config that creates an app, adds secrets, and deploys it.",
+      "expected_output": "Complete Terraform config with provider, data sources for regions/images, spiceai_app, spiceai_secret with for_each, spiceai_deployment with triggers",
+      "files": [],
+      "assertions": [
+        {
+          "name": "configures_provider",
+          "type": "contains",
+          "value": "spiceai/spiceai",
+          "description": "Should configure the spiceai provider source"
+        },
+        {
+          "name": "creates_app_resource",
+          "type": "contains",
+          "value": "spiceai_app",
+          "description": "Should create a spiceai_app resource"
+        },
+        {
+          "name": "creates_deployment",
+          "type": "contains",
+          "value": "spiceai_deployment",
+          "description": "Should create a deployment resource"
+        },
+        {
+          "name": "manages_secrets",
+          "type": "contains",
+          "value": "spiceai_secret",
+          "description": "Should manage secrets as resources"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I already have a Spice.ai Cloud app running (app ID 12345). How do I import it into my Terraform state?",
+      "expected_output": "Use terraform import spiceai_app.name 12345, note that secrets need manual value setting after import",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_import_command",
+          "type": "contains",
+          "value": "terraform import",
+          "description": "Should show the terraform import command"
+        },
+        {
+          "name": "uses_correct_resource_type",
+          "type": "contains",
+          "value": "spiceai_app",
+          "description": "Should reference the correct resource type"
+        }
+      ]
+    }
+  ]
+}

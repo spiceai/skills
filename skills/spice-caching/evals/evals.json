@@ -1,0 +1,65 @@
+{
+  "skill_name": "spice-caching",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My dashboard queries Spice every 2 seconds but the data only changes every minute. How do I set up caching so repeated queries are fast?",
+      "expected_output": "Configure sql_results cache with item_ttl of ~30-60s, maybe enable stale-while-revalidate",
+      "files": [],
+      "assertions": [
+        {
+          "name": "configures_sql_cache",
+          "type": "contains",
+          "value": "sql_results:",
+          "description": "Should configure sql_results caching"
+        },
+        {
+          "name": "sets_ttl",
+          "type": "contains",
+          "value": "item_ttl:",
+          "description": "Should set an appropriate TTL"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I keep getting cache MISS responses even though I'm running the same query. What could be wrong?",
+      "expected_output": "Check item_ttl isn't too short, check cache_key_type (plan vs sql), check if dynamic functions like NOW() are used",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_ttl",
+          "type": "regex",
+          "value": "(?i)(item_ttl|TTL)",
+          "description": "Should mention TTL as a potential issue"
+        },
+        {
+          "name": "mentions_cache_key_type",
+          "type": "contains",
+          "value": "cache_key_type",
+          "description": "Should mention cache_key_type setting"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I want my API to never serve stale data but also not block on cold cache misses. Can I serve slightly old results while refreshing in the background?",
+      "expected_output": "Configure stale_while_revalidate_ttl for background refresh of stale entries",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_swr",
+          "type": "contains",
+          "value": "stale_while_revalidate",
+          "description": "Should recommend stale-while-revalidate"
+        },
+        {
+          "name": "shows_config",
+          "type": "contains",
+          "value": "stale_while_revalidate_ttl:",
+          "description": "Should show the YAML configuration"
+        }
+      ]
+    }
+  ]
+}

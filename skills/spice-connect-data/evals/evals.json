@@ -1,0 +1,71 @@
+{
+  "skill_name": "spice-connect-data",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have customer data in PostgreSQL and order data in S3 parquet files. I need to join them in one SQL query. How do I set this up in Spice?",
+      "expected_output": "Configure both datasets in spicepod.yaml with their respective connectors, then write a federated JOIN query",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_postgres_dataset",
+          "type": "contains",
+          "value": "from: postgres:",
+          "description": "Should show PostgreSQL dataset configuration"
+        },
+        {
+          "name": "shows_s3_dataset",
+          "type": "contains",
+          "value": "s3://",
+          "description": "Should show S3 dataset configuration"
+        },
+        {
+          "name": "shows_join_query",
+          "type": "regex",
+          "value": "JOIN",
+          "description": "Should show a federated JOIN SQL query"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I want to create a view that pre-aggregates my sales data by day so my dashboards are faster. Can Spice do that?",
+      "expected_output": "Yes, configure a view in spicepod.yaml with SQL aggregation, optionally accelerate the view",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_view_config",
+          "type": "contains",
+          "value": "views:",
+          "description": "Should show the views section in YAML config"
+        },
+        {
+          "name": "shows_sql_aggregation",
+          "type": "regex",
+          "value": "(?i)(SUM|COUNT|GROUP BY)",
+          "description": "Should include SQL aggregation in the view definition"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We use Unity Catalog at our company. Can I connect Spice to it so I can query our existing tables without manually defining each dataset?",
+      "expected_output": "Configure a catalog with from: unity_catalog, provide endpoint and token, use include patterns to filter schemas",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_catalog_config",
+          "type": "contains",
+          "value": "catalogs:",
+          "description": "Should show catalogs section"
+        },
+        {
+          "name": "mentions_unity_catalog",
+          "type": "contains",
+          "value": "unity_catalog",
+          "description": "Should mention unity_catalog connector"
+        }
+      ]
+    }
+  ]
+}

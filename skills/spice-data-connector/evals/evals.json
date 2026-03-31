@@ -1,0 +1,71 @@
+{
+  "skill_name": "spice-data-connector",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to connect Spice to my PostgreSQL database running on localhost. The table is public.users. My credentials are in environment variables PG_USER and PG_PASS.",
+      "expected_output": "Dataset config with from: postgres:public.users, pg_host, pg_port, and secret references for credentials",
+      "files": [],
+      "assertions": [
+        {
+          "name": "correct_from_format",
+          "type": "contains",
+          "value": "postgres:public.users",
+          "description": "Should use correct postgres from format"
+        },
+        {
+          "name": "references_env_secrets",
+          "type": "regex",
+          "value": "\\$\\{\\s*env:PG_",
+          "description": "Should reference environment variables for credentials"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have a folder of markdown files documenting our architecture decisions. I want to load them into Spice so I can search over them later.",
+      "expected_output": "Use file connector with file_format: md, produces location and content columns",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_file_connector",
+          "type": "contains",
+          "value": "from: file:",
+          "description": "Should use the file connector"
+        },
+        {
+          "name": "specifies_md_format",
+          "type": "contains",
+          "value": "file_format: md",
+          "description": "Should specify markdown file format"
+        },
+        {
+          "name": "mentions_content_column",
+          "type": "contains",
+          "value": "content",
+          "description": "Should mention the content column produced by document formats"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "What connectors does Spice support? I'm trying to figure out if I can connect to Snowflake and also read from Kafka topics.",
+      "expected_output": "List supported connectors, confirm Snowflake (Beta) and Kafka (Alpha) with from formats",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_snowflake",
+          "type": "contains",
+          "value": "snowflake:",
+          "description": "Should mention Snowflake connector and format"
+        },
+        {
+          "name": "mentions_kafka",
+          "type": "contains",
+          "value": "kafka:",
+          "description": "Should mention Kafka connector and format"
+        }
+      ]
+    }
+  ]
+}

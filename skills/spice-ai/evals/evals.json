@@ -1,0 +1,77 @@
+{
+  "skill_name": "spice-ai",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want my Spice app to let users ask natural language questions about our data and get answers back. Like 'how many orders last month?' and it runs the right SQL. How do I set this up?",
+      "expected_output": "Configure a model with tools: auto to enable SQL tool, use /v1/nsql endpoint or /v1/chat/completions with tool use",
+      "files": [],
+      "assertions": [
+        {
+          "name": "configures_model_with_tools",
+          "type": "contains",
+          "value": "tools: auto",
+          "description": "Should enable tools on the model"
+        },
+        {
+          "name": "mentions_nsql",
+          "type": "regex",
+          "value": "(?i)(nsql|/v1/nsql|text.to.sql)",
+          "description": "Should mention the NSQL endpoint"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I want my chatbot to remember conversation context between sessions. How do I add memory to a Spice model?",
+      "expected_output": "Add memory dataset (from: memory:store) with read_write access, add memory to tools list",
+      "files": [],
+      "assertions": [
+        {
+          "name": "configures_memory_dataset",
+          "type": "contains",
+          "value": "memory:store",
+          "description": "Should configure a memory dataset"
+        },
+        {
+          "name": "sets_read_write_access",
+          "type": "contains",
+          "value": "read_write",
+          "description": "Should set read_write access on memory dataset"
+        },
+        {
+          "name": "adds_memory_tool",
+          "type": "contains",
+          "value": "memory",
+          "description": "Should add memory to tools list"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We want to use GPT-4o as our primary model but fall back to Claude if OpenAI is down. How do I configure model failover in Spice?",
+      "expected_output": "Configure both models, then create a worker with type: load_balance and ordered routing",
+      "files": [],
+      "assertions": [
+        {
+          "name": "configures_worker",
+          "type": "contains",
+          "value": "workers:",
+          "description": "Should configure a worker for routing"
+        },
+        {
+          "name": "uses_load_balance_type",
+          "type": "contains",
+          "value": "type: load_balance",
+          "description": "Should use load_balance worker type"
+        },
+        {
+          "name": "shows_ordering",
+          "type": "contains",
+          "value": "order:",
+          "description": "Should show priority ordering for failover"
+        }
+      ]
+    }
+  ]
+}

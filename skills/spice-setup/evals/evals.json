@@ -1,0 +1,77 @@
+{
+  "skill_name": "spice-setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to try out Spice.ai on my Mac. Walk me through installing it and getting a basic project running so I can query some data.",
+      "expected_output": "Step-by-step guide: install via curl or brew, spice init, spice run, spice sql, verify with SHOW TABLES",
+      "files": [],
+      "assertions": [
+        {
+          "name": "includes_install_command",
+          "type": "contains",
+          "value": "curl https://install.spiceai.org",
+          "description": "Should include the curl install command"
+        },
+        {
+          "name": "includes_init_command",
+          "type": "contains",
+          "value": "spice init",
+          "description": "Should include spice init to create a project"
+        },
+        {
+          "name": "includes_run_command",
+          "type": "contains",
+          "value": "spice run",
+          "description": "Should include spice run to start the runtime"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What port does the Spice HTTP API run on by default? And what are all the API endpoints I can hit?",
+      "expected_output": "Port 8090, list of endpoints including /v1/sql, /v1/search, /v1/nsql, /v1/chat/completions, /v1/embeddings, /v1/datasets, /v1/models, /health",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_port_8090",
+          "type": "contains",
+          "value": "8090",
+          "description": "Should mention the default HTTP port 8090"
+        },
+        {
+          "name": "lists_sql_endpoint",
+          "type": "contains",
+          "value": "/v1/sql",
+          "description": "Should list the SQL endpoint"
+        },
+        {
+          "name": "lists_search_endpoint",
+          "type": "contains",
+          "value": "/v1/search",
+          "description": "Should list the search endpoint"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I'm getting 'command not found' when I try to run spice. I installed it earlier today on Linux. What's wrong?",
+      "expected_output": "PATH issue — need to add $HOME/.spice/bin to PATH, provide the export command",
+      "files": [],
+      "assertions": [
+        {
+          "name": "diagnoses_path_issue",
+          "type": "contains",
+          "value": ".spice/bin",
+          "description": "Should identify the PATH issue and mention .spice/bin"
+        },
+        {
+          "name": "provides_export_command",
+          "type": "contains",
+          "value": "export PATH",
+          "description": "Should provide the export PATH command"
+        }
+      ]
+    }
+  ]
+}

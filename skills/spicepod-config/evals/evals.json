@@ -1,0 +1,95 @@
+{
+  "skill_name": "spicepod-config",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building an AI-powered data app with Spice. I need to connect to PostgreSQL, enable search on a text column, add GPT-4o for chat, and configure caching. Generate me a complete spicepod.yaml.",
+      "expected_output": "Complete spicepod.yaml with secrets, datasets (postgres with acceleration and embeddings), embedding model, LLM model with tools, and runtime caching config",
+      "files": [],
+      "assertions": [
+        {
+          "name": "valid_spicepod_structure",
+          "type": "contains",
+          "value": "version: v1",
+          "description": "Should have valid spicepod header"
+        },
+        {
+          "name": "has_datasets",
+          "type": "contains",
+          "value": "datasets:",
+          "description": "Should include datasets section"
+        },
+        {
+          "name": "has_models",
+          "type": "contains",
+          "value": "models:",
+          "description": "Should include models section"
+        },
+        {
+          "name": "has_caching",
+          "type": "regex",
+          "value": "(?i)(caching|runtime:)",
+          "description": "Should include caching or runtime configuration"
+        },
+        {
+          "name": "has_embeddings",
+          "type": "contains",
+          "value": "embeddings:",
+          "description": "Should include embeddings section for search"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What sections can I put in a spicepod.yaml? Give me an overview of everything Spice supports.",
+      "expected_output": "List all sections: datasets, models, embeddings, secrets, catalogs, views, tools, workers, runtime, snapshots, evals, dependencies",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_datasets",
+          "type": "contains",
+          "value": "datasets",
+          "description": "Should list datasets section"
+        },
+        {
+          "name": "mentions_models",
+          "type": "contains",
+          "value": "models",
+          "description": "Should list models section"
+        },
+        {
+          "name": "mentions_runtime",
+          "type": "contains",
+          "value": "runtime",
+          "description": "Should list runtime section"
+        },
+        {
+          "name": "mentions_workers",
+          "type": "regex",
+          "value": "(?i)workers",
+          "description": "Should list workers section"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "How do I set up Prometheus metrics and OpenTelemetry tracing for my Spice app?",
+      "expected_output": "Configure runtime.telemetry section with otel_exporter endpoint, mention Prometheus metrics endpoint at port 9090",
+      "files": [],
+      "assertions": [
+        {
+          "name": "shows_telemetry_config",
+          "type": "contains",
+          "value": "telemetry:",
+          "description": "Should show telemetry configuration"
+        },
+        {
+          "name": "mentions_prometheus",
+          "type": "regex",
+          "value": "(?i)(prometheus|9090|/metrics)",
+          "description": "Should mention Prometheus metrics endpoint"
+        }
+      ]
+    }
+  ]
+}

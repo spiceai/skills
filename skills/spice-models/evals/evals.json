@@ -1,0 +1,65 @@
+{
+  "skill_name": "spice-models",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to add GPT-4o to my Spice app. My OpenAI API key is stored in the OPENAI_API_KEY environment variable. Show me the YAML config.",
+      "expected_output": "Model config with from: openai:gpt-4o, secret reference for API key",
+      "files": [],
+      "assertions": [
+        {
+          "name": "correct_from_format",
+          "type": "contains",
+          "value": "from: openai:gpt-4o",
+          "description": "Should use correct OpenAI from format"
+        },
+        {
+          "name": "references_api_key_secret",
+          "type": "regex",
+          "value": "openai_api_key.*\\$\\{",
+          "description": "Should reference API key via secret store"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I'm using Groq's API which is OpenAI-compatible. How do I configure Spice to use it with their llama model?",
+      "expected_output": "Use openai: provider with custom endpoint parameter pointing to Groq's API",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_openai_provider",
+          "type": "contains",
+          "value": "from: openai:",
+          "description": "Should use the openai provider for compatible APIs"
+        },
+        {
+          "name": "sets_custom_endpoint",
+          "type": "regex",
+          "value": "endpoint:.*groq",
+          "description": "Should set a custom endpoint for Groq"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I downloaded a GGUF model file and want to serve it locally with Spice. How?",
+      "expected_output": "Use from: file:./path/to/model.gguf",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_file_provider",
+          "type": "contains",
+          "value": "from: file:",
+          "description": "Should use the file provider for local models"
+        },
+        {
+          "name": "mentions_gguf",
+          "type": "regex",
+          "value": "(?i)\\.gguf",
+          "description": "Should reference GGUF format"
+        }
+      ]
+    }
+  ]
+}
