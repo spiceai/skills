@@ -1,0 +1,18 @@
+# Path prefixes scrub.sh skips. One prefix per line, repo-relative.
+#
+# Keep this list as short as possible — every entry is an unguarded surface.
+#
+# skills/improve-skills/ is excluded because this skill's own documentation
+# necessarily discusses the categories it forbids ("a private repo shows...",
+# "an internal benchmark of..."), and denylist.example.txt contains the patterns
+# themselves. Scanning it produces nothing but false positives, and a gate that
+# cries wolf is a gate that gets ignored.
+#
+# The exclusion costs little in practice: the weekly audit never edits this
+# directory (SKILL.md step 5 excludes it from routing), so it is absent from the
+# diff on a normal run. It only applies when a human is deliberately changing
+# the machinery — which is precisely when human review is already happening.
+#
+# Do not add a skills/<name>/ path here to silence a finding. That is the case
+# the gate exists for.
+skills/improve-skills/

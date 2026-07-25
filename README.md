@@ -21,6 +21,19 @@ A Claude Code plugin with skills for working with the [Spice.ai OSS](https://spi
 | [spice-cloud-management](skills/spice-cloud-management/) | Manage Spice.ai Cloud resources via the Management API |
 | [spice-terraform](skills/spice-terraform/) | Manage Spice.ai Cloud infrastructure as code with Terraform |
 
+## Maintaining this repo
+
+| Skill | Description |
+| --- | --- |
+| [improve-skills](skills/improve-skills/) | Weekly audit that keeps the skills above current with what has shipped |
+
+`improve-skills` is for maintainers of this repo rather than for using Spice. It
+audits published Spice.ai releases for user-visible changes, routes each one to
+the skills it affects, applies the edits through `skill-creator`, runs the eval
+regression gate, and opens a PR. Every fact it publishes must be citable from a
+public source; see
+[its disclosure policy](skills/improve-skills/references/disclosure-policy.md).
+
 ## Installation
 
 Add the marketplace and install the plugin:

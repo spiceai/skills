@@ -1,0 +1,57 @@
+# Hosts that may appear in a public commit or PR body.
+#
+# scrub.sh flags any URL whose host is not listed here. Matching is exact or
+# by suffix, so `spiceai.org` also allows `docs.spiceai.org`. Hosts without a
+# dot (placeholders like `<app-name>`) are skipped.
+#
+# The purpose of this check is to catch an internal hostname slipping into a
+# public file — not to police third-party documentation links. When a run flags
+# a legitimate new public host, append it here in the same PR; that addition is
+# itself public-safe and gives reviewers a visible record of every external
+# domain the skills point at.
+
+# Spice public surfaces
+spiceai.org
+spice.ai
+spiceai.io
+spiceai.com
+
+# Code hosting and registries
+github.com
+githubusercontent.com
+crates.io
+hub.docker.com
+registry.terraform.io
+
+# Upstream project documentation referenced by the skills
+apache.org
+duckdb.org
+sqlite.org
+postgresql.org
+turso.tech
+vortex.dev
+openai.com
+anthropic.com
+huggingface.co
+
+# Provider documentation cited by connector and model skills
+databricks.com
+snowflake.com
+aws.amazon.com
+docs.aws.amazon.com
+cloud.google.com
+microsoft.com
+groq.com
+
+# Loopback and reserved documentation domains used in examples
+localhost
+127.0.0.1
+0.0.0.0
+example.com
+example.org
+example.net
+# RFC 2606 / RFC 6761 reserved TLDs, which exist precisely so documentation can
+# use hostnames that can never resolve to a real host.
+example
+test
+invalid

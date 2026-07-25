@@ -1,3 +1,10 @@
 .claude/
 *-workspace/
 dist/
+
+# improve-skills: local config and audit working directory. These hold internal
+# source names and raw signal, and must never reach this public repo.
+*.local.yaml
+*.local.txt
+*.local.json
+.audit/
