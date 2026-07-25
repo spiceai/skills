@@ -209,4 +209,4 @@ When using `mode: memory` (default), the dataset is loaded into RAM. Ensure suff
 - [Retention](https://spiceai.org/docs/features/data-acceleration/data-refresh#retention-policy)
 - [Constraints](https://spiceai.org/docs/features/data-acceleration/constraints)
 - [Indexes](https://spiceai.org/docs/features/data-acceleration/indexes)
-- [Snapshots](https://spiceai.org/docs/components/data-accelerators/snapshots)
+- [Snapshots](https://spiceai.org/docs/features/data-acceleration/snapshots)

@@ -302,6 +302,6 @@ params:
 - [Data Connectors](https://spiceai.org/docs/components/data-connectors)
 - [Datasets Reference](https://spiceai.org/docs/reference/spicepod/datasets)
 - [Catalogs](https://spiceai.org/docs/components/catalogs)
-- [Views](https://spiceai.org/docs/components/views)
+- [Views](https://spiceai.org/docs/features/views)
 - [Query Federation](https://spiceai.org/docs/features/query-federation)
 - [Data Ingestion / Writes](https://spiceai.org/docs/features/data-ingestion)

@@ -29,7 +29,6 @@ models:
 | Azure OpenAI           | `azure:my-deployment`               | Alpha             |
 | Google AI              | `google:gemini-pro`                 | Alpha             |
 | xAI                    | `xai:grok-beta`                     | Alpha             |
-| Perplexity             | `perplexity:sonar-pro`              | Alpha             |
 | Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
 | Databricks             | `databricks:llama-3-70b`            | Alpha             |
 | Spice.ai               | `spiceai:llama3`                    | Release Candidate |
@@ -85,7 +84,6 @@ Tools extend LLM capabilities with runtime functions:
 | `top_n_sample`            | Top N rows by ordering        | auto   |
 | `memory:load`             | Load stored memories          | memory |
 | `memory:store`            | Store new memories            | memory |
-| `websearch`               | Search the web                | —      |
 
 ### Enable Tools
 
@@ -116,21 +114,22 @@ models:
 
 ### Web Search
 
-```yaml
-tools:
-  - name: web
-    from: websearch
-    description: 'Search the web for information.'
-    params:
-      engine: perplexity
-      perplexity_auth_token: ${ secrets:PERPLEXITY_TOKEN }
+Web search runs through OpenAI's hosted tool rather than a Spice `tools:` entry, so it is enabled on the model itself. Both params are required: `responses_api` switches the model to the Responses API, and `openai_responses_tools` allowlists the hosted tool.
 
+```yaml
 models:
-  - from: openai:gpt-4o
+  - from: openai:gpt-4o-mini # or any model supported by OpenAI's Responses API
     name: researcher
     params:
-      tools: auto, web
+      openai_api_key: ${ secrets:OPENAI_API_KEY }
+      tools: auto
+      responses_api: enabled # required for web search
+      openai_responses_tools: web_search
 ```
+
+Query it through `/v1/responses` (not `/v1/chat/completions`), or interactively with `spice chat --responses`.
+
+> The former `websearch` tool was backed by Perplexity and is no longer supported ([spiceai/spiceai#9910](https://github.com/spiceai/spiceai/pull/9910)). See [Web Search](https://spiceai.org/docs/features/web-search).
 
 ### MCP Server Integration
 
@@ -261,7 +260,7 @@ evals:
 
 - [Model Providers](https://spiceai.org/docs/components/models)
 - [LLM Tools](https://spiceai.org/docs/components/tools)
-- [Workers](https://spiceai.org/docs/components/workers)
+- [Workers](https://spiceai.org/docs/features/workers)
 - [Memory](https://spiceai.org/docs/features/large-language-models/memory)
 - [Parameter Overrides](https://spiceai.org/docs/features/large-language-models/parameter_overrides)
 - [Evals](https://spiceai.org/docs/features/large-language-models/evals)
