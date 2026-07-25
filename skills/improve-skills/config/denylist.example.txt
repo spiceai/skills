@@ -1,0 +1,59 @@
+# Denylist for scripts/scrub.sh — patterns that must never appear in an added
+# line of a public commit or PR body.
+#
+# One POSIX extended-regex (ERE) pattern per line. Content is lower-cased before
+# matching, so write patterns in lower case. Blank lines and # comments ignored.
+#
+# `\b` is supported and translated by scrub.sh into an explicit non-word
+# character (POSIX awk has no word-boundary escape). Do not use other Perl-style
+# escapes such as \d, \w, or lookaheads — they are not valid ERE and will either
+# fail to load or silently never match. Use [0-9], [a-z0-9], and plain
+# alternation instead.
+#
+# Copy to denylist.local.txt and add customer names, deployment identifiers, and
+# internal hostnames there — denylist.local.txt is gitignored. Both files load
+# when present. scrub.sh additionally derives patterns from every repo and org
+# named in sources.local.yaml, so private repo names are covered automatically
+# without being written down here.
+#
+# These patterns are deliberately narrow. A gate that cries wolf gets ignored,
+# and an ignored gate is worse than none — words like "internal", "account", and
+# "revenue" have innocent uses in a data platform, so only provenance-revealing
+# phrasings are matched. Breadth comes from the URL allowlist and from sourcing
+# discipline, not from broader regexes here.
+
+# --- Provenance markers -----------------------------------------------------
+# Phrasings that reveal a fact came from a non-public place.
+\binternal (repo|repository|pr|issue|ticket|doc|document|design doc|discussion|thread|dashboard|benchmark|meeting|notes)\b
+\b(confidential|proprietary|do[- ]not[- ]distribute)\b
+\bunder (nda|embargo)\b
+\b(postmortem|post-mortem|incident report|sev[0-9])\b
+\b(roadmap|unreleased|not yet (released|shipped|public)|coming in v?[0-9])\b
+\bprivate (repo|repository|issue|ticket|branch)\b
+
+# --- Private infrastructure -------------------------------------------------
+# Non-public hostnames. Public hosts are governed by config/url-allowlist.txt;
+# these catch bare hostnames that are not written as full URLs.
+# The internal suffix must be terminal. Requiring a non-hostname character after
+# it avoids firing on documentation placeholders like sql.corp.example, where
+# .corp is a middle label rather than the real TLD.
+[a-z0-9-]+\.(internal|corp|intranet)([^a-z0-9.-]|$)
+\b(staging|preprod|pre-prod|dev-cluster)\.[a-z0-9.-]+\.(com|io|ai|dev)\b
+
+# --- People and identities --------------------------------------------------
+# Skills describe software, not who built it or who asked for it.
+[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}
+# Prose @-mentions only. Requiring leading whitespace avoids matching the host
+# separator in connection strings such as postgres://user:${pw}@localhost:5432.
+[[:space:]]@[a-z0-9][a-z0-9-]{2,}
+
+# --- Customer and deployment language ---------------------------------------
+# Generic markers only. Specific names belong in denylist.local.txt.
+\b(customer|prospect) (name|id|report|request|escalation|deployment|environment)\b
+\b(asked|requested|reported|escalated) by (a |our |the )?(customer|client|user at|team at)\b
+\bfor (a|our|the) (customer|client|enterprise account)\b
+\b(a|one|our) (large|major|enterprise) (customer|client|user)\b
+
+# --- Non-public commercial detail -------------------------------------------
+\b(contract value|seat count|annual recurring revenue)\b
+\b(unpublished|preliminary|internal) benchmark\b

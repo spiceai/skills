@@ -56,6 +56,15 @@ for skill_dir in "$ROOT"/skills/*/; do
   # Copy references/ if present
   [ -d "$skill_dir/references" ] && cp -r "$skill_dir/references" "$dest/"
 
+  # Copy config/ if present, excluding *.local.* overrides. Those are gitignored
+  # because they can hold private source lists and customer names; bundling them
+  # into a distributable archive would publish exactly what they exist to keep out.
+  if [ -d "$skill_dir/config" ]; then
+    mkdir -p "$dest/config"
+    find "$skill_dir/config" -maxdepth 1 -type f ! -name '*.local.*' \
+      -exec cp {} "$dest/config/" \;
+  fi
+
   # Copy examples/ if present
   [ -d "$skill_dir/examples" ] && cp -r "$skill_dir/examples" "$dest/"
 

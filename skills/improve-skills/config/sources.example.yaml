@@ -1,0 +1,42 @@
+# Audit sources for the improve-skills weekly run.
+#
+# Copy to sources.local.yaml and add private repos there. sources.local.yaml is
+# gitignored so internal repository names never enter a public commit. Do not
+# add them to this file.
+
+# Public sources supply the CONTENT of every skill edit. Anything written into a
+# SKILL.md must be citable from one of these.
+public:
+  - repo: spiceai/spiceai
+    role: content
+    # Only published, non-prerelease releases count as "shipped". Merged-to-trunk
+    # work that has not been released yet is deliberately out of scope.
+    shipped_only: true
+    prereleases: false
+
+  - repo: spiceai/docs
+    role: corroboration
+    # Backs docs.spiceai.org. Used to confirm a change is publicly documented and
+    # to source the canonical URL for a citation.
+
+  - repo: spiceai/cookbook
+    role: corroboration
+    # Public, runnable examples. Good for verifying that a config snippet in a
+    # skill still matches reality.
+
+# Internal sources supply SIGNAL ONLY — which area is churning, where users hit
+# friction, which skill deserves attention. Never content. See
+# references/disclosure-policy.md.
+#
+# Populate this list in sources.local.yaml, not here.
+internal: []
+#   - repo: <org>/<repo>
+#     role: signal
+#     # What gather.sh collects: merged PR titles, labels, and changed top-level
+#     # paths, written to the gitignored .audit/ directory. Even that much is
+#     # treated as sensitive — read it, act on the direction it points, and copy
+#     # nothing forward.
+
+# Repositories excluded from routing (audited nothing, edited never).
+exclude_skills:
+  - improve-skills
