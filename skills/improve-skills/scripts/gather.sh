@@ -116,9 +116,13 @@ while IFS=$'\t' read -r repo role; do
     continue
   fi
   echo "Fetching published releases: $repo" >&2
+  # The isPrerelease flag is set by hand and is routinely wrong — v2.0.0-rc.*
+  # tags come back with isPrerelease false. Judge by the tag itself as well, or
+  # release-candidate work gets treated as shipped.
   if ! tags=$(gh_retry gh release list --repo "$repo" --limit 50 \
       --json tagName,publishedAt,isPrerelease,isDraft \
       --jq ".[] | select(.isPrerelease == false and .isDraft == false) \
+            | select(.tagName | test(\"-(rc|alpha|beta|pre|dev)\"; \"i\") | not) \
             | select(.publishedAt > \"$SINCE\") | .tagName"); then
     echo "  FAILED to list releases for $repo" >&2
     FAILED+=("$repo (releases)")
