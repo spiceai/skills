@@ -407,6 +407,6 @@ When presenting management API results:
 
 ## Documentation
 
-- [Management API Reference](https://docs.spice.ai/api/management)
+- [Management API Reference](https://docs.spice.ai/api/management-api/management)
 - [Interactive API Docs](https://api.spice.ai/v1/docs)
 - [Spice.ai Cloud](https://spice.ai)

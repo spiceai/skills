@@ -1,6 +1,6 @@
 ---
 name: spice-models
-description: Configure AI/LLM model providers and connections in Spice — OpenAI, Anthropic, Azure, Google, xAI, Bedrock, Perplexity, Databricks, HuggingFace, and local GGUF models. Use this skill whenever the user wants to add a model, configure a specific LLM provider, set up an OpenAI-compatible endpoint (e.g. Groq, Ollama), serve a local model, configure system prompts, set parameter overrides (temperature, response format), or understand which providers are available. This skill is the model connector reference. For AI features like tools, memory, workers, and NSQL, see spice-ai.
+description: Configure AI/LLM model providers and connections in Spice — OpenAI, Anthropic, Azure, Google, xAI, Bedrock, Databricks, HuggingFace, and local GGUF models. Use this skill whenever the user wants to add a model, configure a specific LLM provider, set up an OpenAI-compatible endpoint (e.g. Groq, Ollama), serve a local model, configure system prompts, set parameter overrides (temperature, response format), or understand which providers are available. This skill is the model connector reference. For AI features like tools, memory, workers, and NSQL, see spice-ai.
 ---
 
 # Spice Model Providers
@@ -29,7 +29,6 @@ models:
 | Azure OpenAI           | `azure:my-deployment`               | Alpha             |
 | Google AI              | `google:gemini-pro`                 | Alpha             |
 | xAI                    | `xai:grok-beta`                     | Alpha             |
-| Perplexity             | `perplexity:sonar-pro`              | Alpha             |
 | Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
 | Databricks             | `databricks:llama-3-70b`            | Alpha             |
 | Spice.ai               | `spiceai:llama3`                    | Release Candidate |
