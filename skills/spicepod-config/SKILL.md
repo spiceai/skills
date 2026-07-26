@@ -12,7 +12,7 @@ Spice is an open-source SQL query, search, and LLM-inference engine — not a re
 ## Basic Structure
 
 ```yaml
-version: v1
+version: v2
 kind: Spicepod
 name: my_app
 
@@ -50,10 +50,22 @@ embeddings:
 | `evals`        | Model evaluation definitions       | (below)              |
 | `dependencies` | Dependent Spicepods                | (below)              |
 
+## Manifest Version
+
+`v2` is the current version and what `spice init` writes. `v1` still loads and deprecated fields
+auto-migrate; `v1beta1` is no longer accepted.
+
+| v1 (deprecated)               | v2 (preferred)                    | Notes                                     |
+| ----------------------------- | --------------------------------- | ----------------------------------------- |
+| `runtime.results_cache`       | `runtime.caching.sql_results`     | `cache_max_size` → `max_size`             |
+| `runtime.memory_limit`        | `runtime.query.memory_limit`      | v2 path wins if both are set              |
+| `runtime.temp_directory`      | `runtime.query.temp_directory`    | v2 path wins if both are set              |
+| `dataset.invalid_type_action` | `dataset.unsupported_type_action` | v2 adds a `string` variant                |
+
 ## Quick Start
 
 ```yaml
-version: v1
+version: v2
 kind: Spicepod
 name: quickstart
 
@@ -168,7 +180,7 @@ dependencies:
 ## Full AI Application Example
 
 ```yaml
-version: v1
+version: v2
 kind: Spicepod
 name: ai_app
 

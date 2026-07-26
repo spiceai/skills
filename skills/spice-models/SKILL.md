@@ -1,6 +1,6 @@
 ---
 name: spice-models
-description: Configure AI/LLM model providers and connections in Spice — OpenAI, Anthropic, Azure, Google, xAI, Bedrock, Perplexity, Databricks, HuggingFace, and local GGUF models. Use this skill whenever the user wants to add a model, configure a specific LLM provider, set up an OpenAI-compatible endpoint (e.g. Groq, Ollama), serve a local model, configure system prompts, set parameter overrides (temperature, response format), or understand which providers are available. This skill is the model connector reference. For AI features like tools, memory, workers, and NSQL, see spice-ai.
+description: Configure AI/LLM model providers and connections in Spice — OpenAI, Anthropic, Azure, Google, xAI, Bedrock, Databricks, HuggingFace, and local GGUF models. Use this skill whenever the user wants to add a model, configure a specific LLM provider, set up an OpenAI-compatible endpoint (e.g. Groq, Ollama), serve a local model, configure system prompts, set parameter overrides (temperature, response format), or understand which providers are available. This skill is the model connector reference. For AI features like tools, memory, workers, and NSQL, see spice-ai.
 ---
 
 # Spice Model Providers
@@ -28,19 +28,21 @@ models:
 | Anthropic              | `anthropic:claude-sonnet-4-5`       | Alpha             |
 | Azure OpenAI           | `azure:my-deployment`               | Alpha             |
 | Google AI              | `google:gemini-pro`                 | Alpha             |
-| xAI                    | `xai:grok-beta`                     | Alpha             |
-| Perplexity             | `perplexity:sonar-pro`              | Alpha             |
+| xAI                    | `xai:grok-4.3`                      | Alpha             |
 | Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
 | Databricks             | `databricks:llama-3-70b`            | Alpha             |
 | Spice.ai               | `spiceai:llama3`                    | Release Candidate |
 | HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct` | Release Candidate |
 | Local file             | `file:./models/llama.gguf`          | Release Candidate |
 
+The `perplexity` provider was **removed** in v2.0.0 — re-point affected models at another
+provider. For xAI, `from: xai` with no model defaults to `grok-4.3`.
+
 ## Features
 
 | Feature                   | Description                            |
 | ------------------------- | -------------------------------------- |
-| **Tools**                 | SQL, search, memory, MCP, websearch    |
+| **Tools**                 | SQL, search, memory, MCP               |
 | **System Prompts**        | Declarative default system prompts     |
 | **Parameterized Prompts** | Jinja templating in system prompts     |
 | **Parameter Overrides**   | Temperature, response format, etc.     |
@@ -152,3 +154,4 @@ chat> Hello!
 - [Parameterized Prompts](https://spiceai.org/docs/features/large-language-models/parameterized_prompts)
 - [Evals](https://spiceai.org/docs/features/large-language-models/evals)
 - [Local Model Serving](https://spiceai.org/docs/features/large-language-models/serving)
+- [Web Search](https://spiceai.org/docs/features/web-search) — via OpenAI hosted tools; the `websearch` tool was removed

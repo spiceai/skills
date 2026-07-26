@@ -1,6 +1,6 @@
 ---
 name: spice-secrets
-description: Configure secret stores in Spice — environment variables, Kubernetes, AWS Secrets Manager, and OS keyring. Use this skill whenever the user needs to manage credentials, API keys, passwords, or tokens in Spice, reference secrets in spicepod.yaml params with ${ store:KEY } syntax, set up .env files, configure secret store precedence, or understand how the `secrets:` section works. Also use when the user asks how to pass database passwords or API keys securely to Spice datasets or models.
+description: Configure secret stores in Spice — environment variables, Kubernetes, AWS Secrets Manager, Azure Key Vault, HashiCorp Vault, and OS keyring. Use this skill whenever the user needs to manage credentials, API keys, passwords, or tokens in Spice, reference secrets in spicepod.yaml params with ${ store:KEY } syntax, set up .env files, configure secret store precedence, or understand how the `secrets:` section works. Also use when the user asks how to pass database passwords or API keys securely to Spice datasets or models.
 ---
 
 # Spice Secret Stores
@@ -22,7 +22,12 @@ secrets:
 | Environment | `env` | Environment variables + `.env` / `.env.local` files (default) |
 | Kubernetes | `kubernetes:<secret_name>` | Kubernetes secrets |
 | AWS Secrets Manager | `aws_secrets_manager` | AWS Secrets Manager |
+| Azure Key Vault | `azure_keyvault` | Service principal, managed identity, workload identity, Azure CLI, or auto-detect |
+| HashiCorp Vault | `hashicorp_vault` | KV v1/v2; `token`, `approle`, `kubernetes`, `jwt` auth (Spice.ai Enterprise) |
 | Keyring | `keyring` | OS keyring (macOS Keychain, Linux, Windows) |
+
+Unknown `params` are rejected with an error listing the supported names, which catches typos at
+startup rather than at first use.
 
 ## Default: Environment Variables
 
@@ -117,4 +122,6 @@ secrets:
 - [Environment Secret Store](https://spiceai.org/docs/components/secret-stores/env)
 - [Kubernetes Secret Store](https://spiceai.org/docs/components/secret-stores/kubernetes)
 - [AWS Secrets Manager](https://spiceai.org/docs/components/secret-stores/aws-secrets-manager)
+- [Azure Key Vault](https://spiceai.org/docs/components/secret-stores/azure-keyvault)
+- [HashiCorp Vault](https://spiceai.org/docs/components/secret-stores/hashicorp-vault)
 - [Keyring Secret Store](https://spiceai.org/docs/components/secret-stores/keyring)

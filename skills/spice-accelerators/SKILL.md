@@ -39,14 +39,16 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 
 ## Supported Engines
 
-| Engine     | Mode           | Status            |
-| ---------- | -------------- | ----------------- |
-| `arrow`    | memory         | Stable            |
-| `duckdb`   | memory, file   | Stable            |
-| `sqlite`   | memory, file   | Release Candidate |
-| `cayenne`  | file           | Beta              |
-| `postgres` | N/A (attached) | Release Candidate |
-| `turso`    | memory, file   | Beta              |
+| Engine     | Modes                                  | Status            |
+| ---------- | -------------------------------------- | ----------------- |
+| `arrow`    | memory                                 | Stable            |
+| `duckdb`   | memory, file, file_create, file_update  | Stable            |
+| `cayenne`  | file, file_create, file_update          | Release Candidate |
+| `sqlite`   | memory, file, file_create, file_update  | Release Candidate |
+| `postgres` | N/A (attached, Spice.ai Enterprise)     | Release Candidate |
+| `turso`    | memory, file, file_create, file_update  | Beta              |
+
+`file_create` always creates a fresh acceleration file on startup, removing any existing one (snapshotted first if snapshots are enabled). `file_update` opens an existing file instead: additive schema changes (new columns only) keep it, incompatible ones (columns removed, renamed, or retyped) recreate it.
 
 ## Refresh Modes
 
@@ -55,7 +57,7 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 | `full`            | Complete dataset replacement on each refresh                   | Small, slowly-changing datasets           |
 | `append` (batch)  | Adds new records based on a `time_column`                      | Append-only logs, time-series data        |
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
-| `changes`         | CDC-based incremental updates via Debezium or DynamoDB Streams | Frequently updated transactional data     |
+| `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
 
 ```yaml
@@ -75,10 +77,12 @@ acceleration:
 acceleration:
   refresh_mode: append
 
-# CDC with Debezium or DynamoDB Streams
+# CDC: native Postgres logical replication (recommended for Postgres sources)
 acceleration:
   refresh_mode: changes
 ```
+
+Pair `refresh_mode: changes` with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of re-fetching. For the CDC source matrix and refresh-mode semantics, see spice-acceleration.
 
 ## Common Configurations
 
@@ -165,6 +169,28 @@ acceleration:
   mode: file
   params:
     sqlite_file: ./data/cache.sqlite
+```
+
+## Storage Profile Tuning
+
+`acceleration.storage_profile` tunes connection-pool sizing, checkpoint thresholds, and file-size
+defaults for the backing medium. File-mode only (`duckdb`, `sqlite`, `turso`, `cayenne`); memory-mode
+accelerators ignore it.
+
+| Value       | When                                                        |
+| ----------- | ----------------------------------------------------------- |
+| `auto`      | Default. Detects the medium from the acceleration file path. |
+| `local_ssd` | Local SSD/NVMe (EC2 instance store, Azure local NVMe).      |
+| `ebs`       | Network block storage (Amazon EBS, Azure Managed Disks).    |
+| `tmpfs`     | RAM-backed storage.                                         |
+
+```yaml
+acceleration:
+  engine: duckdb
+  mode: file
+  storage_profile: ebs # amortize per-IO latency over larger flushes
+  params:
+    duckdb_file: /mnt/ebs/analytics.db
 ```
 
 ## Constraints and Indexes

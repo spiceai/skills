@@ -55,31 +55,37 @@ datasets:
 
 | Connector     | From Format             | Status                        |
 | ------------- | ----------------------- | ----------------------------- |
-| PostgreSQL    | `postgres:schema.table` | Stable (also Amazon Redshift) |
+| PostgreSQL    | `postgres:schema.table` | Stable (native WAL CDC; also Amazon Redshift) |
 | MySQL         | `mysql:schema.table`    | Stable                        |
 | DuckDB        | `duckdb:database.table` | Stable                        |
+| DynamoDB      | `dynamodb:table`        | Stable (with Streams)         |
+| Azure Cosmos DB | `cosmosdb:database.container` | Release Candidate      |
 | MS SQL Server | `mssql:db.table`        | Beta                          |
-| MongoDB       | `mongodb:collection`    | Alpha                         |
+| MongoDB       | `mongodb:collection`    | Alpha (Change Streams)        |
 | ClickHouse    | `clickhouse:db.table`   | Alpha                         |
-| DynamoDB      | `dynamodb:table`        | Release Candidate             |
+| Oracle        | `oracle:schema.table`   | Alpha                         |
+| ScyllaDB      | `scylladb:table`        | Alpha                         |
 
 ### Data Warehouses
 
-| Connector               | From Format                       | Status |
-| ----------------------- | --------------------------------- | ------ |
-| Snowflake               | `snowflake:db.schema.table`       | Beta   |
-| Databricks (Delta Lake) | `databricks:catalog.schema.table` | Stable |
-| Spark                   | `spark:db.table`                  | Beta   |
+| Connector               | From Format                       | Status            |
+| ----------------------- | --------------------------------- | ----------------- |
+| Databricks (Delta Lake) | `databricks:catalog.schema.table` | Stable            |
+| Snowflake               | `snowflake:db.schema.table`       | Release Candidate |
+| Spark                   | `spark:db.table`                  | Beta              |
 
 ### Data Lakes & Object Storage
 
-| Connector    | From Format                  | Status |
-| ------------ | ---------------------------- | ------ |
-| S3           | `s3://bucket/path/`          | Stable |
-| Delta Lake   | `delta_lake:/path/to/delta/` | Stable |
-| Iceberg      | `iceberg:table`              | Beta   |
-| Azure BlobFS | `abfs://container/path/`     | Alpha  |
-| File (local) | `file:./path/to/data`        | Stable |
+| Connector    | From Format                  | Status            |
+| ------------ | ---------------------------- | ----------------- |
+| S3           | `s3://bucket/path/`          | Stable            |
+| Delta Lake   | `delta_lake:/path/to/delta/` | Stable            |
+| File (local) | `file:./path/to/data`        | Stable            |
+| Iceberg      | `iceberg:table`              | Release Candidate (read+write) |
+| DuckLake     | `ducklake:table`             | Beta              |
+| Azure BlobFS | `abfs://container/path/`     | Alpha             |
+| Google Cloud Storage | `gs://bucket/path/`  | Alpha             |
+| AWS Glue     | `glue:db.table`              | Alpha             |
 
 ### Other Sources
 
@@ -89,14 +95,19 @@ datasets:
 | Dremio       | `dremio:source.table`                 | Stable            |
 | GitHub       | `github:github.com/owner/repo/issues` | Stable            |
 | GraphQL      | `graphql:endpoint`                    | Release Candidate |
+| ADBC         | `adbc:table`                          | Release Candidate |
 | FlightSQL    | `flightsql:query`                     | Beta              |
-| ODBC         | `odbc:connection`                     | Beta              |
+| ODBC         | `odbc:connection`                     | Beta (Spice.ai Enterprise) |
+| SharePoint   | `sharepoint:site/path`                | Beta              |
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
 | Kafka        | `kafka:topic`                         | Alpha             |
 | Debezium CDC | `debezium:topic`                      | Alpha             |
-| SharePoint   | `sharepoint:site/path`                | Alpha             |
+| Elasticsearch | `elasticsearch:index`                | Alpha (Spice.ai Enterprise) |
 | IMAP         | `imap:mailbox`                        | Alpha             |
+| localpod     | `localpod:dataset`                    | Alpha             |
+| SMB          | `smb://host/share/path/`              | Alpha             |
+| NFS          | `nfs://host/path/`                    | Alpha (Spice.ai Enterprise) |
 
 ## Common Examples
 

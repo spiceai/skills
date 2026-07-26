@@ -41,14 +41,16 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 
 ## Supported Engines
 
-| Engine     | Mode           | Status            |
-| ---------- | -------------- | ----------------- |
-| `arrow`    | memory         | Stable            |
-| `duckdb`   | memory, file   | Stable            |
-| `sqlite`   | memory, file   | Release Candidate |
-| `cayenne`  | file           | Beta              |
-| `postgres` | N/A (attached) | Release Candidate |
-| `turso`    | memory, file   | Beta              |
+| Engine     | Modes                               | Status            |
+| ---------- | ----------------------------------- | ----------------- |
+| `arrow`    | memory                              | Stable            |
+| `duckdb`   | memory, file                        | Stable            |
+| `cayenne`  | file                                | Release Candidate |
+| `sqlite`   | memory, file                        | Release Candidate |
+| `postgres` | N/A (attached, Spice.ai Enterprise) | Release Candidate |
+| `turso`    | memory, file                        | Beta              |
+
+File-backed engines also accept `file_create` and `file_update` modes, plus `storage_profile` tuning — see spice-accelerators.
 
 ## Refresh Modes
 
@@ -57,7 +59,7 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 | `full`            | Complete dataset replacement on each refresh                   | Small, slowly-changing datasets           |
 | `append` (batch)  | Adds new records based on a `time_column`                      | Append-only logs, time-series data        |
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
-| `changes`         | CDC-based incremental updates via Debezium or DynamoDB Streams | Frequently updated transactional data     |
+| `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
 
 ```yaml
@@ -77,10 +79,16 @@ acceleration:
 acceleration:
   refresh_mode: append
 
-# CDC with Debezium or DynamoDB Streams
+# CDC: native Postgres logical replication (recommended for Postgres sources)
 acceleration:
   refresh_mode: changes
 ```
+
+Streaming CDC sources for `refresh_mode: changes`: **PostgreSQL logical replication** (native
+`wal_level=logical` + pgoutput; recommended for Postgres), **DynamoDB Streams**, **MongoDB Change
+Streams**, and **Debezium** over Kafka for sources without a native path (MySQL, SQL Server).
+Kafka topics themselves use `refresh_mode: append`. Pair CDC with a persistent accelerator
+(`mode: file`, or `postgres`) so a restart resumes instead of re-fetching.
 
 ## Common Configurations
 
@@ -209,4 +217,4 @@ When using `mode: memory` (default), the dataset is loaded into RAM. Ensure suff
 - [Retention](https://spiceai.org/docs/features/data-acceleration/data-refresh#retention-policy)
 - [Constraints](https://spiceai.org/docs/features/data-acceleration/constraints)
 - [Indexes](https://spiceai.org/docs/features/data-acceleration/indexes)
-- [Snapshots](https://spiceai.org/docs/components/data-accelerators/snapshots)
+- [Snapshots](https://spiceai.org/docs/features/data-acceleration/snapshots)
