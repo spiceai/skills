@@ -61,6 +61,7 @@ File-backed engines also accept `file_create` and `file_update` modes, plus `sto
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
 | `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
+| `snapshot`        | Reloads exclusively from the snapshot store; never queries the source | Read-only replicas fed by central snapshots |
 
 ```yaml
 # Full refresh every 8 hours
@@ -82,7 +83,21 @@ acceleration:
 # CDC: native Postgres logical replication (recommended for Postgres sources)
 acceleration:
   refresh_mode: changes
+
+# Read-only replica: reload only from the snapshot store, never from the source
+acceleration:
+  refresh_mode: snapshot
+  refresh_check_interval: 30s # snapshot poll interval; defaults to 1m
 ```
+
+`refresh_mode: snapshot` needs `acceleration.snapshots` set to `enabled` or `bootstrap_only` and a
+snapshot-capable file engine (DuckDB, SQLite, Cayenne, or Turso). The runtime polls the snapshot store
+at `refresh_check_interval`, validates each newer snapshot's schema, and swaps the file atomically, so
+queries keep serving from the previous snapshot until the swap lands. `INSERT INTO` is rejected —
+the acceleration is driven entirely by snapshots.
+
+A file-mode DuckDB acceleration on `refresh_mode: full` grows on every refresh unless
+`on_full_refresh` is set; see spice-accelerators for that parameter.
 
 Streaming CDC sources for `refresh_mode: changes`: **PostgreSQL logical replication** (native
 `wal_level=logical` + pgoutput; recommended for Postgres), **DynamoDB Streams**, **MongoDB Change
@@ -185,25 +200,7 @@ Snapshot triggers vary by refresh mode:
 
 ## Engine-Specific Parameters
 
-### DuckDB
-
-```yaml
-acceleration:
-  engine: duckdb
-  mode: file
-  params:
-    duckdb_file: ./data/cache.db
-```
-
-### SQLite
-
-```yaml
-acceleration:
-  engine: sqlite
-  mode: file
-  params:
-    sqlite_file: ./data/cache.sqlite
-```
+Each engine takes its own `params` — `duckdb_file`, `sqlite_file`, `on_full_refresh`, `storage_profile`, and the rest — documented in spice-accelerators.
 
 ## Memory Considerations
 

@@ -59,6 +59,7 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
 | `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
+| `snapshot`        | Reloads exclusively from the snapshot store; never queries the source | Read-only replicas fed by central snapshots |
 
 ```yaml
 # Full refresh every 8 hours
@@ -161,6 +162,32 @@ acceleration:
     duckdb_file: ./data/cache.db
 ```
 
+#### Bounding file growth on full refresh
+
+A full refresh bulk-loads a fresh copy of the data, and bulk loads bypass the WAL — so DuckDB's
+automatic checkpoint never fires and the blocks holding the previous copy are never returned. The
+file grows on every refresh. `on_full_refresh` (v2.1.2) chooses how that space is reclaimed:
+
+| Value             | Behavior                                                                                       | Cost                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `reuse_file`      | Default. Keeps writing into the current file; reclaims nothing.                                 | File grows every refresh.                                               |
+| `replace_file`    | Streams into a fresh staging file, carries over other objects sharing it, checkpoints, then atomically swaps it in. | Readers never interrupted, writers pause briefly. File can shrink.      |
+| `checkpoint_file` | `CHECKPOINT` in place after each refresh, escalating to `FORCE CHECKPOINT` when transactions block it. | An escalating checkpoint stalls queries on that file for a bounded window. File plateaus at its high-water mark. |
+
+```yaml
+acceleration:
+  engine: duckdb
+  mode: file
+  refresh_mode: full
+  params:
+    duckdb_file: /data/shared.duckdb
+    on_full_refresh: replace_file # default: reuse_file
+```
+
+Both non-default values need `mode: file` — pairing either with `mode: memory` is rejected at load
+time, as is `replace_file` alongside `refresh_mode: snapshot` on the same DuckDB file, including when
+a different dataset is what sets the snapshot mode. Give one of them its own `duckdb_file` instead.
+
 ### SQLite
 
 ```yaml
@@ -207,35 +234,13 @@ acceleration:
     '(created_at, status)': unique # Multi-column unique index
 ```
 
-## Snapshots (DuckDB, SQLite & Cayenne file mode)
+## Snapshots
 
-Bootstrap file-based accelerations from S3 or filesystem snapshots on startup. This dramatically reduces cold-start latency in distributed deployments.
-
-Snapshot triggers vary by refresh mode:
-
-- `refresh_complete`: Creates snapshots after each refresh (full and batch-append modes)
-- `time_interval`: Creates snapshots on a fixed schedule (all refresh modes)
-- `stream_batches`: Creates snapshots after every N batches (streaming modes: Kafka, Debezium, DynamoDB Streams)
-
-```yaml
-snapshots:
-  enabled: true
-  location: s3://my_bucket/snapshots/
-  bootstrap_on_failure_behavior: warn # warn | retry | fallback
-  params:
-    s3_auth: iam_role
-```
-
-Per-dataset opt-in:
-
-```yaml
-acceleration:
-  enabled: true
-  engine: duckdb
-  mode: file
-  snapshots:
-    enabled: true
-```
+Snapshots bootstrap an acceleration file from object storage on startup, cutting cold-start latency.
+They require a file-mode engine: `duckdb`, `sqlite`, `cayenne`, or `turso`. Each snapshotted dataset
+must write to its own file — sharing one file across datasets is unsupported here, so a shared
+`duckdb_file` and snapshots are mutually exclusive. For triggers and configuration, see
+spice-acceleration.
 
 ## Memory Considerations
 
