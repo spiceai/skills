@@ -28,8 +28,7 @@ models:
 | Anthropic              | `anthropic:claude-sonnet-4-5`       | Alpha             |
 | Azure OpenAI           | `azure:my-deployment`               | Alpha             |
 | Google AI              | `google:gemini-pro`                 | Alpha             |
-| xAI                    | `xai:grok-beta`                     | Alpha             |
-| Perplexity             | `perplexity:sonar-pro`              | Alpha             |
+| xAI                    | `xai:grok-4.3`                      | Alpha             |
 | Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
 | Databricks             | `databricks:llama-3-70b`            | Alpha             |
 | Spice.ai               | `spiceai:llama3`                    | Release Candidate |
@@ -68,6 +67,16 @@ curl -XPOST "http://localhost:8090/v1/nsql" \
   -d '{"query": "What was the highest tip any passenger gave?"}'
 ```
 
+`GET /v1/nsql/context` returns exactly what `/v1/nsql` injects into the model — SQL dialect,
+per-dataset schemas (keys, indexes, searchable columns), the registered function inventory, and
+optional sample rows. Use it to inspect or cache the context instead of guessing at it:
+
+```bash
+curl "http://localhost:8090/v1/nsql/context?include_examples=true&examples_limit=3"
+```
+
+`examples_limit` defaults to `3` (max `100`).
+
 ## Tools (Function Calling)
 
 Tools extend LLM capabilities with runtime functions:
@@ -85,7 +94,6 @@ Tools extend LLM capabilities with runtime functions:
 | `top_n_sample`            | Top N rows by ordering        | auto   |
 | `memory:load`             | Load stored memories          | memory |
 | `memory:store`            | Store new memories            | memory |
-| `websearch`               | Search the web                | —      |
 
 ### Enable Tools
 
@@ -116,21 +124,21 @@ models:
 
 ### Web Search
 
-```yaml
-tools:
-  - name: web
-    from: websearch
-    description: 'Search the web for information.'
-    params:
-      engine: perplexity
-      perplexity_auth_token: ${ secrets:PERPLEXITY_TOKEN }
+The Perplexity-backed `websearch` tool was **removed**. Web search now runs through OpenAI's
+hosted tool on the Responses API — `responses_api: enabled` is required:
 
+```yaml
 models:
-  - from: openai:gpt-4o
+  - from: openai:gpt-4o-mini # any model supported by the OpenAI Responses API
     name: researcher
     params:
-      tools: auto, web
+      openai_api_key: ${ secrets:OPENAI_API_KEY }
+      tools: auto
+      responses_api: enabled # required for web search
+      openai_responses_tools: web_search # allowlist the hosted tool
 ```
+
+Invoke it via `POST /v1/responses` or `spice chat --responses`.
 
 ### MCP Server Integration
 
@@ -261,7 +269,7 @@ evals:
 
 - [Model Providers](https://spiceai.org/docs/components/models)
 - [LLM Tools](https://spiceai.org/docs/components/tools)
-- [Workers](https://spiceai.org/docs/components/workers)
+- [Workers](https://spiceai.org/docs/features/workers)
 - [Memory](https://spiceai.org/docs/features/large-language-models/memory)
 - [Parameter Overrides](https://spiceai.org/docs/features/large-language-models/parameter_overrides)
 - [Evals](https://spiceai.org/docs/features/large-language-models/evals)

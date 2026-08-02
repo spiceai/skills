@@ -41,14 +41,16 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 
 ## Supported Engines
 
-| Engine     | Mode           | Status            |
-| ---------- | -------------- | ----------------- |
-| `arrow`    | memory         | Stable            |
-| `duckdb`   | memory, file   | Stable            |
-| `sqlite`   | memory, file   | Release Candidate |
-| `cayenne`  | file           | Beta              |
-| `postgres` | N/A (attached) | Release Candidate |
-| `turso`    | memory, file   | Beta              |
+| Engine     | Modes                               | Status            |
+| ---------- | ----------------------------------- | ----------------- |
+| `arrow`    | memory                              | Stable            |
+| `duckdb`   | memory, file                        | Stable            |
+| `cayenne`  | file                                | Release Candidate |
+| `sqlite`   | memory, file                        | Release Candidate |
+| `postgres` | N/A (attached, Spice.ai Enterprise) | Release Candidate |
+| `turso`    | memory, file                        | Beta              |
+
+File-backed engines also accept `file_create` and `file_update` modes, plus `storage_profile` tuning — see spice-accelerators.
 
 ## Refresh Modes
 
@@ -57,8 +59,9 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 | `full`            | Complete dataset replacement on each refresh                   | Small, slowly-changing datasets           |
 | `append` (batch)  | Adds new records based on a `time_column`                      | Append-only logs, time-series data        |
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
-| `changes`         | CDC-based incremental updates via Debezium or DynamoDB Streams | Frequently updated transactional data     |
+| `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
+| `snapshot`        | Reloads exclusively from the snapshot store; never queries the source | Read-only replicas fed by central snapshots |
 
 ```yaml
 # Full refresh every 8 hours
@@ -77,10 +80,30 @@ acceleration:
 acceleration:
   refresh_mode: append
 
-# CDC with Debezium or DynamoDB Streams
+# CDC: native Postgres logical replication (recommended for Postgres sources)
 acceleration:
   refresh_mode: changes
+
+# Read-only replica: reload only from the snapshot store, never from the source
+acceleration:
+  refresh_mode: snapshot
+  refresh_check_interval: 30s # snapshot poll interval; defaults to 1m
 ```
+
+`refresh_mode: snapshot` needs `acceleration.snapshots` set to `enabled` or `bootstrap_only` and a
+snapshot-capable file engine (DuckDB, SQLite, Cayenne, or Turso). The runtime polls the snapshot store
+at `refresh_check_interval`, validates each newer snapshot's schema, and swaps the file atomically, so
+queries keep serving from the previous snapshot until the swap lands. `INSERT INTO` is rejected —
+the acceleration is driven entirely by snapshots.
+
+A file-mode DuckDB acceleration on `refresh_mode: full` grows on every refresh unless
+`on_full_refresh` is set; see spice-accelerators for that parameter.
+
+Streaming CDC sources for `refresh_mode: changes`: **PostgreSQL logical replication** (native
+`wal_level=logical` + pgoutput; recommended for Postgres), **DynamoDB Streams**, **MongoDB Change
+Streams**, and **Debezium** over Kafka for sources without a native path (MySQL, SQL Server).
+Kafka topics themselves use `refresh_mode: append`. Pair CDC with a persistent accelerator
+(`mode: file`, or `postgres`) so a restart resumes instead of re-fetching.
 
 ## Common Configurations
 
@@ -177,25 +200,7 @@ Snapshot triggers vary by refresh mode:
 
 ## Engine-Specific Parameters
 
-### DuckDB
-
-```yaml
-acceleration:
-  engine: duckdb
-  mode: file
-  params:
-    duckdb_file: ./data/cache.db
-```
-
-### SQLite
-
-```yaml
-acceleration:
-  engine: sqlite
-  mode: file
-  params:
-    sqlite_file: ./data/cache.sqlite
-```
+Each engine takes its own `params` — `duckdb_file`, `sqlite_file`, `on_full_refresh`, `storage_profile`, and the rest — documented in spice-accelerators.
 
 ## Memory Considerations
 
@@ -209,4 +214,4 @@ When using `mode: memory` (default), the dataset is loaded into RAM. Ensure suff
 - [Retention](https://spiceai.org/docs/features/data-acceleration/data-refresh#retention-policy)
 - [Constraints](https://spiceai.org/docs/features/data-acceleration/constraints)
 - [Indexes](https://spiceai.org/docs/features/data-acceleration/indexes)
-- [Snapshots](https://spiceai.org/docs/components/data-accelerators/snapshots)
+- [Snapshots](https://spiceai.org/docs/features/data-acceleration/snapshots)

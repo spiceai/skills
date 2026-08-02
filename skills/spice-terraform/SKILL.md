@@ -408,7 +408,7 @@ When generating Terraform configurations:
 
 ## Documentation
 
-- [Terraform Provider Docs](https://docs.spice.ai/api/management/terraform)
+- [Terraform Provider Docs](https://docs.spice.ai/api/management-api/terraform)
 - [Terraform Registry](https://registry.terraform.io/providers/spiceai/spiceai/latest)
 - [GitHub Repository](https://github.com/spiceai/terraform-provider-spiceai)
-- [Spice.ai Management API](https://docs.spice.ai/api/management)
+- [Spice.ai Management API](https://docs.spice.ai/api/management-api)

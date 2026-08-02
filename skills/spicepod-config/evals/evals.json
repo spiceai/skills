@@ -10,8 +10,8 @@
         {
           "name": "valid_spicepod_structure",
           "type": "contains",
-          "value": "version: v1",
-          "description": "Should have valid spicepod header"
+          "value": "version: v2",
+          "description": "Should have valid spicepod header on the current manifest version (v2)"
         },
         {
           "name": "has_datasets",

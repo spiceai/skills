@@ -304,7 +304,7 @@ spice search --cache-control no-cache "search terms"
 ## Complete Example
 
 ```yaml
-version: v1
+version: v2
 kind: Spicepod
 name: search_app
 

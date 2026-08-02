@@ -23,7 +23,11 @@ curl https://install.spiceai.org | /bin/bash
 brew install spiceai/spiceai/spice
 ```
 
-### Windows (PowerShell)
+### Windows
+
+Native Windows **runtime** builds (`spiced.exe`) were removed in v2.0.0 — run the runtime under
+[WSL](https://learn.microsoft.com/en-us/windows/wsl/) using the install script above. The Windows
+`spice` CLI still ships and can drive a runtime elsewhere:
 
 ```powershell
 iex ((New-Object System.Net.WebClient).DownloadString("https://install.spiceai.org/Install.ps1"))
@@ -58,7 +62,7 @@ sql> show tables;
 The Spicepod manifest defines all components for a Spice application:
 
 ```yaml
-version: v1
+version: v2 # current version; v1 still loads with deprecated fields auto-migrated
 kind: Spicepod
 name: my_app
 
@@ -171,7 +175,7 @@ Spice ships as a single ~140MB binary with no external dependencies.
 ## Full Example
 
 ```yaml
-version: v1
+version: v2
 kind: Spicepod
 name: ai_app
 

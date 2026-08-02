@@ -16,7 +16,7 @@ Spice caches results from SQL queries (`/v1/sql`), search (`/v1/search`), and em
 Caching is configured under `runtime.caching` in `spicepod.yaml`:
 
 ```yaml
-version: v1
+version: v2
 kind: Spicepod
 name: app
 

@@ -50,7 +50,7 @@
     {
       "id": 3,
       "prompt": "What connectors does Spice support? I'm trying to figure out if I can connect to Snowflake and also read from Kafka topics.",
-      "expected_output": "List supported connectors, confirm Snowflake (Beta) and Kafka (Alpha) with from formats",
+      "expected_output": "List supported connectors, confirm Snowflake (Release Candidate) and Kafka (Alpha) with from formats",
       "files": [],
       "assertions": [
         {
