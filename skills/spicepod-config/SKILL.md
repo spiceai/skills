@@ -120,9 +120,10 @@ runtime:
 ```
 
 Also settable as `--cpu-cores` and `SPICE_CPU_CORES`; precedence is flag > environment > Spicepod.
-`auto` detects the entitlement from the cgroup CPU quota, the pod's `requests.cpu`, or the host — so a
-pod that sets `resources.requests.cpu` with no CPU limit exposes no quota and sizes for every core on
-the node instead of its own share. Applied at startup only: a Spicepod reload cannot resize the pools
+`auto` resolves the entitlement in order — cgroup CPU quota, then the process's CPU affinity, then a
+one-core fallback. A CPU *share* is never an input, only reported, so a pod that sets
+`resources.requests.cpu` with no CPU limit exposes no quota and sizes for every core on the node
+instead of its own share; that is the case needing the explicit override above. Applied at startup only: a Spicepod reload cannot resize the pools
 it sized. The effective value and its source are logged at startup and exported as the
 `spiced_cpu_budget_cores` gauge.
 
