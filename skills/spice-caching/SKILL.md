@@ -206,8 +206,16 @@ Cache metrics are available at the Prometheus-compatible metrics endpoint. Prefi
 | `*_cache_hits`           | Counter | Total cache hits          |
 | `*_cache_items_count`    | Gauge   | Current items in cache    |
 | `*_cache_size_bytes`     | Gauge   | Current cache size        |
-| `*_cache_evictions`      | Counter | Total evictions           |
+| `*_cache_evictions`      | Counter | Entries removed, by `reason` |
 | `*_cache_hit_ratio`      | Gauge   | Hit ratio (hits / total)  |
+
+As of v2.1.5, `*_cache_evictions` carries a `reason` label — `size` (over `max_size`), `expired`
+(past `item_ttl`), or `invalidated` (a refresh or DML write dropped entries referencing a table). On
+an accelerated dataset with a periodic refresh `invalidated` usually dominates, so alert on `size`
+and `expired` for real cache pressure. The SQL results cache also emits `results_cache_stale_rejections`,
+counting lookups that found an entry but refused to serve it because a table it read had since been
+invalidated; those are counted in `results_cache_misses` too. Every series is exported from startup,
+so a zero is no activity rather than a missing metric.
 
 ## Common Recipes
 
@@ -254,6 +262,6 @@ runtime:
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings)                                |
 | Cache filling up quickly                             | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl`                                                                                         |
-| Stale data being served                              | Reduce `item_ttl` or `stale_while_revalidate_ttl`; use `cache-control: no-cache` for specific queries                                                     |
+| Stale data being served                              | v2.1.5+ drops cached entries on refresh, DML write, retention, and localpod parent refresh — if it persists, reduce `item_ttl` or `stale_while_revalidate_ttl`, or use `cache-control: no-cache` |
 | Dynamic functions (`NOW()`) returning cached results | Switch to `cache_key_type: plan` or use `cache-control: no-cache`                                                                                         |
 | SWR conflict error                                   | Don't set both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset |

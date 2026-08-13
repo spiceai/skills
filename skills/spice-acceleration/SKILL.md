@@ -156,6 +156,10 @@ acceleration:
   retention_sql: "DELETE FROM logs WHERE status = 'archived'"
 ```
 
+On DuckDB-accelerated datasets, retention evicts expired rows on every check interval as of v2.1.4 —
+including a policy that pairs a time window with an additional condition. On earlier builds those
+evictions could be skipped, so the file kept growing.
+
 ## Constraints and Indexes
 
 ```yaml

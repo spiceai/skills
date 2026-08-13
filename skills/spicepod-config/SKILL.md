@@ -108,6 +108,24 @@ runtime:
     port: 50051
 ```
 
+### CPU Entitlement
+
+`runtime.cpu.cores` states how many cores the runtime sizes itself for — thread pools, query
+partitioning, and accelerator concurrency all derive from it (v2.1.3+).
+
+```yaml
+runtime:
+  cpu:
+    cores: 4 # `auto` (default) detects; accepts 4, 3.5, 3500m
+```
+
+Also settable as `--cpu-cores` and `SPICE_CPU_CORES`; precedence is flag > environment > Spicepod.
+`auto` detects the entitlement from the cgroup CPU quota, the pod's `requests.cpu`, or the host — so a
+pod that sets `resources.requests.cpu` with no CPU limit exposes no quota and sizes for every core on
+the node instead of its own share. Applied at startup only: a Spicepod reload cannot resize the pools
+it sized. The effective value and its source are logged at startup and exported as the
+`spiced_cpu_budget_cores` gauge.
+
 ### Results Caching
 
 ```yaml
@@ -222,14 +240,8 @@ models:
 
 ## CLI Commands
 
-```bash
-spice init my_app       # initialize
-spice run               # start runtime
-spice sql               # SQL REPL
-spice chat              # chat REPL
-spice status            # check status
-spice datasets          # list datasets
-```
+`spice init`, `spice run`, `spice sql`, `spice chat`, `spice status`, `spice datasets` — see
+spice-setup for the full command table.
 
 ## Deployment Models
 
@@ -259,17 +271,6 @@ datasets:
 ```sql
 INSERT INTO transactions SELECT * FROM staging_transactions;
 ```
-
-## Use Cases
-
-| Use Case                   | How Spice Helps                                                                                 |
-| -------------------------- | ----------------------------------------------------------------------------------------------- |
-| Operational Data Lakehouse | Serve real-time workloads directly from Iceberg, Delta Lake, or Parquet with sub-second latency |
-| Data Lake Accelerator      | Accelerate queries from seconds to milliseconds by materializing datasets locally               |
-| Enterprise Search          | Combine semantic and full-text search across structured and unstructured data                   |
-| RAG Pipelines              | Merge federated data with vector search and LLMs for context-aware AI                           |
-| Agentic AI                 | Tool-augmented LLMs with fast access to operational data                                        |
-| Real-Time Analytics        | Stream data from Kafka or DynamoDB with sub-second latency                                      |
 
 ## Documentation
 

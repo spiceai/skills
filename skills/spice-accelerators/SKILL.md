@@ -138,18 +138,6 @@ acceleration:
   retention_sql: "DELETE FROM logs WHERE status = 'archived'"
 ```
 
-### With Indexes (DuckDB, SQLite, Turso)
-
-```yaml
-acceleration:
-  enabled: true
-  engine: sqlite
-  indexes:
-    user_id: enabled
-    '(created_at, status)': unique
-  primary_key: id
-```
-
 ## Engine-Specific Parameters
 
 ### DuckDB
@@ -198,6 +186,16 @@ acceleration:
     sqlite_file: ./data/cache.sqlite
 ```
 
+### Cayenne
+
+Cayenne reserves a compaction memory pool only for accelerations that can compact into it — file mode
+on a small-write refresh profile. Every other deployment, `refresh_mode: full` included, keeps the
+full memory limit available to queries (v2.1.3+). Budgets derive from the process's own cgroup limit
+rather than total host memory, so a container sized below its host no longer over-admits work.
+
+Accelerating an Iceberg dataset with a `timestamptz` column needs v2.1.3+ on Cayenne and v2.1.4+ on
+DuckDB — earlier builds fail the refresh write or leave the dataset unhealthy and unqueryable.
+
 ## Storage Profile Tuning
 
 `acceleration.storage_profile` tunes connection-pool sizing, checkpoint thresholds, and file-size
@@ -222,7 +220,7 @@ acceleration:
 
 ## Constraints and Indexes
 
-Accelerated datasets support primary key constraints and indexes:
+Accelerated datasets support primary key constraints and indexes (`duckdb`, `sqlite`, `turso`):
 
 ```yaml
 acceleration:
