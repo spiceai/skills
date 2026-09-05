@@ -251,6 +251,7 @@ Stemming is English-only, so the full-text arm contributes little across languag
 arm up and let RRF do the rest — the recency parameters are the same as above:
 
 ```sql
+SELECT fused_score, text, langs
 FROM rrf(
     vector_search(posts, 'ultimas noticias', rank_weight => 100),
     text_search(posts, 'news'),
