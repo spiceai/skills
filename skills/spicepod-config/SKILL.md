@@ -120,14 +120,15 @@ runtime:
 ```
 
 Also settable as `--cpu-cores` and `SPICE_CPU_CORES`; precedence is flag > environment > Spicepod.
-`auto` detects from the cgroup CPU quota, then the pod's declared `requests.cpu`, then the affinity
-mask. **Changed in v2.2.0**: a pod with a CPU request and no CPU limit now sizes to
-`min(max(2 cores, request x 2), available CPUs)` instead of every core on the node. Set `all` to
-restore full-machine sizing — e.g. a `0.5`-core request that should burst on a 24-core node. `all`
-defers to a quantity named on a lower-precedence surface, so a platform-wide `SPICE_CPU_CORES=all`
-does not silence an operator's `runtime.cpu.cores: 4`. Applied at startup only: a Spicepod reload
-cannot resize the pools it sized. The effective value and its source are logged at startup and
-exported as the `spiced_cpu_budget_cores` gauge.
+`auto` resolves the entitlement in order — cgroup CPU quota, then the pod's **declared**
+`requests.cpu`, then the process's CPU affinity, then a one-core fallback. A CPU *share* is never an
+input, only reported. **Changed in v2.2.0**: a pod with a CPU request and no CPU limit exposes no
+quota, and now sizes to `min(max(2 cores, request x 2), available CPUs)` rather than every core on
+the node. Set `all` to restore full-machine sizing — e.g. a `0.5`-core request that should burst on a
+24-core node. `all` defers to a quantity named on a lower-precedence surface, so a platform-wide
+`SPICE_CPU_CORES=all` does not silence an operator's `runtime.cpu.cores: 4`. Applied at startup only:
+a Spicepod reload cannot resize the pools it sized. The effective value and its source are logged at
+startup and exported as the `spiced_cpu_budget_cores` gauge.
 
 ### Query Timeout
 
