@@ -27,7 +27,7 @@ models:
 | OpenAI (or compatible) | `openai:gpt-4o`                     | Stable            |
 | Anthropic              | `anthropic:claude-sonnet-4-5`       | Alpha             |
 | Azure OpenAI           | `azure:my-deployment`               | Alpha             |
-| Google AI              | `google:gemini-pro`                 | Alpha             |
+| Google (Vertex AI)     | `google:gemini-2.5-pro`             | Alpha             |
 | xAI                    | `xai:grok-4.3`                      | Alpha             |
 | Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
 | Databricks             | `databricks:llama-3-70b`            | Alpha             |
@@ -37,6 +37,15 @@ models:
 
 The `perplexity` provider was **removed** in v2.0.0 — re-point affected models at another
 provider. For xAI, `from: xai` with no model defaults to `grok-4.3`.
+
+**Breaking in v2.3.0 — Google models use Vertex AI.** `from: google` no longer accepts
+`google_api_key` (Google AI Studio). Authenticate as a GCP service account with
+`google_project`, `google_location`, and exactly one of `google_service_account_path`,
+`google_service_account_key`, or `google_application_default_credentials`.
+
+Other v2.3.0 model fixes: an Anthropic model without an explicit id resolves again (the retired
+`claude-3-5-sonnet-latest` default was replaced); HuggingFace chat models read `hf_token` again
+(it had been treated as unknown under a `huggingface_` prefix).
 
 ## Features
 
@@ -72,6 +81,19 @@ models:
     params:
       endpoint: https://api.groq.com/openai/v1
       openai_api_key: ${ secrets:GROQ_API_KEY }
+```
+
+### Google (Vertex AI) — v2.3.0+
+
+```yaml
+models:
+  - from: google:gemini-2.5-pro
+    name: gemini
+    params:
+      google_project: my-project
+      google_location: us-central1
+      google_service_account_path: /etc/spice/gcp-sa.json
+      # or google_service_account_key / google_application_default_credentials
 ```
 
 ### Model with Memory
