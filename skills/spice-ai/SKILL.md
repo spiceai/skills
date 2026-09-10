@@ -27,13 +27,17 @@ models:
 | OpenAI (or compatible) | `openai:gpt-4o`                     | Stable            |
 | Anthropic              | `anthropic:claude-sonnet-4-5`       | Alpha             |
 | Azure OpenAI           | `azure:my-deployment`               | Alpha             |
-| Google AI              | `google:gemini-pro`                 | Alpha             |
+| Google (Vertex AI)     | `google:gemini-2.5-pro`             | Alpha             |
 | xAI                    | `xai:grok-4.3`                      | Alpha             |
 | Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
 | Databricks             | `databricks:llama-3-70b`            | Alpha             |
 | Spice.ai               | `spiceai:llama3`                    | Release Candidate |
 | HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct` | Release Candidate |
 | Local file             | `file:./models/llama.gguf`          | Release Candidate |
+
+As of v2.3.0, `from: google` authenticates against **Vertex AI** (not Google AI Studio). Configure
+`google_project` / `google_location` / a service-account credential — see spice-models. Do not use
+`google_api_key`.
 
 ## Using Models
 
