@@ -57,7 +57,7 @@ Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, 
 | `full`            | Complete dataset replacement on each refresh                   | Small, slowly-changing datasets           |
 | `append` (batch)  | Adds new records based on a `time_column`                      | Append-only logs, time-series data        |
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
-| `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
+| `changes`         | CDC from Postgres WAL, MySQL binlog, MongoDB/DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
 | `snapshot`        | Reloads exclusively from the snapshot store; never queries the source | Read-only replicas fed by central snapshots |
 
@@ -78,12 +78,15 @@ acceleration:
 acceleration:
   refresh_mode: append
 
-# CDC: native Postgres logical replication (recommended for Postgres sources)
+# CDC: native Postgres logical replication or MySQL binlog (no Kafka/Debezium)
 acceleration:
   refresh_mode: changes
+  primary_key: id
+  on_conflict:
+    id: upsert
 ```
 
-Pair `refresh_mode: changes` with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of re-fetching. For the CDC source matrix and refresh-mode semantics, see spice-acceleration.
+Pair `refresh_mode: changes` with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of re-fetching. Every engine except append-only `arrow` requires `primary_key` and `on_conflict: upsert`. For the CDC source matrix and refresh-mode semantics, see spice-acceleration.
 
 ## Common Configurations
 
@@ -176,6 +179,11 @@ Both non-default values need `mode: file` — pairing either with `mode: memory`
 time, as is `replace_file` alongside `refresh_mode: snapshot` on the same DuckDB file, including when
 a different dataset is what sets the snapshot mode. Give one of them its own `duckdb_file` instead.
 
+**Removed in v2.2.0**: the DuckDB accelerator rejects `partition_by`. Use `cayenne` or `arrow` for a
+partitioned dataset. v2.2.1 also pins the bundled DuckDB back to v1.4.4 (from v1.5.5), which leaked
+about 6 MiB per upsert refresh until the write hit OOM — so SQL and functions DuckDB added in v1.5
+are not available to a DuckDB-accelerated dataset.
+
 ### SQLite
 
 ```yaml
@@ -195,6 +203,12 @@ rather than total host memory, so a container sized below its host no longer ove
 
 Accelerating an Iceberg dataset with a `timestamptz` column needs v2.1.3+ on Cayenne and v2.1.4+ on
 DuckDB — earlier builds fail the refresh write or leave the dataset unhealthy and unqueryable.
+
+Two v2.2.0 changes to carry into an existing config: Cayenne tables now share **one process-wide**
+Vortex segment cache, sized by `cayenne_segment_cache_mb` under `runtime.params` (the per-table
+setting is deprecated), defaulting to 1/64 of the memory entitlement clamped to 256 MiB–2 GiB; and an
+unset `cayenne_tuning` now resolves to `auto`, so the closed-loop controller needs an explicit
+`cayenne_tuning: adaptive`.
 
 ## Storage Profile Tuning
 

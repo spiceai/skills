@@ -7,6 +7,11 @@ description: Search data using vector similarity, full-text keywords, or hybrid 
 
 Spice provides integrated search capabilities: vector (semantic) search, full-text (keyword) search, and hybrid search with Reciprocal Rank Fusion (RRF) — all via SQL functions and HTTP APIs. Search indexes are built on top of accelerated datasets.
 
+As of v2.2.0 both vector and full-text indexes serve from a warm in-memory tier by default, with no
+configuration change: each change is written to the warm tier and the durable store together, and
+queries read the warm tier first and fall back to the durable store. It covers vector indexes,
+full-text indexes, `.vectors` datasets, views, and chunked Elasticsearch vector columns.
+
 ## Search Methods
 
 | Method               | When to Use                                            | Requires                                    |
@@ -30,6 +35,12 @@ embeddings:
     params:
       openai_api_key: ${ secrets:OPENAI_API_KEY }
 ```
+
+> **Requires v2.2.1 for HuggingFace sentence-transformers.** Earlier builds kept the fixed padding
+> declared in the model's `tokenizer.json` and padded every input to 128 tokens, so the padding
+> dominated the vector of a short input and results were close to random — on MTEB SciFact with
+> `all-MiniLM-L6-v2`, nDCG@10 was 0.018 against a published 0.645. v2.2.1 clears that padding and
+> scores 0.640. Full-text search and `model2vec` static models were never affected.
 
 ### Supported Embedding Providers
 
@@ -122,6 +133,14 @@ vector_search(
 ## Set Up Full-Text Search
 
 Full-text search uses **BM25 scoring** (powered by Tantivy) for keyword relevance ranking.
+
+The built-in engine analyzes text with Tantivy's `en_stem` tokenizer: terms are lowercased and
+reduced to their English (Snowball) stem, so a search for `running` matches `run` and `runs`. Phrase
+queries still work — token positions are retained. Stemming is always on, has no configuration
+parameter, and is English-only; other languages are tokenized and lowercased but not stemmed. A
+persisted index built before stemming became the default (pre-v2.2.0) keeps serving its own analysis
+and logs a warning — delete the index directory to rebuild. `index_store: memory` rebuilds every
+start and is never affected.
 
 ### 1. Enable Indexing on Columns
 
@@ -228,18 +247,16 @@ ORDER BY fused_score DESC;
 
 ### Cross-Language Search
 
+Stemming is English-only, so the full-text arm contributes little across languages. Weight the vector
+arm up and let RRF do the rest — the recency parameters are the same as above:
+
 ```sql
 SELECT fused_score, text, langs
 FROM rrf(
     vector_search(posts, 'ultimas noticias', rank_weight => 100),
     text_search(posts, 'news'),
-    time_column => 'created_at',
-    recency_decay => 'exponential',
-    decay_constant => 0.05,
-    decay_scale_secs => 3600
+    time_column => 'created_at'
 )
-WHERE trim(text) != ''
-ORDER BY fused_score DESC LIMIT 15;
 ```
 
 ### `rrf` Parameters
@@ -356,6 +373,7 @@ LIMIT 10;
 | Issue                                     | Solution                                                             |
 | ----------------------------------------- | -------------------------------------------------------------------- |
 | `vector_search` returns no results        | Verify embeddings configured on column and model is loaded           |
+| Poor vector relevance on a HuggingFace model | Upgrade to v2.2.1 — earlier builds padded every input to 128 tokens |
 | `text_search` returns no results          | Check `full_text_search.enabled: true`; acceleration must be enabled |
 | Poor hybrid search relevance              | Tune `rank_weight` per query and adjust `k`                          |
 | Results missing recent content            | Add `time_column` and `recency_decay` to RRF                         |

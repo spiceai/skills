@@ -54,7 +54,7 @@ datasets:
 | Connector     | From Format             | Status                        |
 | ------------- | ----------------------- | ----------------------------- |
 | PostgreSQL    | `postgres:schema.table` | Stable (native WAL CDC; also Amazon Redshift) |
-| MySQL         | `mysql:schema.table`    | Stable                        |
+| MySQL         | `mysql:schema.table`    | Stable (native binlog CDC)    |
 | DuckDB        | `duckdb:database.table` | Stable                        |
 | DynamoDB      | `dynamodb:table`        | Stable (with Streams)         |
 | Azure Cosmos DB | `cosmosdb:database.container` | Release Candidate      |
@@ -100,7 +100,7 @@ datasets:
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
 | Kafka        | `kafka:topic`                         | Alpha             |
-| Debezium CDC | `debezium:topic`                      | Alpha             |
+| Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (push) | Alpha       |
 | Elasticsearch | `elasticsearch:index`                | Alpha (Spice.ai Enterprise) |
 | IMAP         | `imap:mailbox`                        | Alpha             |
 | localpod     | `localpod:dataset`                    | Alpha             |
@@ -124,42 +124,8 @@ datasets:
       enabled: true
 ```
 
-### S3 with Parquet
-
-```yaml
-datasets:
-  - from: s3://my-bucket/data/sales/
-    name: sales
-    params:
-      file_format: parquet
-      s3_region: us-east-1
-    acceleration:
-      enabled: true
-      engine: duckdb
-```
-
-### GitHub Issues
-
-```yaml
-datasets:
-  - from: github:github.com/spiceai/spiceai/issues
-    name: spiceai.issues
-    params:
-      github_token: ${ secrets:GITHUB_TOKEN }
-    acceleration:
-      enabled: true
-      refresh_mode: append
-      refresh_check_interval: 24h
-      refresh_data_window: 14d
-```
-
-### Local File
-
-```yaml
-datasets:
-  - from: file:./data/sales.parquet
-    name: sales
-```
+For the per-connector `from:` and `params:` reference — S3 and object storage, GitHub, local files,
+MySQL CDC, HTTP APIs, and the rest — see spice-data-connector.
 
 ## File Formats
 
@@ -209,7 +175,9 @@ SELECT * FROM partitioned_data WHERE year = '2024' AND month = '01';
 
 Catalog connectors expose external data catalogs, preserving the source schema hierarchy. Tables are accessed as `<catalog>.<schema>.<table>`.
 
-> **Note:** Acceleration is not supported for catalog tables. Use datasets for accelerated access.
+> **Note:** Only the `pg` catalog can be accelerated as a whole (v2.2.0+, Alpha). On every other
+> catalog an `acceleration` block is a configuration error, not a silent no-op — accelerate an
+> individual table by defining it as a dataset instead.
 
 ```yaml
 catalogs:
@@ -232,7 +200,7 @@ catalogs:
 | DuckLake        | `ducklake`      | Beta   |
 | AWS Glue        | `glue`          | Alpha  |
 | Snowflake       | `snowflake`     | Alpha  |
-| PostgreSQL      | `pg`            | Alpha  |
+| PostgreSQL      | `pg`            | Beta   |
 | MySQL           | `mysql`         | Alpha  |
 | MS SQL Server   | `mssql`         | Alpha  |
 | ADBC            | `adbc`          | Alpha  |
@@ -254,6 +222,30 @@ catalogs:
 ```sql
 SELECT * FROM unity.my_schema.customers LIMIT 10;
 ```
+
+### PostgreSQL Catalog CDC
+
+One block bootstraps and CDC-accelerates every table the `include` patterns match, with no per-table
+config. All of them share one replication slot and publication derived from the catalog `name`, so
+the WAL is decoded once for the catalog rather than once per table.
+
+```yaml
+catalogs:
+  - from: pg
+    name: my_pg
+    include:
+      - 'public.*'
+    acceleration:
+      engine: cayenne # optional; cayenne is the only supported engine
+      refresh_mode: changes # required — no catalog-level default, and `full` is unsupported
+    params:
+      pg_connection_string: postgresql://${ secrets:PG_USER }:${ secrets:PG_PASS }@localhost:5432/mydb
+```
+
+Needs `wal_level = logical` and the replication privilege; Spice validates both at load and fails
+fast. It also checks the server's free slots against `max_replication_slots` before creating one.
+Alpha in v2.2.0: the configuration may change, and a durable catalog acceleration can come back empty
+after a restart.
 
 ## Views
 

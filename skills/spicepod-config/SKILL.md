@@ -116,16 +116,35 @@ partitioning, and accelerator concurrency all derive from it (v2.1.3+).
 ```yaml
 runtime:
   cpu:
-    cores: 4 # `auto` (default) detects; accepts 4, 3.5, 3500m
+    cores: 4 # `auto` (default) detects; also `all`, or 4, 3.5, 3500m
 ```
 
 Also settable as `--cpu-cores` and `SPICE_CPU_CORES`; precedence is flag > environment > Spicepod.
-`auto` resolves the entitlement in order — cgroup CPU quota, then the process's CPU affinity, then a
-one-core fallback. A CPU *share* is never an input, only reported, so a pod that sets
-`resources.requests.cpu` with no CPU limit exposes no quota and sizes for every core on the node
-instead of its own share; that is the case needing the explicit override above. Applied at startup only: a Spicepod reload cannot resize the pools
-it sized. The effective value and its source are logged at startup and exported as the
-`spiced_cpu_budget_cores` gauge.
+`auto` resolves the entitlement in order — cgroup CPU quota, then the pod's **declared**
+`requests.cpu`, then the process's CPU affinity, then a one-core fallback. A CPU *share* is never an
+input, only reported. **Changed in v2.2.0**: a pod with a CPU request and no CPU limit exposes no
+quota, and now sizes to `min(max(2 cores, request x 2), available CPUs)` rather than every core on
+the node. Set `all` to restore full-machine sizing — e.g. a `0.5`-core request that should burst on a
+24-core node. `all` defers to a quantity named on a lower-precedence surface, so a platform-wide
+`SPICE_CPU_CORES=all` does not silence an operator's `runtime.cpu.cores: 4`. Applied at startup only:
+a Spicepod reload cannot resize the pools it sized. The effective value and its source are logged at
+startup and exported as the `spiced_cpu_budget_cores` gauge.
+
+### Query Timeout
+
+`runtime.query.timeout` bounds the wall-clock lifetime of a client query — planning, admission waits,
+execution, and result streaming (v2.2.0+). Unset by default, meaning no timeout.
+
+```yaml
+runtime:
+  query:
+    timeout: 30s
+```
+
+Cancellation is cooperative, so a query can overrun slightly. Expiring before the response starts
+returns HTTP `504` / gRPC `DEADLINE_EXCEEDED`; once results are streaming the stream is terminated
+with an error rather than ending silently as if complete. Acceleration refreshes and health checks
+are exempt. Resolved per request, so changing it alone needs no restart.
 
 ### Results Caching
 
@@ -198,14 +217,13 @@ dependencies:
 
 ## Full AI Application Example
 
+Datasets + embeddings + model in one manifest. The embedding column config is abbreviated here — see
+spice-search for chunking and search setup, and spice-ai for `memory` and tool wiring.
+
 ```yaml
 version: v2
 kind: Spicepod
 name: ai_app
-
-secrets:
-  - from: env
-    name: env
 
 embeddings:
   - from: openai:text-embedding-3-small
@@ -223,9 +241,6 @@ datasets:
         embeddings:
           - from: embed
             row_id: id
-            chunking:
-              enabled: true
-              target_chunk_size: 512
 
   - from: memory:store
     name: llm_memory

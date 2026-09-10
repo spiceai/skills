@@ -9,33 +9,10 @@ Data Connectors enable federated SQL queries across databases, data warehouses, 
 
 ## Cross-Source Federation
 
-Query across multiple heterogeneous sources in one SQL statement:
-
-```yaml
-datasets:
-  - from: postgres:customers
-    name: customers
-    params:
-      pg_host: db.example.com
-      pg_user: ${secrets:PG_USER}
-  - from: s3://bucket/orders/
-    name: orders
-    params:
-      file_format: parquet
-  - from: snowflake:analytics.sales
-    name: sales
-```
-
-```sql
--- Query across all three sources in one statement
-SELECT c.name, o.order_total, s.region
-FROM customers c
-  JOIN orders o ON c.id = o.customer_id
-  JOIN sales s ON o.id = s.order_id
-WHERE s.region = 'EMEA';
-```
-
-Without acceleration, each query fetches data directly from the underlying sources with optimized filter pushdown.
+Datasets from different connectors are queryable in one SQL statement — a `postgres:` table joined to
+an `s3://` Parquet prefix joined to a `snowflake:` table. Without acceleration, each query reads
+directly from the underlying sources with filter pushdown and column projection. For the federation
+model, views, and catalogs, see spice-connect-data.
 
 ## Basic Dataset Configuration
 
@@ -56,7 +33,7 @@ datasets:
 | Connector     | From Format             | Status                        |
 | ------------- | ----------------------- | ----------------------------- |
 | PostgreSQL    | `postgres:schema.table` | Stable (native WAL CDC; also Amazon Redshift) |
-| MySQL         | `mysql:schema.table`    | Stable                        |
+| MySQL         | `mysql:schema.table`    | Stable (native binlog CDC)    |
 | DuckDB        | `duckdb:database.table` | Stable                        |
 | DynamoDB      | `dynamodb:table`        | Stable (with Streams)         |
 | Azure Cosmos DB | `cosmosdb:database.container` | Release Candidate      |
@@ -102,7 +79,7 @@ datasets:
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
 | Kafka        | `kafka:topic`                         | Alpha             |
-| Debezium CDC | `debezium:topic`                      | Alpha             |
+| Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (push) | Alpha       |
 | Elasticsearch | `elasticsearch:index`                | Alpha (Spice.ai Enterprise) |
 | IMAP         | `imap:mailbox`                        | Alpha             |
 | localpod     | `localpod:dataset`                    | Alpha             |
@@ -125,6 +102,38 @@ datasets:
     acceleration:
       enabled: true
 ```
+
+### MySQL with Native CDC
+
+`refresh_mode: changes` streams the source's binary log (`binlog_format=ROW`) straight into the
+accelerator — no Kafka, no Debezium (v2.2.0+). Spice snapshots the table, then applies committed
+inserts, updates, and deletes.
+
+```yaml
+datasets:
+  - from: mysql:mydb.orders
+    name: orders
+    params:
+      mysql_host: localhost
+      mysql_db: mydb
+      mysql_user: replicator
+      mysql_pass: ${ secrets:mysql_pass }
+    acceleration:
+      enabled: true
+      engine: duckdb
+      mode: file
+      refresh_mode: changes
+      primary_key: id
+      on_conflict:
+        id: upsert
+```
+
+`primary_key` and `on_conflict: upsert` are required on every upsert-capable engine (`duckdb`,
+`sqlite`, `cayenne`, `postgres`, `turso`); the connector fails fast at startup without them. Only
+append-only `arrow` is exempt. A file-backed accelerator persists the resume position in its
+`spice_sys_mysql_binlog` sidecar, so a restart resumes rather than re-snapshotting. Delivery is
+at-least-once, which the primary-key upsert absorbs. Where GTID is enabled on the source, the
+position is tracked as a GTID set and survives a failover to a new primary.
 
 ### S3 with Parquet
 
@@ -162,6 +171,24 @@ datasets:
   - from: file:./data/sales.parquet
     name: sales
 ```
+
+### HTTP JSON API Response Cache
+
+A dynamic JSON API dataset caches responses. Since v2.2.1 that cache is bounded per dataset —
+previously it kept every response for the life of the process.
+
+```yaml
+datasets:
+  - from: https://api.example.com/v1/items
+    name: items
+    params:
+      response_cache_max_size_bytes: 16777216 # default 67108864 (64 MiB); 0 disables
+      response_cache_fallback_ttl: 5m # only for an origin sending no Cache-Control at all
+```
+
+The byte value must be a whole number — `64MiB` is rejected at load. The origin's `Cache-Control`
+always wins, including `no-store`, `no-cache`, and `private`, which are never retained. Structured
+HTTP file datasets do not use this cache.
 
 ## File Formats
 
