@@ -105,6 +105,19 @@ runtime:
 
 > **Conflict warning**: When using `refresh_mode: caching` on a dataset, do not configure both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset. Choose one approach.
 
+### Stale across acceleration refresh (v2.3.0+)
+
+Before v2.3.0, an acceleration refresh hard-evicted every dependent SQL results-cache entry (a successful
+`refresh_mode: full` flushed the per-table cache). When `stale_while_revalidate_ttl` is configured,
+v2.3.0 **marks** dependent entries stale as of the refresh instead of deleting them. Inside the stale
+window the runtime serves the previous result with `Results-Cache-Status: STALE` and starts one
+background revalidation per key. Past the window the request is a miss. With no stale window
+configured, invalidation stays hard (same as before). Memory accounting for SQL results, search
+results, and embeddings caches was also corrected so `max_size` tracks retained memory more closely.
+
+For dataset-level `refresh_mode: caching` size/count bounds (`caching_max_size`, `caching_max_items`),
+see spice-acceleration.
+
 ## Cache Control Headers
 
 ### HTTP API
@@ -262,6 +275,6 @@ runtime:
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings)                                |
 | Cache filling up quickly                             | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl`                                                                                         |
-| Stale data being served                              | v2.1.5+ drops cached entries on refresh, DML write, retention, and localpod parent refresh — if it persists, reduce `item_ttl` or `stale_while_revalidate_ttl`, or use `cache-control: no-cache` |
+| Stale data being served                              | DML write, retention, and localpod parent refresh still invalidate; as of v2.3.0 an acceleration refresh with `stale_while_revalidate_ttl` set serves `STALE` instead of hard-evicting — reduce `item_ttl` / SWR TTL or use `cache-control: no-cache` if that is unwanted |
 | Dynamic functions (`NOW()`) returning cached results | Switch to `cache_key_type: plan` or use `cache-control: no-cache`                                                                                         |
 | SWR conflict error                                   | Don't set both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset |
