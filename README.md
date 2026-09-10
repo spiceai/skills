@@ -87,6 +87,10 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 
 Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0` when you need a fixed surface, or use `trunk` for latest.
 
+## Versioning
+
+Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0`, or use `trunk` for latest.
+
 ## Available Skills
 
 | Skill | Description |
