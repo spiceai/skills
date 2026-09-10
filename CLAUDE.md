@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This repo is the `spiceai` Claude Code plugin — a collection of skills for AI agents working with the [Spice.ai OSS](https://spiceai.org) runtime.
+This repo is the **Spice.ai Marketplace** — Agent Skills / plugins for AI coding agents working with the [Spice.ai OSS](https://spiceai.org) runtime. Compatible harnesses include Claude Code, Cursor, Codex, Grok, OpenCode, Pi, and others that support the open skills/plugin format.
 
 ## Repository Structure
 
