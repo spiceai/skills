@@ -41,7 +41,7 @@ datasets:
 | MongoDB       | `mongodb:collection`    | Alpha (Change Streams)        |
 | ClickHouse    | `clickhouse:db.table`   | Alpha                         |
 | Oracle        | `oracle:schema.table`   | Alpha                         |
-| ScyllaDB      | `scylladb:table`        | Alpha                         |
+| ScyllaDB      | `scylladb:table`        | Alpha (opt-in build; not in default binary as of v2.3.0) |
 
 ### Data Warehouses
 
@@ -74,7 +74,7 @@ datasets:
 | GraphQL      | `graphql:endpoint`                    | Release Candidate |
 | ADBC         | `adbc:table`                          | Release Candidate |
 | FlightSQL    | `flightsql:query`                     | Beta              |
-| ODBC         | `odbc:connection`                     | Beta (Spice.ai Enterprise) |
+| ODBC         | `odbc:connection`                     | Beta (Spice.ai Enterprise; opt-in build like ScyllaDB) |
 | SharePoint   | `sharepoint:site/path`                | Beta              |
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
@@ -149,7 +149,24 @@ datasets:
       engine: duckdb
 ```
 
-### GitHub Issues
+### GitHub Issues, Reviews, Releases (v2.3.0+)
+
+Paths under `github:github.com/{owner}/{repo}/…` (and owner/login scoped tables). Every table returns
+`repo` and `owner` columns so a multi-repo `UNION ALL` stays separable. v2.3.0 adds:
+
+| Path | Rows |
+| --- | --- |
+| `…/reviews` | One per PR review (`state`, `author`, `submitted_at`, `commit_sha`) |
+| `…/review_threads` | Resolvable threads (`is_resolved`, `is_outdated`, `path`, `resolved_by`) |
+| `…/releases` / `…/release_assets` | Releases and downloadable assets |
+| `…/milestones` | Milestones (`due_on`, `progress_percentage`) |
+| `…/repo` | One row of repository metadata |
+| `github.com/{owner}/repos` | Every repository an owner has |
+| `github.com/{login}/user` | Public profile for one login |
+
+`pulls` gains draft/merge-queue/review-decision columns (e.g. `is_draft`, `mergeable`,
+`review_decision`, `status_check_rollup`, `base_ref`, `head_sha`, …). GraphQL page size is bounded so
+large repos no longer fail with `Resource limits for this query exceeded`.
 
 ```yaml
 datasets:
@@ -162,6 +179,11 @@ datasets:
       refresh_mode: append
       refresh_check_interval: 24h
       refresh_data_window: 14d
+
+  - from: github:github.com/spiceai/spiceai/reviews
+    name: spiceai.reviews
+    params:
+      github_token: ${ secrets:GITHUB_TOKEN }
 ```
 
 ### Local File
@@ -189,6 +211,17 @@ datasets:
 The byte value must be a whole number — `64MiB` is rejected at load. The origin's `Cache-Control`
 always wins, including `no-store`, `no-cache`, and `private`, which are never retained. Structured
 HTTP file datasets do not use this cache.
+
+**ScyllaDB (breaking, v2.3.0):** the connector is out of the default `spiced` build (same pattern as
+ODBC). Build with `--features scylladb` or `make install-scylladb`. A Spicepod that names `scylladb:`
+on a build without it now reports the missing feature instead of a near-match name.
+
+**BigQuery (via ADBC):** v2.3.0 federates more shapes as one remote job (temporal expressions,
+recursive CTEs, correlated subqueries, window aggregates, multi-dataset same-project queries) and
+cancels the BigQuery job when the client goes away. Use `from: adbc:…` with the BigQuery ADBC driver;
+see [ADBC / BigQuery](https://spiceai.org/docs/components/data-connectors/adbc).
+
+**Databricks:** Unity Catalog streaming tables and views are accepted (v2.3.0).
 
 ## File Formats
 

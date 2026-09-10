@@ -50,10 +50,15 @@ embeddings:
 | HuggingFace    | `huggingface:huggingface.co/sentence-transformers/all-MiniLM-L6-v2` | Release Candidate |
 | Local file     | `file:model.safetensors`                                            | Release Candidate |
 | Azure OpenAI   | `azure:my-deployment`                                               | Alpha             |
-| Google AI      | `google:text-embedding-004`                                         | Alpha             |
+| Google (Vertex AI) | `google:text-embedding-004`                                      | Alpha             |
 | Amazon Bedrock | `bedrock:amazon.titan-embed-text-v1`                                | Alpha             |
 | Databricks     | `databricks:endpoint`                                               | Alpha             |
 | Model2Vec      | `model2vec:model-name`                                              | Alpha             |
+
+`from: google` embeddings require Vertex AI credentials as of v2.3.0 (`google_project`,
+`google_location`, and a service-account setting) — same breaking change as chat models; see
+spice-models. Search also respects the requested `limit` on Elasticsearch-backed indexes and keeps
+vector/full-text index deletes in sync with rejected or chunk-removed writes (v2.3.0).
 
 ### 2. Configure Dataset Columns for Embeddings
 

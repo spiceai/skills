@@ -96,6 +96,34 @@ at `refresh_check_interval`, validates each newer snapshot's schema, and swaps t
 queries keep serving from the previous snapshot until the swap lands. `INSERT INTO` is rejected —
 the acceleration is driven entirely by snapshots.
 
+### Request caching (`refresh_mode: caching`) — v2.3.0 bounds
+
+HTTP / API datasets often use `refresh_mode: caching` for request-keyed row caches. Before v2.3.0
+nothing capped that acceleration by size or count (and `caching_stale_if_error` disabled TTL-derived
+eviction entirely). Set explicit bounds — unparseable values are refused rather than defaulted:
+
+```yaml
+datasets:
+  - from: https://api.example.com/v1/items
+    name: items
+    acceleration:
+      enabled: true
+      engine: duckdb
+      refresh_mode: caching
+      primary_key: '(request_query, request_path)'
+      params:
+        caching_ttl: 5m              # also accepted as caching_item_ttl
+        caching_max_size: 512MiB     # byte budget
+        caching_max_items: 50000     # row/entry budget
+```
+
+Eviction is entry-granular (an entry may span several rows). A caching accelerator with nothing
+bounding it logs that fact at startup. `caching_stale_if_error` now fires when the HTTP connector
+surfaces a 429/5xx after exhausting `max_retries` (previously those looked like successful fetches).
+
+`acceleration.enabled: false` keeps the rest of the block in the manifest but the runtime now names
+the settings it discards (v2.3.0). Views honor `acceleration.ready_state` the same way datasets do.
+
 A file-mode DuckDB acceleration on `refresh_mode: full` grows on every refresh unless
 `on_full_refresh` is set; see spice-accelerators for that parameter.
 
@@ -150,7 +178,7 @@ acceleration:
   engine: duckdb
   retention_check_enabled: true
   retention_period: 30d
-  retention_check_interval: 1h
+  retention_check_interval: 1h  # required when retention_check_enabled — omitted → no task + diagnostic (v2.3.0)
 ```
 
 ### SQL-Based Retention
