@@ -130,6 +130,10 @@ the node. Set `all` to restore full-machine sizing — e.g. a `0.5`-core request
 a Spicepod reload cannot resize the pools it sized. The effective value and its source are logged at
 startup and exported as the `spiced_cpu_budget_cores` gauge.
 
+As of v2.3.0 the runtime **warns** (but does not clamp) when `runtime.cpu.cores` exceeds the
+container's cgroup CPU ceiling — e.g. `cores: 6` under `resources.limits.cpu: 2` — so operators can
+spot oversizing without blocking a node they have not reached yet.
+
 ### Query Timeout
 
 `runtime.query.timeout` bounds the wall-clock lifetime of a client query — planning, admission waits,
