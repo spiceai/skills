@@ -27,10 +27,35 @@ jobs:
           STAGING=$(mktemp -d)
           STAGE_DIR="$STAGING/$ARCHIVE_NAME"
 
-          # Plugin metadata
+          # Claude
           mkdir -p "$STAGE_DIR/.claude-plugin"
           cp .claude-plugin/plugin.json "$STAGE_DIR/.claude-plugin/"
           cp .claude-plugin/marketplace.json "$STAGE_DIR/.claude-plugin/"
+
+          # Cursor
+          if [ -d .cursor-plugin ]; then
+            mkdir -p "$STAGE_DIR/.cursor-plugin"
+            cp .cursor-plugin/*.json "$STAGE_DIR/.cursor-plugin/"
+          fi
+
+          # Codex
+          if [ -d .codex-plugin ]; then
+            mkdir -p "$STAGE_DIR/.codex-plugin"
+            cp .codex-plugin/*.json "$STAGE_DIR/.codex-plugin/"
+          fi
+
+          # Grok
+          if [ -d .grok-plugin ]; then
+            mkdir -p "$STAGE_DIR/.grok-plugin"
+            cp .grok-plugin/*.json "$STAGE_DIR/.grok-plugin/"
+          fi
+
+          # Portable Agent Plugins + Codex/ChatGPT repo marketplace
+          [ -f plugin.json ] && cp plugin.json "$STAGE_DIR/"
+          if [ -f .agents/plugins/marketplace.json ]; then
+            mkdir -p "$STAGE_DIR/.agents/plugins"
+            cp .agents/plugins/marketplace.json "$STAGE_DIR/.agents/plugins/"
+          fi
 
           # Skills
           mkdir -p "$STAGE_DIR/skills"
@@ -43,6 +68,11 @@ jobs:
             [ -d "$skill_dir/references" ] && cp -r "$skill_dir/references" "$dest/"
             [ -d "$skill_dir/examples" ] && cp -r "$skill_dir/examples" "$dest/"
             [ -d "$skill_dir/evals" ] && cp -r "$skill_dir/evals" "$dest/"
+            if [ -d "$skill_dir/config" ]; then
+              mkdir -p "$dest/config"
+              find "$skill_dir/config" -maxdepth 1 -type f ! -name '*.local.*' \
+                -exec cp {} "$dest/config/" \;
+            fi
           done
 
           # Top-level files

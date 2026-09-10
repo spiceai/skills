@@ -22,6 +22,9 @@ Skills install under `.agents/skills/` (project) or `~/.codex/skills/` (global).
 
 See [Codex Skills](https://developers.openai.com/codex/skills).
 
+**Publish (maintainers):** for the universal ChatGPT/Codex Plugins Directory, submit the repo (skills-only) via the [OpenAI plugin submission portal](https://developers.openai.com/plugins/deploy/submission). Compatibility manifest: [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json); portable Agent Plugins: [`plugin.json`](plugin.json). Local/repo catalog: [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) (`codex plugin marketplace add spiceai/skills`).
+
+
 ### Grok Build
 
 ```bash
@@ -34,7 +37,16 @@ Or install as a Grok plugin from the repo:
 grok plugin install spiceai/skills --trust
 ```
 
-Browse/install from the TUI with `/marketplace` or `/plugins`. Skills land in `.grok/skills/` (project) or `~/.grok/skills/` (global). Grok also reads Claude Code marketplaces and `.agents/skills/` with no extra setup — see [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+Add this repo as a marketplace source, then install `spiceai-skills`:
+
+```bash
+grok plugin marketplace add spiceai/skills
+grok plugin install spiceai-skills --trust
+```
+
+Browse/install from the TUI with `/marketplace` or `/plugins`. Skills land in `.grok/skills/` (project) or `~/.grok/skills/` (global). Native manifests: [`.grok-plugin/plugin.json`](.grok-plugin/plugin.json) + [`.grok-plugin/marketplace.json`](.grok-plugin/marketplace.json). Grok also reads Claude Code marketplaces and `.agents/skills/` with no extra setup — see [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+
+**Publish (maintainers):** after merge, open a PR to [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) adding a remote catalog entry for `spiceai-skills` pinned to a full commit `sha` of `spiceai/skills` (see their [CONTRIBUTING](https://github.com/xai-org/plugin-marketplace/blob/main/CONTRIBUTING.md)). Until that lands, users can still `grok plugin marketplace add spiceai/skills` or `grok plugin install spiceai/skills --trust`.
 
 ### Grok Bot
 
@@ -45,6 +57,18 @@ npx skills add spiceai/skills -a cursor
 ```
 
 Or ask a Grok Bot (or open **Settings → Plugins**) to add the `spiceai/skills` marketplace/plugin. After install, start a new Bot turn so the skills catalog refreshes.
+
+### Cursor (plugin marketplace)
+
+Install skills into Cursor paths:
+
+```bash
+npx skills add spiceai/skills -a cursor
+```
+
+Or add this repo as a Cursor plugin / Team Marketplace source (requires [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json)).
+
+**Publish (maintainers):** submit `https://github.com/spiceai/skills` at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) after manifests land on `trunk`. Plugin id: `spiceai-skills` @ `2.3.0`.
 
 ### Other agents (`npx`)
 
@@ -86,10 +110,6 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 ## Versioning
 
 Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0` when you need a fixed surface, or use `trunk` for latest.
-
-## Versioning
-
-Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0`, or use `trunk` for latest.
 
 ## Available Skills
 

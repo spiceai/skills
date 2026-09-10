@@ -1,0 +1,17 @@
+{
+  "name": "spiceai",
+  "owner": {
+    "name": "Spice AI"
+  },
+  "metadata": {
+    "description": "Skills for working with the Spice.ai runtime",
+    "version": "2.3.0"
+  },
+  "plugins": [
+    {
+      "name": "spiceai-skills",
+      "source": ".",
+      "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management"
+    }
+  ]
+}

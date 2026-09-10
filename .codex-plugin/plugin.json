@@ -1,0 +1,37 @@
+{
+  "name": "spiceai-skills",
+  "version": "2.3.0",
+  "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
+  "author": {
+    "name": "Spice AI",
+    "email": "hello@spice.ai",
+    "url": "https://spiceai.org"
+  },
+  "homepage": "https://spiceai.org",
+  "repository": "https://github.com/spiceai/skills",
+  "license": "MIT",
+  "keywords": [
+    "spice",
+    "spiceai",
+    "data",
+    "sql",
+    "ai",
+    "llm",
+    "search",
+    "federation"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Spice.ai Skills",
+    "shortDescription": "Skills for the Spice.ai runtime",
+    "longDescription": "Agent Skills for Spice.ai \u2014 data federation, acceleration, search, AI/LLM, and cloud management. Aligns with Spice OSS runtime v2.3.0.",
+    "developerName": "Spice AI",
+    "category": "Developer Tools",
+    "websiteURL": "https://spiceai.org",
+    "defaultPrompt": [
+      "Help me set up Spice.ai and connect a data source",
+      "Configure spicepod.yaml for federated SQL across Postgres and S3",
+      "Add vector search and an LLM tool to my Spice app"
+    ]
+  }
+}
