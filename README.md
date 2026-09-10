@@ -2,6 +2,10 @@
 
 A Claude Code plugin with skills for working with the [Spice.ai OSS](https://spiceai.org) runtime — data federation, acceleration, search, AI/LLM, and cloud management.
 
+## Versioning
+
+Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0`, or use `trunk` for latest.
+
 ## Available Skills
 
 | Skill | Description |
