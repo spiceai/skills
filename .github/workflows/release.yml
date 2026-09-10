@@ -44,6 +44,12 @@ jobs:
             cp .codex-plugin/*.json "$STAGE_DIR/.codex-plugin/"
           fi
 
+          # Grok
+          if [ -d .grok-plugin ]; then
+            mkdir -p "$STAGE_DIR/.grok-plugin"
+            cp .grok-plugin/*.json "$STAGE_DIR/.grok-plugin/"
+          fi
+
           # Portable Agent Plugins + Codex/ChatGPT repo marketplace
           [ -f plugin.json ] && cp plugin.json "$STAGE_DIR/"
           if [ -f .agents/plugins/marketplace.json ]; then

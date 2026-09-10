@@ -37,7 +37,16 @@ Or install as a Grok plugin from the repo:
 grok plugin install spiceai/skills --trust
 ```
 
-Browse/install from the TUI with `/marketplace` or `/plugins`. Skills land in `.grok/skills/` (project) or `~/.grok/skills/` (global). Grok also reads Claude Code marketplaces and `.agents/skills/` with no extra setup — see [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+Add this repo as a marketplace source, then install `spiceai-skills`:
+
+```bash
+grok plugin marketplace add spiceai/skills
+grok plugin install spiceai-skills --trust
+```
+
+Browse/install from the TUI with `/marketplace` or `/plugins`. Skills land in `.grok/skills/` (project) or `~/.grok/skills/` (global). Native manifests: [`.grok-plugin/plugin.json`](.grok-plugin/plugin.json) + [`.grok-plugin/marketplace.json`](.grok-plugin/marketplace.json). Grok also reads Claude Code marketplaces and `.agents/skills/` with no extra setup — see [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+
+**Publish (maintainers):** after merge, open a PR to [xai-org/plugin-marketplace](https://github.com/xai-org/plugin-marketplace) adding a remote catalog entry for `spiceai-skills` pinned to a full commit `sha` of `spiceai/skills` (see their [CONTRIBUTING](https://github.com/xai-org/plugin-marketplace/blob/main/CONTRIBUTING.md)). Until that lands, users can still `grok plugin marketplace add spiceai/skills` or `grok plugin install spiceai/skills --trust`.
 
 ### Grok Bot
 

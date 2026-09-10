@@ -2,7 +2,7 @@
 set -e
 
 # Package the Spice.ai skills plugin into a distributable archive.
-# Includes Claude, Cursor, Codex, and portable Agent Plugins manifests.
+# Includes Claude, Cursor, Codex, Grok, and portable Agent Plugins manifests.
 #
 # Usage:
 #   ./scripts/package_plugin.sh              # creates dist/skills-plugin-<version>.tar.gz
@@ -52,6 +52,12 @@ fi
 if [ -d "$ROOT/.codex-plugin" ]; then
   mkdir -p "$STAGE_DIR/.codex-plugin"
   cp "$ROOT/.codex-plugin/"*.json "$STAGE_DIR/.codex-plugin/" 2>/dev/null || true
+fi
+
+# Grok Build
+if [ -d "$ROOT/.grok-plugin" ]; then
+  mkdir -p "$STAGE_DIR/.grok-plugin"
+  cp "$ROOT/.grok-plugin/"*.json "$STAGE_DIR/.grok-plugin/" 2>/dev/null || true
 fi
 
 # Portable Agent Plugins root manifest
