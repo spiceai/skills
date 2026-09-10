@@ -59,7 +59,7 @@ File-backed engines also accept `file_create` and `file_update` modes, plus `sto
 | `full`            | Complete dataset replacement on each refresh                   | Small, slowly-changing datasets           |
 | `append` (batch)  | Adds new records based on a `time_column`                      | Append-only logs, time-series data        |
 | `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
-| `changes`         | CDC from Postgres WAL, MongoDB or DynamoDB Streams, or Debezium | Frequently updated transactional data     |
+| `changes`         | CDC from Postgres WAL, MySQL binlog, MongoDB/DynamoDB Streams, or Debezium | Frequently updated transactional data     |
 | `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
 | `snapshot`        | Reloads exclusively from the snapshot store; never queries the source | Read-only replicas fed by central snapshots |
 
@@ -99,11 +99,17 @@ the acceleration is driven entirely by snapshots.
 A file-mode DuckDB acceleration on `refresh_mode: full` grows on every refresh unless
 `on_full_refresh` is set; see spice-accelerators for that parameter.
 
-Streaming CDC sources for `refresh_mode: changes`: **PostgreSQL logical replication** (native
-`wal_level=logical` + pgoutput; recommended for Postgres), **DynamoDB Streams**, **MongoDB Change
-Streams**, and **Debezium** over Kafka for sources without a native path (MySQL, SQL Server).
-Kafka topics themselves use `refresh_mode: append`. Pair CDC with a persistent accelerator
-(`mode: file`, or `postgres`) so a restart resumes instead of re-fetching.
+Streaming CDC sources for `refresh_mode: changes`. **PostgreSQL logical replication**
+(`wal_level=logical` + pgoutput) and **MySQL binlog replication** (`binlog_format=ROW`, v2.2.0+) are
+native and recommended for those sources — no Kafka, no Debezium, no external CDC infrastructure.
+Also native: **DynamoDB Streams** and **MongoDB Change Streams**. For a database with no native path
+(SQL Server, Oracle, Db2), use **Debezium** — either over Kafka (`from: debezium:…`) or, as of
+v2.2.0, push-ingest with no Kafka bus (`from: cdc:…`), where the Debezium plugin POSTs JSON or Avro
+change events to `/v1/datasets/{name}/cdc`. Kafka topics themselves use `refresh_mode: append`.
+
+Pair CDC with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of
+re-fetching. Every engine except append-only `arrow` needs `primary_key` and `on_conflict: upsert` —
+updates apply as upserts and deletes route by that key; see spice-data-connector.
 
 ## Common Configurations
 
@@ -155,6 +161,15 @@ acceleration:
   retention_check_interval: 1h
   retention_sql: "DELETE FROM logs WHERE status = 'archived'"
 ```
+
+On DuckDB-accelerated datasets, retention evicts expired rows on every check interval as of v2.1.4 —
+including a policy that pairs a time window with an additional condition. On earlier builds those
+evictions could be skipped, so the file kept growing.
+
+On Cayenne, only the append path ran `retention_sql` before v2.2.1: a `refresh_mode: full` refresh
+reloaded every source row and brought back what the policy had removed. v2.2.1 runs it on `full` and
+on CDC `changes` too, and resolves a `now()` predicate once per pass instead of failing silently.
+Cayenne warns and skips retention under `mode: memory`.
 
 ## Constraints and Indexes
 
