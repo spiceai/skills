@@ -6,13 +6,53 @@ This is the **Spice.ai Marketplace**: packaged skills/plugins any compatible har
 
 ## Installation
 
-### Most agents (`npx`)
+### OpenAI Codex
+
+```bash
+npx skills add spiceai/skills -a codex
+```
+
+Global (all projects):
+
+```bash
+npx skills add spiceai/skills -g -a codex
+```
+
+Skills install under `.agents/skills/` (project) or `~/.codex/skills/` (global). Inside a Codex session you can also run `$skill-installer` and point it at `spiceai/skills`, then restart Codex if the skills do not appear. Verify with `/skills`.
+
+See [Codex Skills](https://developers.openai.com/codex/skills).
+
+### Grok Build
+
+```bash
+npx skills add spiceai/skills -a grok
+```
+
+Or install as a Grok plugin from the repo:
+
+```bash
+grok plugin install spiceai/skills --trust
+```
+
+Browse/install from the TUI with `/marketplace` or `/plugins`. Skills land in `.grok/skills/` (project) or `~/.grok/skills/` (global). Grok also reads Claude Code marketplaces and `.agents/skills/` with no extra setup — see [Skills, Plugins & Marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces).
+
+### Grok Bot
+
+Grok Bot teammates use the same Agent Skills format. Install Spice skills into the Cursor skill paths the Bot shares:
+
+```bash
+npx skills add spiceai/skills -a cursor
+```
+
+Or ask a Grok Bot (or open **Settings → Plugins**) to add the `spiceai/skills` marketplace/plugin. After install, start a new Bot turn so the skills catalog refreshes.
+
+### Other agents (`npx`)
 
 ```bash
 npx skills add spiceai/skills
 ```
 
-Once installed, skills activate when the agent detects a relevant Spice task.
+Target a specific harness with `-a` (examples: `opencode`, `pi`, `claude-code`, `cursor`). Use `-g` for a user-global install. Once installed, skills activate when the agent detects a relevant Spice task.
 
 ### Claude Code (plugin marketplace)
 
