@@ -1,6 +1,51 @@
-# Spice.ai Plugin for Claude Code
+# Spice.ai Marketplace
 
-A Claude Code plugin with skills for working with the [Spice.ai OSS](https://spiceai.org) runtime — data federation, acceleration, search, AI/LLM, and cloud management.
+Open [Agent Skills](https://github.com/spiceai/skills) and plugins for AI coding agents working with the [Spice.ai OSS](https://spiceai.org) runtime — data federation, acceleration, search, AI/LLM, and cloud management.
+
+This is the **Spice.ai Marketplace**: packaged skills/plugins any compatible harness can load. The format works across Claude Code, Cursor, Codex, Grok, OpenCode, Pi, and other agents that support the open Agent Skills / plugin standard — not Claude-only.
+
+## Installation
+
+### Most agents (`npx`)
+
+```bash
+npx skills add spiceai/skills
+```
+
+Once installed, skills activate when the agent detects a relevant Spice task.
+
+### Claude Code (plugin marketplace)
+
+```text
+/plugin marketplace add spiceai/skills
+/plugin install skills@spiceai
+```
+
+Skills are then available as `/skills:spice-setup`, `/skills:spice-ai`, `/skills:spicepod-config`, etc.
+
+#### Project-level auto-discovery (Claude Code)
+
+To auto-suggest the plugin for all contributors, add this to your project's `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "spiceai": {
+      "source": {
+        "source": "github",
+        "repo": "spiceai/skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "skills@spiceai": true
+  }
+}
+```
+
+## Versioning
+
+Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0` when you need a fixed surface, or use `trunk` for latest.
 
 ## Available Skills
 
@@ -27,43 +72,7 @@ A Claude Code plugin with skills for working with the [Spice.ai OSS](https://spi
 | --- | --- |
 | [improve-skills](skills/improve-skills/) | Weekly audit that keeps the skills above current with what has shipped |
 
-`improve-skills` is for maintainers of this repo rather than for using Spice. It
-audits published Spice.ai releases for user-visible changes, routes each one to
-the skills it affects, applies the edits through `skill-creator`, runs the eval
-regression gate, and opens a PR. Every fact it publishes must be citable from a
-public source; see
-[its disclosure policy](skills/improve-skills/references/disclosure-policy.md).
-
-## Installation
-
-Add the marketplace and install the plugin:
-
-```
-/plugin marketplace add spiceai/skills
-/plugin install skills@spiceai
-```
-
-Skills are then available as `/skills:spice-setup`, `/skills:spice-ai`, `/skills:spicepod-config`, etc.
-
-### Project-level auto-discovery
-
-To auto-suggest the plugin for all contributors, add this to your project's `.claude/settings.json`:
-
-```json
-{
-  "extraKnownMarketplaces": {
-    "spiceai": {
-      "source": {
-        "source": "github",
-        "repo": "spiceai/skills"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "skills@spiceai": true
-  }
-}
-```
+`improve-skills` is for maintainers of this repo rather than for using Spice. It audits published Spice.ai releases for user-visible changes, routes each one to the skills it affects, applies the edits through `skill-creator`, runs the eval regression gate, and opens a PR. Every fact it publishes must be citable from a public source; see [its disclosure policy](skills/improve-skills/references/disclosure-policy.md).
 
 ## References
 
@@ -71,6 +80,7 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 - [Spice Documentation](https://docs.spiceai.org)
 - [Spicepod Reference](https://docs.spiceai.org/reference/spicepod)
 - [Cookbook](https://github.com/spiceai/cookbook)
+- [Introducing Spice Skills](https://spice.ai/blog/introducing-spice-skills-for-ai-coding-agents)
 
 ## License
 
