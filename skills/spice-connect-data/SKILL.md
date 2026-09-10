@@ -62,7 +62,7 @@ datasets:
 | MongoDB       | `mongodb:collection`    | Alpha (Change Streams)        |
 | ClickHouse    | `clickhouse:db.table`   | Alpha                         |
 | Oracle        | `oracle:schema.table`   | Alpha                         |
-| ScyllaDB      | `scylladb:table`        | Alpha                         |
+| ScyllaDB      | `scylladb:table`        | Alpha (opt-in build as of v2.3.0; see spice-data-connector) |
 
 ### Data Warehouses
 
@@ -124,8 +124,10 @@ datasets:
       enabled: true
 ```
 
-For the per-connector `from:` and `params:` reference — S3 and object storage, GitHub, local files,
-MySQL CDC, HTTP APIs, and the rest — see spice-data-connector.
+For the per-connector `from:` and `params:` reference — S3 and object storage, GitHub (including
+v2.3.0 review/release/repo tables), local files, MySQL CDC, HTTP APIs, BigQuery-via-ADBC, and the
+rest — see spice-data-connector. Databricks Unity Catalog catalogs accept streaming tables and views
+as of v2.3.0.
 
 ## File Formats
 
