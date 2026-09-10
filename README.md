@@ -1,6 +1,6 @@
 # Spice.ai Marketplace
 
-Open [Agent Skills](https://github.com/spiceai/skills) and plugins for AI coding agents working with the [Spice.ai OSS](https://spiceai.org) runtime — data federation, acceleration, search, AI/LLM, and cloud management.
+Open [Agent Skills](https://github.com/vercel-labs/skills) and plugins for AI coding agents working with the [Spice.ai OSS](https://spiceai.org) runtime — data federation, acceleration, search, AI/LLM, and cloud management.
 
 This is the **Spice.ai Marketplace**: packaged skills/plugins any compatible harness can load. The format works across Claude Code, Cursor, Codex, Grok, OpenCode, Pi, and other agents that support the open Agent Skills / plugin standard — not Claude-only.
 
@@ -81,6 +81,7 @@ Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with ru
 - [Spicepod Reference](https://docs.spiceai.org/reference/spicepod)
 - [Cookbook](https://github.com/spiceai/cookbook)
 - [Introducing Spice Skills](https://spice.ai/blog/introducing-spice-skills-for-ai-coding-agents)
+- [Agent Skills CLI](https://github.com/vercel-labs/skills)
 
 ## License
 
