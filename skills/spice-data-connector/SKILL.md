@@ -235,10 +235,12 @@ Connectors reading from object stores (S3, ABFS, GCS) or network storage (FTP, S
 | Text           | `txt`         | Stable | Document   |
 | PDF            | `pdf`         | Alpha  | Document   |
 | Microsoft Word | `docx`        | Alpha  | Document   |
+| Microsoft Excel | `xlsx`       | Alpha  | Document   |
+| PowerPoint     | `pptx`        | Alpha  | Document   |
 
 ### Document Formats
 
-Document files (md, txt, pdf, docx) produce a table with `location` and `content` columns:
+Document files (md, txt, pdf, docx, xlsx, pptx) produce a table with `location` and `content` columns:
 
 ```yaml
 datasets:

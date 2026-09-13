@@ -122,7 +122,13 @@ bounding it logs that fact at startup. `caching_stale_if_error` now fires when t
 surfaces a 429/5xx after exhausting `max_retries` (previously those looked like successful fetches).
 
 `acceleration.enabled: false` keeps the rest of the block in the manifest but the runtime now names
-the settings it discards (v2.3.0). Views honor `acceleration.ready_state` the same way datasets do.
+the settings it discards (v2.3.0) — `enabled: false` turns the block off rather than parking it, so a
+dataset that appears to cache is federating every query.
+
+Set `ready_state` at the **dataset or view level**, not inside `acceleration`. The in-block spelling
+is deprecated and will be removed; it takes precedence over the top-level key and applies even when
+`enabled: false`, which is why it is never listed among the discarded settings. The runtime warns at
+load and names the component.
 
 A file-mode DuckDB acceleration on `refresh_mode: full` grows on every refresh unless
 `on_full_refresh` is set; see spice-accelerators for that parameter.
@@ -190,14 +196,23 @@ acceleration:
   retention_sql: "DELETE FROM logs WHERE status = 'archived'"
 ```
 
-On DuckDB-accelerated datasets, retention evicts expired rows on every check interval as of v2.1.4 —
-including a policy that pairs a time window with an additional condition. On earlier builds those
-evictions could be skipped, so the file kept growing.
+On DuckDB-accelerated datasets, retention evicts expired rows on every check interval, including a
+policy that pairs a time window with an additional condition.
 
 On Cayenne, only the append path ran `retention_sql` before v2.2.1: a `refresh_mode: full` refresh
 reloaded every source row and brought back what the policy had removed. v2.2.1 runs it on `full` and
 on CDC `changes` too, and resolves a `now()` predicate once per pass instead of failing silently.
 Cayenne warns and skips retention under `mode: memory`.
+
+## Durable Write-Back
+
+`acceleration.write_mode: write_back` commits a write to the accelerator, then delivers it
+asynchronously to the source. Reconciling a row has to reach the source in one atomic step, so the
+runtime **rejects the dataset at registration** rather than accept a config that can lose a committed
+write. Today only PostgreSQL can deliver it that way, and the dataset must set a single-column
+`primary_key`, `mode: file`, no acceleration retention, and be the sole writer of those source rows.
+`INSERT`/`UPDATE` must run inside one `BEGIN; … COMMIT;`; `DELETE` and `MERGE` are rejected. Watch
+`dataset_acceleration_write_back_pending_keys` — a backlog that does not drain is a delivery problem.
 
 ## Constraints and Indexes
 

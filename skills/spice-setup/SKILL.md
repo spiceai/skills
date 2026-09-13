@@ -42,6 +42,13 @@ spice upgrade
 
 If `command not found`, add to PATH: `export PATH="$PATH:$HOME/.spice/bin"`
 
+That PATH entry finds the `spice` CLI; it does **not** decide which runtime the CLI launches.
+`spice run` and `spice version` resolve `spiced` in order — `$SPICED_PATH`, then beside the running
+`spice` binary, then `$HOME/.spice/bin/spiced`, then (under `sudo`) the invoking user's copy —
+installing one if none is found. `PATH` is never searched, so a `spiced` dropped there is ignored;
+set `SPICED_PATH` to pin a specific build (an invalid value is an error, not a fallback). `spice run`
+logs the runtime it resolved and where it came from.
+
 ## Quick Start
 
 ```bash
