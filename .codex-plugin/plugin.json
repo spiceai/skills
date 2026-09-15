@@ -1,6 +1,6 @@
 {
   "name": "spiceai-skills",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
   "author": {
     "name": "Spice AI",
@@ -24,9 +24,12 @@
   "interface": {
     "displayName": "Spice.ai Skills",
     "shortDescription": "Skills for the Spice.ai runtime",
-    "longDescription": "Agent Skills for Spice.ai \u2014 data federation, acceleration, search, AI/LLM, and cloud management. Aligns with Spice OSS runtime v2.3.0.",
+    "longDescription": "Agent Skills for Spice.ai \u2014 data federation, acceleration, search, AI/LLM, and cloud management. Aligns with Spice OSS runtime v2.3.1.",
     "developerName": "Spice AI",
     "category": "Developer Tools",
+    "capabilities": [
+      "Skills"
+    ],
     "websiteURL": "https://spiceai.org",
     "defaultPrompt": [
       "Help me set up Spice.ai and connect a data source",
