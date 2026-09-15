@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.1
+
+- Align plugin metadata with Spice.ai OSS runtime `v2.3.1`.
+- Publishing: create GitHub Release tag `v2.3.1`; [Release Plugin](https://github.com/spiceai/skills/actions/workflows/release.yml) uploads `skills-plugin-2.3.1.zip`.
+
 ## 2.3.0
 
 - First GitHub-versioned release aligned to Spice.ai OSS runtime `v2.3.0`.

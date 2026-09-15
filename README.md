@@ -68,7 +68,7 @@ npx skills add spiceai/skills -a cursor
 
 Or add this repo as a Cursor plugin / Team Marketplace source (requires [`.cursor-plugin/plugin.json`](.cursor-plugin/plugin.json)).
 
-**Publish (maintainers):** submit `https://github.com/spiceai/skills` at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) after manifests land on `trunk`. Plugin id: `spiceai-skills` @ `2.3.0`.
+**Publish (maintainers):** submit `https://github.com/spiceai/skills` at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) after manifests land on `trunk`. Plugin id: `spiceai-skills` @ `2.3.1`.
 
 ### Other agents (`npx`)
 
@@ -109,7 +109,7 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 
 ## Versioning
 
-Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.0` with runtime `v2.3.0`). Pin to GitHub release tag `v2.3.0` when you need a fixed surface, or use `trunk` for latest.
+Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.1` with runtime `v2.3.1`). Pin to GitHub release tag `v2.3.1` when you need a fixed surface, or use `trunk` for latest.
 
 ## Available Skills
 
