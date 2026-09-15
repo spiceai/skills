@@ -209,9 +209,28 @@ Cayenne warns and skips retention under `mode: memory`.
 `acceleration.write_mode: write_back` commits a write to the accelerator, then delivers it
 asynchronously to the source. Reconciling a row has to reach the source in one atomic step, so the
 runtime **rejects the dataset at registration** rather than accept a config that can lose a committed
-write. Today only PostgreSQL can deliver it that way, and the dataset must set a single-column
-`primary_key`, `mode: file`, no acceleration retention, and be the sole writer of those source rows.
-`INSERT`/`UPDATE` must run inside one `BEGIN; … COMMIT;`; `DELETE` and `MERGE` are rejected. Watch
+write. Today only PostgreSQL can deliver it that way, and every one of these is required — the
+dataset is refused at load if any is missing:
+
+```yaml
+datasets:
+  - from: postgres:public.orders
+    name: orders
+    replication:
+      enabled: true          # write-back lags the source; opt in explicitly
+    acceleration:
+      engine: cayenne        # only Cayenne records delivery markers
+      mode: file             # a recreating mode would discard undelivered writes
+      write_mode: write_back
+      refresh_mode: changes  # delivery is driven by the change stream
+      primary_key: id        # single column; composite keys are refused
+      on_conflict:
+        id: upsert           # the delivery worker reconciles on this key
+```
+
+The dataset must also carry no acceleration retention (a prune could drop an acknowledged row before
+it is delivered) and be the sole writer of those source rows. `INSERT`/`UPDATE` must run inside one
+`BEGIN; … COMMIT;`; `DELETE` and `MERGE` are rejected. Watch
 `dataset_acceleration_write_back_pending_keys` — a backlog that does not drain is a delivery problem.
 
 ## Constraints and Indexes

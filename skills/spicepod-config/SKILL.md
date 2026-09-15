@@ -156,10 +156,12 @@ are exempt. Resolved per request, so changing it alone needs no restart.
 past `runtime.query.memory_limit` — and it doubles as DuckDB's own `temp_directory`, Cayenne's
 compaction scratch, and a cluster executor's working directory. Every spilled batch is a synchronous
 write the query waits on, so point it at local NVMe/SSD with room to spare: not the root volume, not
-a network file system, and not a RAM-backed mount, whose pages count against the process. Unset, it
-falls back to `$TMPDIR` (and Cayenne logs a startup reminder). Total spill is capped at 100 GB per
-runtime and is not configurable — `SET datafusion.runtime.max_temp_directory_size` is rejected
-because the query APIs do not accept `SET`.
+a network file system, and not a RAM-backed mount, whose pages count against the process. Unset, the
+engines diverge: DataFusion spills to `$TMPDIR` (or `/tmp`) and Cayenne logs a startup reminder,
+while DuckDB is never told the path at all and falls back to its own default — a `.tmp` directory
+beside its database file. Set it explicitly, or you will be watching the wrong disk. DataFusion's
+spill is capped at 100 GB and is not configurable — `SET datafusion.runtime.max_temp_directory_size`
+is rejected because the query APIs do not accept `SET`.
 
 ```yaml
 runtime:
