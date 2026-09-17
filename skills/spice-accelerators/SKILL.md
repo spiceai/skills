@@ -223,6 +223,14 @@ accelerators ignore it.
 | `ebs`       | Network block storage (Amazon EBS, Azure Managed Disks).    |
 | `tmpfs`     | RAM-backed storage.                                         |
 
+`auto` only ever detects anything on Linux — on every other platform it returns unknown — and there
+it reads the device out of sysfs, so it also returns unknown when that lookup fails. On Linux it
+detects EBS, Azure Managed Disks, EC2 instance NVMe, and `tmpfs`/`ramfs` by name, and maps NFS and
+SMB/CIFS mounts to `ebs`. It does **not** recognize GCP Persistent Disk or Hyperdisk, SAN, or Ceph:
+where those are exposed as non-rotational devices they resolve to `local_ssd`, which tunes for a
+latency they cannot deliver, and otherwise they come back unknown. Either way the profile is wrong,
+so set `storage_profile: ebs` explicitly on any network block storage outside AWS and Azure.
+
 ```yaml
 acceleration:
   engine: duckdb

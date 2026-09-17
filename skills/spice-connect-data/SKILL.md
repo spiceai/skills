@@ -141,6 +141,8 @@ Connectors reading from object stores (S3, ABFS) or network storage (FTP, SFTP) 
 | Text           | `txt`         | Document   |
 | PDF            | `pdf`         | Document   |
 | Microsoft Word | `docx`        | Document   |
+| Microsoft Excel | `xlsx`       | Document   |
+| PowerPoint     | `pptx`        | Document   |
 
 Document files produce a table with `location` and `content` columns:
 
@@ -298,6 +300,21 @@ datasets:
 ```sql
 INSERT INTO transactions SELECT * FROM staging_transactions;
 ```
+
+### Deleting from Iceberg
+
+`DELETE FROM` needs an Iceberg v2+ table and is written as an **equality delete file** — "remove rows
+whose key columns equal these values". That key cannot carry float/double columns (`NaN` is not equal
+to itself), nested columns, or any column without a Parquet field ID. A `WHERE` clause reading a
+column outside the key is not expressible exactly, so rather than delete the row beside the one
+selected, Spice **refuses** the statement and names the offending column. Also refused: a subquery
+predicate (run it first and delete by the values it returns), a volatile predicate such as
+`random()`, and any `WHERE` on a table with no keyable column. `DELETE FROM t` with no condition and
+a key-columns-only `WHERE` both work; `UPDATE` is not supported.
+
+For writes that must land in a non-Iceberg source of record, see `acceleration.write_mode:
+write_back` in spice-acceleration — it is PostgreSQL-only and rejects unsupported configurations at
+load.
 
 ## Referencing Secrets
 
