@@ -44,7 +44,7 @@
     {
       "id": 3,
       "prompt": "My accelerated dataset keeps growing and I'm running out of disk space. It's an events table and I only need the last 30 days. How do I set up automatic cleanup?",
-      "expected_output": "Configure retention policy with retention_period: 30d and retention_check_enabled: true",
+      "expected_output": "Configure retention policy with retention_period: 30d, retention_check_enabled: true, and retention_check_interval (required; without it no retention runs), with a dataset-level time_column for retention_period to compare against",
       "files": [],
       "assertions": [
         {

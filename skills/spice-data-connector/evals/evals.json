@@ -66,6 +66,32 @@
           "description": "Should mention Kafka connector and format"
         }
       ]
+    },
+    {
+      "prompt": "We run Spice v2.1.5 and want to stream changes from a MySQL table into a DuckDB acceleration with refresh_mode: changes. How do I set that up?",
+      "expected_output": "Explain that native MySQL binlog CDC (refresh_mode: changes on mysql:) needs Spice v2.2.0 or later, so v2.1.5 must upgrade first (spice upgrade) or use Debezium; show the MySQL dataset with refresh_mode: changes, primary_key, and an on_conflict upsert map",
+      "files": [],
+      "assertions": [
+        {
+          "name": "states_minimum_version",
+          "type": "regex",
+          "value": "v?2\\.2(\\.0)?",
+          "description": "Should say native MySQL CDC needs v2.2.0+"
+        },
+        {
+          "name": "recommends_upgrade",
+          "type": "regex",
+          "value": "(?i)upgrad",
+          "description": "Should tell a v2.1.5 user to upgrade (or use an older-version alternative)"
+        },
+        {
+          "name": "uses_changes_mode",
+          "type": "contains",
+          "value": "refresh_mode: changes",
+          "description": "Should show refresh_mode: changes"
+        }
+      ],
+      "id": 4
     }
   ]
 }

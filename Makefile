@@ -1,4 +1,4 @@
-.PHONY: eval eval-skill grade package clean help
+.PHONY: eval eval-skill grade package check-versions clean help
 
 SKILL ?=
 
@@ -27,6 +27,9 @@ endif
 
 package: ## Package the plugin into dist/
 	./scripts/package_plugin.sh
+
+check-versions: ## Check manifests and skills target the same Spice release line
+	bash scripts/check_versions.sh
 
 clean: ## Remove workspace dirs and dist/
 	rm -rf *-workspace/ dist/

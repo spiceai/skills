@@ -42,7 +42,7 @@
     {
       "id": 2,
       "prompt": "What sections can I put in a spicepod.yaml? Give me an overview of everything Spice supports.",
-      "expected_output": "List all sections: datasets, models, embeddings, secrets, catalogs, views, tools, workers, runtime, snapshots, evals, dependencies",
+      "expected_output": "List all sections: datasets, catalogs, views, models, embeddings, rerankers, tools, workers, functions, secrets, runtime, snapshots, management, metadata, dependencies (no evals — removed in v2.0.0)",
       "files": [],
       "assertions": [
         {
@@ -74,7 +74,7 @@
     {
       "id": 3,
       "prompt": "How do I set up Prometheus metrics and OpenTelemetry tracing for my Spice app?",
-      "expected_output": "Configure runtime.telemetry section with otel_exporter endpoint, mention Prometheus metrics endpoint at port 9090",
+      "expected_output": "Configure runtime.telemetry section with otel_exporter endpoint, mention the Prometheus metrics endpoint is disabled by default and enabled with the --metrics flag (e.g. 127.0.0.1:9090)",
       "files": [],
       "assertions": [
         {
@@ -90,6 +90,38 @@
           "description": "Should mention Prometheus metrics endpoint"
         }
       ]
+    },
+    {
+      "prompt": "I have an old spicepod from Spice v1.11 with an `evals:` section and a `runtime.results_cache` block. What do I need to change to run it on Spice v2.3?",
+      "expected_output": "The evals section (and /v1/evals) was removed in v2.0.0, so delete it; runtime.results_cache is deprecated in favor of runtime.caching.sql_results (cache_max_size becomes max_size) and auto-migrates; set version: v2",
+      "files": [],
+      "assertions": [
+        {
+          "name": "evals_removed",
+          "type": "regex",
+          "value": "(?is)evals.{0,200}(remov|no longer)|(remov|no longer).{0,200}evals",
+          "description": "Should say the evals section was removed"
+        },
+        {
+          "name": "migrates_results_cache",
+          "type": "contains",
+          "value": "sql_results",
+          "description": "Should move results_cache to runtime.caching.sql_results"
+        },
+        {
+          "name": "renames_max_size",
+          "type": "contains",
+          "value": "max_size",
+          "description": "Should rename cache_max_size to max_size"
+        },
+        {
+          "name": "uses_v2_manifest",
+          "type": "contains",
+          "value": "version: v2",
+          "description": "Should recommend the v2 manifest version"
+        }
+      ],
+      "id": 4
     }
   ]
 }

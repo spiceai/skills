@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "I have a 50GB analytics dataset with complex window function queries. Should I use Arrow or DuckDB as my acceleration engine?",
-      "expected_output": "Recommend DuckDB for medium datasets with complex SQL. Explain Arrow is better for small datasets, DuckDB for complex SQL with memory management.",
+      "expected_output": "Between the two, recommend DuckDB over Arrow: Arrow is in-memory and suited to small datasets (<1 GB), while DuckDB handles complex SQL (window functions) with memory management. Note that for datasets of 10 GB or larger the docs recommend Cayenne, which needs 1/3 to 1/2 the memory of DuckDB.",
       "files": [],
       "assertions": [
         {

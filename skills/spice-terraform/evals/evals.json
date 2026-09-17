@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "I want to manage my Spice.ai Cloud infrastructure with Terraform. Write me a complete config that creates an app, adds secrets, and deploys it.",
-      "expected_output": "Complete Terraform config with provider, data sources for regions/images, spiceai_app, spiceai_secret with for_each, spiceai_deployment with triggers",
+      "expected_output": "Complete Terraform config with provider, data source for regions (container images only when pinning image_tag on the Enterprise plan), spiceai_app, spiceai_secret with for_each, spiceai_deployment with triggers",
       "files": [],
       "assertions": [
         {

@@ -4,14 +4,14 @@
     {
       "id": 1,
       "prompt": "I want to create a new Spice.ai Cloud app called 'analytics-prod' in the US West region, add a database secret, and deploy it. Walk me through the API calls.",
-      "expected_output": "Step-by-step: list regions, POST /v1/apps, POST secrets, POST deployments, check status",
+      "expected_output": "Step-by-step: list regions, POST /v1/projects with region us-west-2 (legacy /v1/apps also works), POST secrets, POST deployments, check status",
       "files": [],
       "assertions": [
         {
           "name": "creates_app",
           "type": "regex",
-          "value": "POST.*(/v1/apps|create-app)",
-          "description": "Should show creating the app via API"
+          "value": "POST.*(/v1/(projects|apps)|create-(project|app))",
+          "description": "Should show creating the project via API (canonical /v1/projects or legacy /v1/apps)"
         },
         {
           "name": "adds_secret",

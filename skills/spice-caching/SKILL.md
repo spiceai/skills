@@ -11,6 +11,23 @@ Configure in-memory caching for SQL query results, search results, and embedding
 
 Spice caches results from SQL queries (`/v1/sql`), search (`/v1/search`), and embeddings requests. All three caches are **enabled by default** with a 1-second TTL and 128 MiB max size. Caching applies to HTTP and Arrow Flight APIs.
 
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+
+- **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
+- **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
+- **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `runtime.results_cache` (`cache_max_size`) | Deprecated in v1.4.0 (auto-migrates) | `runtime.caching.sql_results` (`max_size`) |
+| `engine: pingora` on an OSS build | Breaking in v2.2.0 (Enterprise only; falls back to Moka) | `engine: moka` (default) |
+| Caching-accelerator storage created before v2.0.0 | Breaking in v2.0.0 (errors at startup) | Delete the accelerator file before upgrading |
+| Refresh or DML write evicting cached results | Changed in v2.3.0 when `stale_while_revalidate_ttl` is set (served `STALE`) | Leave the TTL unset or `0s` to keep eviction |
+| Unlabeled `*_cache_evictions` | Changed in v2.1.5 (`reason` label) | Aggregate by `reason` |
+
 ## Configuration
 
 Caching is configured under `runtime.caching` in `spicepod.yaml`:
@@ -51,7 +68,7 @@ runtime:
 | `eviction_policy`   | `lru`    | `lru` (Least Recently Used) or `tiny_lfu` (higher hit rate for skewed access)         |
 | `item_ttl`          | `1s`     | Cache entry TTL (Time to Live)                                                        |
 | `hashing_algorithm` | `xxh3`   | Hash for cache keys: `xxh3`, `ahash`, `siphash`, `blake3`, `xxh32`, `xxh64`, `xxh128` |
-| `engine`            | `moka`   | Cache backend: `moka`, or `pingora` on a Spice.ai Enterprise build                     |
+| `engine`            | `moka`   | Cache backend: `moka`, or `pingora` on a Spice.ai Enterprise build (**Breaking in v2.2.0**) |
 
 `engine: pingora` is **not** rejected on an open-source build — it parses, logs a fallback line, and
 runs on Moka. Read the engine off the cache's own startup line (`Initialized sql results cache; … engine: Moka`)
@@ -112,16 +129,14 @@ runtime:
 
 ### Stale across acceleration refresh (v2.3.0+)
 
-Before v2.3.0, an acceleration refresh hard-evicted every dependent SQL results-cache entry (a successful
-`refresh_mode: full` flushed the per-table cache). When `stale_while_revalidate_ttl` is configured,
-v2.3.0 **marks** dependent entries stale as of the refresh instead of deleting them. Inside the stale
-window the runtime serves the previous result with `Results-Cache-Status: STALE` and starts one
-background revalidation per key. Past the window the request is a miss. With no stale window
-configured, invalidation stays hard (same as before). Memory accounting for SQL results, search
-results, and embeddings caches was also corrected so `max_size` tracks retained memory more closely.
+With a non-zero `stale_while_revalidate_ttl`, an acceleration refresh or DML write **marks** dependent
+SQL results-cache entries stale instead of evicting them. Inside the window — measured from the change,
+but never past `item_ttl + stale_while_revalidate_ttl` after the entry was stored — the previous result
+is served with `Results-Cache-Status: STALE` while one background revalidation runs per key; past it,
+the request is a miss. With no window (unset or `0s`), invalidation evicts, as it did before v2.3.0.
 
-For dataset-level `refresh_mode: caching` size/count bounds (`caching_max_size`, `caching_max_items`),
-see spice-acceleration.
+For dataset-level `refresh_mode: caching` size/count bounds (`caching_max_size`, `caching_max_items`,
+v2.3.0+), see spice-acceleration.
 
 ## Cache Control Headers
 
@@ -135,7 +150,6 @@ Use the standard `Cache-Control` header with `/v1/sql` and `/v1/search`:
 | `min-fresh=N`      | Require cached entry to remain fresh for at least N seconds       |
 | `max-stale=N`      | Accept stale responses up to N seconds old                        |
 | `only-if-cached`   | Return only cached responses; error on cache miss                 |
-| `stale-if-error=N` | Serve stale cache (up to N seconds) if fetching fresh data fails  |
 
 ```bash
 # Skip cache for this query
@@ -153,11 +167,12 @@ curl -H "cache-control: only-if-cached" -XPOST http://localhost:8090/v1/sql -d '
 
 ### Spice CLI
 
+`--cache-control` takes only `cache` (default) or `no-cache` — `spice sql` silently treats any other
+value as `cache`, and `spice search` rejects it. Send `min-fresh`, `max-stale`, or `only-if-cached` as
+an HTTP or Flight header instead.
+
 ```bash
 spice sql --cache-control no-cache
-spice sql --cache-control min-fresh=30
-spice sql --cache-control max-stale=60
-spice sql --cache-control only-if-cached
 spice search --cache-control no-cache
 ```
 
@@ -222,18 +237,19 @@ Cache metrics are available at the Prometheus-compatible metrics endpoint. Prefi
 | `*_cache_max_size_bytes` | Gauge   | Configured max cache size |
 | `*_cache_requests`       | Counter | Total cache lookups       |
 | `*_cache_hits`           | Counter | Total cache hits          |
+| `*_cache_misses`         | Counter | Total cache misses        |
 | `*_cache_items_count`    | Gauge   | Current items in cache    |
 | `*_cache_size_bytes`     | Gauge   | Current cache size        |
-| `*_cache_evictions`      | Counter | Entries removed, by `reason` |
+| `*_cache_evictions`      | Counter | Entries removed, by `reason` (v2.1.5+) |
 | `*_cache_hit_ratio`      | Gauge   | Hit ratio (hits / total)  |
 
-As of v2.1.5, `*_cache_evictions` carries a `reason` label — `size` (over `max_size`), `expired`
-(past `item_ttl`), or `invalidated` (a refresh or DML write dropped entries referencing a table). On
-an accelerated dataset with a periodic refresh `invalidated` usually dominates, so alert on `size`
-and `expired` for real cache pressure. The SQL results cache also emits `results_cache_stale_rejections`,
-counting lookups that found an entry but refused to serve it because a table it read had since been
-invalidated; those are counted in `results_cache_misses` too. Every series is exported from startup,
-so a zero is no activity rather than a missing metric.
+The `reason` label is `size` (over `max_size`), `expired` (past `item_ttl`), or `invalidated` (a
+refresh or DML write dropped entries that read a table); alert on `size` and `expired` for real cache
+pressure. `results_cache_stale_rejections` (v2.1.5+) counts lookups that refused an entry because a
+table it read had changed; they are also counted in `results_cache_misses`. With a non-zero
+`stale_while_revalidate_ttl`, refreshes mark entries stale instead of evicting them, so watch
+`results_cache_table_invalidations{mode="evict"|"mark_stale"}` and
+`results_cache_swr_revalidations{outcome}` (v2.3.0+). Counters export as zero from startup (v2.1.5+).
 
 ## Common Recipes
 
@@ -278,8 +294,14 @@ runtime:
 
 | Issue                                                | Solution                                                                                                                                                  |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings)                                |
-| Cache filling up quickly                             | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl`                                                                                         |
-| Stale data being served                              | DML write, retention, and localpod parent refresh still invalidate; as of v2.3.0 an acceleration refresh with `stale_while_revalidate_ttl` set serves `STALE` instead of hard-evicting — reduce `item_ttl` / SWR TTL or use `cache-control: no-cache` if that is unwanted |
+| Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings); a refresh or DML write on a queried table evicts entries (`reason="invalidated"`) unless `stale_while_revalidate_ttl` is set (v2.3.0+) |
+| Cache filling up quickly                             | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl`. **Changed in v2.3.0**: `max_size` counts more of each entry's retained memory          |
+| Stale data being served                              | With `stale_while_revalidate_ttl` set, entries are served `STALE` for that window after `item_ttl` expires or (v2.3.0+) after a refresh or DML write — reduce `item_ttl` / the SWR TTL, or send `cache-control: no-cache` |
 | Dynamic functions (`NOW()`) returning cached results | Switch to `cache_key_type: plan` or use `cache-control: no-cache`                                                                                         |
 | SWR conflict error                                   | Don't set both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset |
+
+## Documentation
+
+- [Caching](https://spiceai.org/docs/features/caching)
+- [Runtime Caching Reference](https://spiceai.org/docs/reference/spicepod/runtime#runtimecaching)
+- [Caching Refresh Mode](https://spiceai.org/docs/features/data-acceleration/refresh-modes/caching)

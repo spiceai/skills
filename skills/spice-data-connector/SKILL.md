@@ -7,6 +7,27 @@ description: Configure individual data source connectors in Spice — PostgreSQL
 
 Data Connectors enable federated SQL queries across databases, data warehouses, data lakes, and files. Spice connects directly to your existing data sources and provides a unified SQL interface — no ETL pipelines required. The query planner (built on Apache DataFusion) optimizes and routes queries, including filter pushdown and column projection.
 
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+
+- **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
+- **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
+- **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `schema_inference` dataset field | Removed in v2.2.0 (fails to load) | Delete it — inference is always on |
+| Metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` (document tables keep `location`, `content`) |
+| ScyllaDB in the default build | Breaking in v2.3.0 | `--features scylladb` build, or Spice.ai Enterprise |
+| DynamoDB `ready_lag`, `lag_exceeds_shard_retention_behavior` | Deprecated in v2.2.0 | `dynamodb_replication_ready_lag`, `dynamodb_replication_invalid_checkpoint_behavior` |
+| `mongodb_num_docs_to_infer_schema` | Deprecated in v2.2.0 | `mongodb_schema_infer_max_records` |
+| `pg_replication_temporary_slot` | Deprecated in v2.2.0 (ignored) | Delete it — slots are always durable |
+| `csv_schema_infer_max_records`, `tsv_schema_infer_max_records` | Deprecated in v1.11 | `schema_infer_max_records` |
+| `runtime.params.github_max_concurrent_connections` | Deprecated in v2.0 | `runtime.source_rate_control.github_concurrent_connections_limit` |
+| `spiceai:` prefix, `spiceai_token`, `spiceai_flight_endpoint` | Legacy aliases, still accepted | `spice.ai`, `spiceai_api_key`, `spiceai_endpoint` |
+
 ## Cross-Source Federation
 
 Datasets from different connectors are queryable in one SQL statement — a `postgres:` table joined to
@@ -33,22 +54,22 @@ datasets:
 | Connector     | From Format             | Status                        |
 | ------------- | ----------------------- | ----------------------------- |
 | PostgreSQL    | `postgres:schema.table` | Stable (native WAL CDC; also Amazon Redshift) |
-| MySQL         | `mysql:schema.table`    | Stable (native binlog CDC)    |
-| DuckDB        | `duckdb:database.table` | Stable                        |
+| MySQL         | `mysql:schema.table`    | Stable (native binlog CDC v2.2.0+) |
+| DuckDB        | `duckdb:database.schema.table` | Stable                 |
 | DynamoDB      | `dynamodb:table`        | Stable (with Streams)         |
 | Azure Cosmos DB | `cosmosdb:database.container` | Release Candidate      |
-| MS SQL Server | `mssql:db.table`        | Beta                          |
+| MS SQL Server | `mssql:database.schema.table` | Beta                    |
 | MongoDB       | `mongodb:collection`    | Alpha (Change Streams)        |
 | ClickHouse    | `clickhouse:db.table`   | Alpha                         |
 | Oracle        | `oracle:schema.table`   | Alpha                         |
-| ScyllaDB      | `scylladb:table`        | Alpha (opt-in build; not in default binary as of v2.3.0) |
+| ScyllaDB      | `scylladb:table`        | Alpha (Spice.ai Enterprise; see below) |
 
 ### Data Warehouses
 
 | Connector               | From Format                       | Status            |
 | ----------------------- | --------------------------------- | ----------------- |
-| Databricks (Delta Lake) | `databricks:catalog.schema.table` | Stable            |
-| Snowflake               | `snowflake:db.schema.table`       | Release Candidate |
+| Databricks              | `databricks:catalog.schema.table` | Stable with `mode: delta_lake`; Beta with `mode: spark_connect` (the default) |
+| Snowflake               | `snowflake:DB.SCHEMA.TABLE`       | Release Candidate |
 | Spark                   | `spark:db.table`                  | Beta              |
 
 ### Data Lakes & Object Storage
@@ -58,7 +79,7 @@ datasets:
 | S3           | `s3://bucket/path/`          | Stable            |
 | Delta Lake   | `delta_lake:/path/to/delta/` | Stable            |
 | File (local) | `file:./path/to/data`        | Stable            |
-| Iceberg      | `iceberg:table`              | Release Candidate (read+write) |
+| Iceberg      | `iceberg:https://<catalog>/v1/namespaces/<ns>/tables/<table>` | Release Candidate (read+write) |
 | DuckLake     | `ducklake:table`             | Beta              |
 | Azure BlobFS | `abfs://container/path/`     | Alpha             |
 | Google Cloud Storage | `gs://bucket/path/`  | Alpha             |
@@ -68,23 +89,26 @@ datasets:
 
 | Connector    | From Format                           | Status            |
 | ------------ | ------------------------------------- | ----------------- |
-| Spice.ai     | `spice.ai:path/to/dataset`            | Stable            |
+| Spice.ai     | `spice.ai/<org>/<app>/datasets/<name>` | Stable           |
 | Dremio       | `dremio:source.table`                 | Stable            |
 | GitHub       | `github:github.com/owner/repo/issues` | Stable            |
-| GraphQL      | `graphql:endpoint`                    | Release Candidate |
+| Git          | `git:https://host/owner/repo.git@<ref>` | Release Candidate |
+| GraphQL      | `graphql:https://host/graphql`        | Release Candidate |
 | ADBC         | `adbc:table`                          | Release Candidate |
-| FlightSQL    | `flightsql:query`                     | Beta              |
-| ODBC         | `odbc:connection`                     | Beta (Spice.ai Enterprise; opt-in build like ScyllaDB) |
-| SharePoint   | `sharepoint:site/path`                | Beta              |
+| FlightSQL    | `flightsql:catalog.schema.table`      | Beta              |
+| ODBC         | `odbc:path.to.table`                  | Beta (Spice.ai Enterprise) |
+| SharePoint   | `sharepoint:drive:<name>/path:/<folder>` | Beta           |
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
 | Kafka        | `kafka:topic`                         | Alpha             |
-| Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (push) | Alpha       |
+| Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (HTTP push, v2.2.0+) | Alpha |
 | Elasticsearch | `elasticsearch:index`                | Alpha (Spice.ai Enterprise) |
-| IMAP         | `imap:mailbox`                        | Alpha             |
+| IMAP         | `imap:<email_address>`                | Alpha             |
 | localpod     | `localpod:dataset`                    | Alpha             |
 | SMB          | `smb://host/share/path/`              | Alpha             |
 | NFS          | `nfs://host/path/`                    | Alpha (Spice.ai Enterprise) |
+
+Spice.ai Enterprise connectors are not in the default OSS build ([Distributions](https://spiceai.org/docs/reference/distributions)).
 
 ## Common Examples
 
@@ -103,11 +127,10 @@ datasets:
       enabled: true
 ```
 
-### MySQL with Native CDC
+### MySQL with Native CDC (v2.2.0+)
 
-`refresh_mode: changes` streams the source's binary log (`binlog_format=ROW`) straight into the
-accelerator — no Kafka, no Debezium (v2.2.0+). Spice snapshots the table, then applies committed
-inserts, updates, and deletes.
+`refresh_mode: changes` snapshots the table, then streams committed inserts, updates, and deletes
+from the binary log (`binlog_format=ROW`) into the accelerator — no Kafka, no Debezium.
 
 ```yaml
 datasets:
@@ -128,12 +151,11 @@ datasets:
         id: upsert
 ```
 
-`primary_key` and `on_conflict: upsert` are required on every upsert-capable engine (`duckdb`,
-`sqlite`, `cayenne`, `postgres`, `turso`); the connector fails fast at startup without them. Only
-append-only `arrow` is exempt. A file-backed accelerator persists the resume position in its
-`spice_sys_mysql_binlog` sidecar, so a restart resumes rather than re-snapshotting. Delivery is
-at-least-once, which the primary-key upsert absorbs. Where GTID is enabled on the source, the
-position is tracked as a GTID set and survives a failover to a new primary.
+`primary_key` and an `on_conflict` upsert on that key (the map above) are required on every upsert-capable engine (`duckdb`,
+`sqlite`, `cayenne`, `postgres`, `turso`) — startup fails fast without them; append-only `arrow` is
+exempt. A file-backed accelerator persists the resume position in its `spice_sys_mysql_binlog`
+sidecar, so a restart resumes without re-snapshotting. Delivery is at-least-once (the upsert absorbs
+replays). With GTID enabled on the source, the position is a GTID set that survives a failover.
 
 ### S3 with Parquet
 
@@ -152,7 +174,8 @@ datasets:
 ### GitHub Issues, Reviews, Releases (v2.3.0+)
 
 Paths under `github:github.com/{owner}/{repo}/…` (and owner/login scoped tables). Every table returns
-`repo` and `owner` columns so a multi-repo `UNION ALL` stays separable. v2.3.0 adds:
+an `owner` column, and repository-scoped tables also return `repo`, so a multi-repo `UNION ALL` stays
+separable. v2.3.0 adds:
 
 | Path | Rows |
 | --- | --- |
@@ -165,8 +188,8 @@ Paths under `github:github.com/{owner}/{repo}/…` (and owner/login scoped table
 | `github.com/{login}/user` | Public profile for one login |
 
 `pulls` gains draft/merge-queue/review-decision columns (e.g. `is_draft`, `mergeable`,
-`review_decision`, `status_check_rollup`, `base_ref`, `head_sha`, …). GraphQL page size is bounded so
-large repos no longer fail with `Resource limits for this query exceeded`.
+`review_decision`, `status_check_rollup`, `base_ref`, `head_sha`, …), and large repos no longer fail
+with `Resource limits for this query exceeded`.
 
 ```yaml
 datasets:
@@ -174,6 +197,8 @@ datasets:
     name: spiceai.issues
     params:
       github_token: ${ secrets:GITHUB_TOKEN }
+      github_query_mode: search # push created_at filters to the GitHub Search API
+    time_column: created_at # required by refresh_mode: append and refresh_data_window
     acceleration:
       enabled: true
       refresh_mode: append
@@ -194,10 +219,10 @@ datasets:
     name: sales
 ```
 
-### HTTP JSON API Response Cache
+### HTTP JSON API Response Cache (v2.2.1+)
 
-A dynamic JSON API dataset caches responses. Since v2.2.1 that cache is bounded per dataset —
-previously it kept every response for the life of the process.
+A dynamic JSON API dataset keeps origin responses in its own per-dataset, size-bounded cache (unbounded
+before v2.2.1).
 
 ```yaml
 datasets:
@@ -208,39 +233,41 @@ datasets:
       response_cache_fallback_ttl: 5m # only for an origin sending no Cache-Control at all
 ```
 
-The byte value must be a whole number — `64MiB` is rejected at load. The origin's `Cache-Control`
-always wins, including `no-store`, `no-cache`, and `private`, which are never retained. Structured
-HTTP file datasets do not use this cache.
+The byte value must be a whole number (`64MiB` is rejected at load). The origin's `Cache-Control`
+always wins (`no-store`, `no-cache`, `private` are never retained); structured HTTP files skip it.
 
-**ScyllaDB (breaking, v2.3.0):** the connector is out of the default `spiced` build (same pattern as
-ODBC). Build with `--features scylladb` or `make install-scylladb`. A Spicepod that names `scylladb:`
-on a build without it now reports the missing feature instead of a near-match name.
+**ScyllaDB — Breaking in v2.3.0:** out of the default open source `spiced` build (like ODBC). Build
+with `--features scylladb` / `make install-scylladb`, or use a Spice.ai Enterprise distribution. On a
+build without it, a `scylladb:` dataset fails to load and names the missing feature.
 
-**BigQuery (via ADBC):** v2.3.0 federates more shapes as one remote job (temporal expressions,
-recursive CTEs, correlated subqueries, window aggregates, multi-dataset same-project queries) and
-cancels the BigQuery job when the client goes away. Use `from: adbc:…` with the BigQuery ADBC driver;
-see [ADBC / BigQuery](https://spiceai.org/docs/components/data-connectors/adbc).
+**BigQuery (via ADBC):** use `from: adbc:<table>` with `adbc_driver: bigquery`. v2.3.0 runs more
+shapes as one BigQuery job (temporal expressions, recursive CTEs, correlated subqueries, window
+aggregates, multi-dataset same-project queries) and cancels the job when the client goes away. See
+[ADBC / BigQuery](https://spiceai.org/docs/components/data-connectors/adbc).
 
-**Databricks:** Unity Catalog streaming tables and views are accepted (v2.3.0).
+**Databricks:** the connector accepts Unity Catalog streaming tables and views (v2.3.0+).
 
 ## File Formats
 
-Connectors reading from object stores (S3, ABFS, GCS) or network storage (FTP, SFTP) support:
+File-based connectors (S3, ABFS, GCS, HTTP/S, FTP/SFTP, SMB, NFS, local `file:`) support:
 
 | Format         | `file_format` | Status | Type       |
 | -------------- | ------------- | ------ | ---------- |
 | Apache Parquet | `parquet`     | Stable | Structured |
 | CSV            | `csv`         | Stable | Structured |
+| JSON           | `json`        | Stable | Structured |
 | Markdown       | `md`          | Stable | Document   |
 | Text           | `txt`         | Stable | Document   |
-| PDF            | `pdf`         | Alpha  | Document   |
+| PDF            | `pdf`         | Beta   | Document   |
 | Microsoft Word | `docx`        | Alpha  | Document   |
 | Microsoft Excel | `xlsx`       | Alpha  | Document   |
 | PowerPoint     | `pptx`        | Alpha  | Document   |
 
+Also `tsv` and `jsonl` (see the File Formats reference).
+
 ### Document Formats
 
-Document files (md, txt, pdf, docx, xlsx, pptx) produce a table with `location` and `content` columns:
+Document files (md, txt, pdf, docx, xlsx, pptx) produce one row per file with `location` and `content` columns (not `_location`):
 
 ```yaml
 datasets:
