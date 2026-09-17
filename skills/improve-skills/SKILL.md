@@ -142,8 +142,14 @@ Remove (no longer valid):
 
 Constraints: keep under 500 lines, match the existing house style
 (YAML examples, comparison tables, cross-references to sibling skills),
-aim for a neutral net line delta. See CLAUDE.md for repo conventions.
+aim for a neutral net line delta. Mark additions `(vX.Y.Z+)` at the release
+that shipped them, and move removed or deprecated config into the skill's
+Version Compatibility table. See CLAUDE.md "Version Awareness".
 ```
+
+When a run covers a new Spice release, bump every plugin manifest and each
+skill's `(checked against vX.Y.Z)`; on a new minor, also update the target line
+(`Written for **Spice vX.Y.x**`).
 
 If the skill-creator plugin is not installed, apply the edits directly against
 the same brief and house style rather than skipping the run — skill-creator
@@ -155,9 +161,11 @@ Skill-creator's full loop includes a browser-based human review step. In an unat
 
 ```bash
 make eval SKILL=<name>
+make check-versions
 ```
 
-The repo's existing eval harness is the automated quality bar. Every touched skill must pass before the PR opens. A regression means the edit broke something the skill previously did well — fix the edit, do not weaken the eval to make it pass.
+The repo's existing eval harness is the automated quality bar; `check-versions`
+confirms the manifests and every skill's target line still agree. Every touched skill must pass before the PR opens. A regression means the edit broke something the skill previously did well — fix the edit, do not weaken the eval to make it pass.
 
 If a shipped change genuinely invalidates an eval assertion (the old assertion tested behavior that no longer exists), update the assertion and call that out explicitly in the PR body — it is a meaningful change to the quality bar and reviewers must see it.
 

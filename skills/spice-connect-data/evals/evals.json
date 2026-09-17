@@ -50,7 +50,7 @@
     {
       "id": 3,
       "prompt": "We use Unity Catalog at our company. Can I connect Spice to it so I can query our existing tables without manually defining each dataset?",
-      "expected_output": "Configure a catalog with from: unity_catalog, provide endpoint and token, use include patterns to filter schemas",
+      "expected_output": "Configure a catalog with from: unity_catalog:<Unity Catalog catalog API URL> (the URL is required; there is no endpoint param), provide unity_catalog_token, use include patterns to filter schemas",
       "files": [],
       "assertions": [
         {

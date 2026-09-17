@@ -7,6 +7,26 @@ description: Choose and configure the right acceleration engine — Arrow, DuckD
 
 Accelerators materialize data locally from connected sources for faster queries and reduced load on source systems.
 
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+
+- **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
+- **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
+- **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `partition_by` with `engine: duckdb` (and the DuckDB partition params) | Removed in v2.2.0 | `engine: cayenne` or `arrow` |
+| DuckDB `partitioned_write_flush_threshold` | Renamed in v2.0.0 (`…_rows`); removed in v2.2.0 | Cayenne or Arrow partitioning |
+| `acceleration.params.cayenne_segment_cache_mb` | Deprecated in v2.2.0 (ignored) | `runtime.params.cayenne_segment_cache_mb` |
+| Unset `cayenne_tuning` | Breaking in v2.2.0 (now resolves to `auto`) | `cayenne_tuning: adaptive` for the closed-loop controller |
+| DuckDB v1.5 SQL and functions | Changed in v2.2.1 (bundled DuckDB is v1.4.4) | DuckDB 1.4-compatible SQL |
+| `hash_index: enabled` (Arrow) | Ignored since v2.0.0 | `primary_key` |
+| `turso_mvcc` | Removed in v2.0.0 (MVCC always on) | Delete it |
+| `acceleration.ready_state` | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
+
 ## Basic Configuration
 
 ```yaml
@@ -15,78 +35,62 @@ datasets:
     name: my_table
     acceleration:
       enabled: true
-      engine: duckdb # arrow, duckdb, sqlite, cayenne, postgres, turso
-      mode: memory # memory or file
+      engine: duckdb # arrow (default), duckdb, sqlite, cayenne, postgres, turso
+      mode: memory # memory (default) or file
       refresh_check_interval: 1h
 ```
 
 ## Choosing an Accelerator
 
-| Use Case                                 | Engine     | Why                                                     |
-| ---------------------------------------- | ---------- | ------------------------------------------------------- |
-| Small datasets (<1 GB), max speed        | `arrow`    | In-memory, lowest latency                               |
-| Medium datasets (1-100 GB), complex SQL  | `duckdb`   | Mature SQL, memory management                           |
-| Large datasets (100 GB-1+ TB), analytics | `cayenne`  | Built on Vortex (Linux Foundation), 10-20x faster scans |
-| Point lookups on large datasets          | `cayenne`  | 100x faster random access vs Parquet                    |
-| Simple queries, low resource usage       | `sqlite`   | Lightweight, minimal overhead                           |
-| Async operations, concurrent workloads   | `turso`    | Native async, modern connection pooling                 |
-| External database integration            | `postgres` | Leverage existing PostgreSQL infra                      |
+| Use Case                               | Engine     | Why                                                                        |
+| -------------------------------------- | ---------- | -------------------------------------------------------------------------- |
+| Small datasets (<1 GB), max speed      | `arrow`    | In-memory, lowest latency                                                  |
+| Small datasets (1-10 GB), complex SQL  | `duckdb`   | Mature SQL, memory management                                              |
+| Datasets 10 GB and above (up to 1+ TB) | `cayenne`  | Needs 1/3 to 1/2 the memory of `duckdb`; scales beyond single-file limits  |
+| Point lookups on large datasets        | `cayenne`  | Vortex: 100x faster random access vs Parquet                               |
+| Simple queries, low resource usage     | `sqlite`   | Lightweight, minimal overhead                                              |
+| Async operations, concurrent workloads | `turso`    | Native async, modern connection pooling                                    |
+| External database integration          | `postgres` | Leverage existing PostgreSQL infra (Spice.ai Enterprise)                   |
 
 ### Cayenne vs DuckDB
 
-Choose **Cayenne** when datasets exceed ~1 TB, multi-file ingestion is needed, or point lookups are common.
-Choose **DuckDB** when datasets are under ~1 TB, complex SQL (window functions, CTEs) is needed, or DuckDB tooling is beneficial.
+Choose **Cayenne** for datasets of 10 GB or larger, tight memory headroom, multi-file ingestion (e.g. partitioned S3 data), or frequent point lookups (Vortex benchmarks: 10-20x faster scans).
+Choose **DuckDB** for datasets under 10 GB, complex SQL (window functions, CTEs), existing DuckDB tooling, or explicit index control.
 
 ## Supported Engines
 
-| Engine     | Modes                                  | Status            |
-| ---------- | -------------------------------------- | ----------------- |
-| `arrow`    | memory                                 | Stable            |
-| `duckdb`   | memory, file, file_create, file_update  | Stable            |
-| `cayenne`  | file, file_create, file_update          | Release Candidate |
-| `sqlite`   | memory, file, file_create, file_update  | Release Candidate |
-| `postgres` | N/A (attached, Spice.ai Enterprise)     | Release Candidate |
-| `turso`    | memory, file, file_create, file_update  | Beta              |
+| Engine     | Modes                                            | Status            |
+| ---------- | ------------------------------------------------ | ----------------- |
+| `arrow`    | memory                                           | Stable            |
+| `duckdb`   | memory, file, file_create, file_update           | Stable            |
+| `cayenne`  | memory (v2.2.0+), file, file_create, file_update | Stable            |
+| `sqlite`   | memory, file, file_create, file_update           | Release Candidate |
+| `postgres` | N/A (attached, Spice.ai Enterprise)              | Release Candidate |
+| `turso`    | memory, file, file_create, file_update           | Beta              |
 
 `file_create` always creates a fresh acceleration file on startup, removing any existing one (snapshotted first if snapshots are enabled). `file_update` opens an existing file instead: additive schema changes (new columns only) keep it, incompatible ones (columns removed, renamed, or retyped) recreate it.
 
-## Refresh Modes
+## Refresh Modes by Engine
 
-| Mode              | Description                                                    | Use Case                                  |
-| ----------------- | -------------------------------------------------------------- | ----------------------------------------- |
-| `full`            | Complete dataset replacement on each refresh                   | Small, slowly-changing datasets           |
-| `append` (batch)  | Adds new records based on a `time_column`                      | Append-only logs, time-series data        |
-| `append` (stream) | Continuous streaming without time column                       | Real-time event streams (Kafka, Debezium) |
-| `changes`         | CDC from Postgres WAL, MySQL binlog, MongoDB/DynamoDB Streams, or Debezium | Frequently updated transactional data     |
-| `caching`         | Request-based row-level caching                                | API responses, HTTP endpoints             |
-| `snapshot`        | Reloads exclusively from the snapshot store; never queries the source | Read-only replicas fed by central snapshots |
+Refresh modes (`full`, `append`, `changes`, `caching`, `snapshot`), retention, and snapshot triggers are
+covered in spice-acceleration. Engine constraints to keep in mind:
+
+- **`changes` (CDC)**: pair with a persistent accelerator (`mode: file`, or `postgres`) so a restart
+  resumes instead of re-fetching. Every engine except append-only `arrow` requires `primary_key` plus an
+  `on_conflict` upsert on that key (example below).
+- **`caching`**: survives restarts only with `mode: file` on `duckdb`, `sqlite`, or `cayenne`.
+- **`snapshot`** (Spice.ai Enterprise): needs a file-mode `duckdb`, `sqlite`, `cayenne`, or `turso` engine.
 
 ```yaml
-# Full refresh every 8 hours
+# CDC: native Postgres logical replication or MySQL binlog (v2.2.0+), no Kafka/Debezium
 acceleration:
-  refresh_mode: full
-  refresh_check_interval: 8h
-
-# Append mode: check for new records from the last day every 10 minutes
-acceleration:
-  refresh_mode: append
-  time_column: created_at
-  refresh_check_interval: 10m
-  refresh_data_window: 1d
-
-# Continuous ingestion using Kafka
-acceleration:
-  refresh_mode: append
-
-# CDC: native Postgres logical replication or MySQL binlog (no Kafka/Debezium)
-acceleration:
+  engine: duckdb
+  mode: file
   refresh_mode: changes
   primary_key: id
   on_conflict:
     id: upsert
 ```
-
-Pair `refresh_mode: changes` with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of re-fetching. Every engine except append-only `arrow` requires `primary_key` and `on_conflict: upsert`. For the CDC source matrix and refresh-mode semantics, see spice-acceleration.
 
 ## Common Configurations
 
@@ -115,32 +119,6 @@ datasets:
       refresh_data_window: 7d
 ```
 
-### With Retention Policy
-
-Retention policies prevent unbounded growth of accelerated datasets. Spice supports time-based and custom SQL-based retention strategies:
-
-```yaml
-datasets:
-  - from: postgres:events
-    name: events
-    time_column: created_at
-    acceleration:
-      enabled: true
-      engine: duckdb
-      retention_check_enabled: true
-      retention_period: 30d
-      retention_check_interval: 1h
-```
-
-### With SQL-Based Retention
-
-```yaml
-acceleration:
-  retention_check_enabled: true
-  retention_check_interval: 1h
-  retention_sql: "DELETE FROM logs WHERE status = 'archived'"
-```
-
 ## Engine-Specific Parameters
 
 ### DuckDB
@@ -157,7 +135,7 @@ acceleration:
 
 A full refresh bulk-loads a fresh copy of the data, and bulk loads bypass the WAL — so DuckDB's
 automatic checkpoint never fires and the blocks holding the previous copy are never returned. The
-file grows on every refresh. `on_full_refresh` (v2.1.2) chooses how that space is reclaimed:
+file grows on every refresh. `on_full_refresh` (v2.1.2+) chooses how that space is reclaimed:
 
 | Value             | Behavior                                                                                       | Cost                                                                    |
 | ----------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -180,9 +158,9 @@ time, as is `replace_file` alongside `refresh_mode: snapshot` on the same DuckDB
 a different dataset is what sets the snapshot mode. Give one of them its own `duckdb_file` instead.
 
 **Removed in v2.2.0**: the DuckDB accelerator rejects `partition_by`. Use `cayenne` or `arrow` for a
-partitioned dataset. v2.2.1 also pins the bundled DuckDB back to v1.4.4 (from v1.5.5), which leaked
-about 6 MiB per upsert refresh until the write hit OOM — so SQL and functions DuckDB added in v1.5
-are not available to a DuckDB-accelerated dataset.
+partitioned dataset. **Changed in v2.2.1**: the bundled DuckDB is v1.4.4 (down from v1.5.5, which leaked
+memory on upsert refreshes), so SQL syntax and functions added in DuckDB v1.5 are unavailable to
+DuckDB-accelerated datasets.
 
 ### SQLite
 
@@ -196,19 +174,21 @@ acceleration:
 
 ### Cayenne
 
-Cayenne reserves a compaction memory pool only for accelerations that can compact into it — file mode
-on a small-write refresh profile. Every other deployment, `refresh_mode: full` included, keeps the
-full memory limit available to queries (v2.1.3+). Budgets derive from the process's own cgroup limit
-rather than total host memory, so a container sized below its host no longer over-admits work.
+`mode: file` is durable. `mode: memory` (v2.2.0+) is ephemeral: it reloads from the source on restart,
+doesn't support `partition_by`, and errors at a hard per-table RAM bound instead of spilling to disk
+(filtered `DELETE`/`UPDATE`/`INSERT` on it apply correctly from v2.3.1). Cayenne ignores `indexes` with
+a warning; deduplicate with `primary_key` + `on_conflict`.
 
-Accelerating an Iceberg dataset with a `timestamptz` column needs v2.1.3+ on Cayenne and v2.1.4+ on
-DuckDB — earlier builds fail the refresh write or leave the dataset unhealthy and unqueryable.
+Engine-global Cayenne settings go under `runtime.params`; setting one under `acceleration.params` has no
+effect. **Deprecated in v2.2.0**: table-level `cayenne_segment_cache_mb` — Cayenne tables share one
+process-wide Vortex segment cache sized by `runtime.params.cayenne_segment_cache_mb` (default 1/64 of the
+memory entitlement, clamped to 256 MiB–2 GiB). **Breaking in v2.2.0**: an unset `cayenne_tuning` resolves
+to `auto`; the closed-loop controller needs an explicit `cayenne_tuning: adaptive`.
 
-Two v2.2.0 changes to carry into an existing config: Cayenne tables now share **one process-wide**
-Vortex segment cache, sized by `cayenne_segment_cache_mb` under `runtime.params` (the per-table
-setting is deprecated), defaulting to 1/64 of the memory entitlement clamped to 256 MiB–2 GiB; and an
-unset `cayenne_tuning` now resolves to `auto`, so the closed-loop controller needs an explicit
-`cayenne_tuning: adaptive`.
+The compaction memory pool is reserved only for file-mode accelerations on a small-write refresh profile,
+so `refresh_mode: full` keeps the full memory limit for queries, and budgets derive from the process's
+cgroup limit (v2.1.3+). Iceberg `timestamptz` columns accelerate on Cayenne from v2.1.3 and on DuckDB
+from v2.1.4.
 
 ## Storage Profile Tuning
 
@@ -234,7 +214,8 @@ acceleration:
 
 ## Constraints and Indexes
 
-Accelerated datasets support primary key constraints and indexes (`duckdb`, `sqlite`, `turso`):
+`indexes` apply on `duckdb`, `sqlite`, `turso`, and `postgres`; `cayenne` ignores them. On `arrow`,
+`primary_key` builds an experimental hash index (the legacy `hash_index: enabled` param is ignored).
 
 ```yaml
 acceleration:
@@ -248,10 +229,10 @@ acceleration:
 
 ## Snapshots
 
-Snapshots bootstrap an acceleration file from object storage on startup, cutting cold-start latency.
-They require a file-mode engine: `duckdb`, `sqlite`, `cayenne`, or `turso`. Each snapshotted dataset
-must write to its own file — sharing one file across datasets is unsupported here, so a shared
-`duckdb_file` and snapshots are mutually exclusive. For triggers and configuration, see
+Snapshots (Spice.ai Enterprise) bootstrap an acceleration file from object storage on startup, cutting
+cold-start latency. They require a file-mode engine: `duckdb`, `sqlite`, `cayenne`, or `turso`. Each
+snapshotted dataset must write to its own file — sharing one file across datasets is unsupported here, so
+a shared `duckdb_file` and snapshots are mutually exclusive. For triggers and configuration, see
 spice-acceleration.
 
 ## Memory Considerations
@@ -261,6 +242,8 @@ When using `mode: memory` (default), the dataset is loaded into RAM. Ensure suff
 ## Documentation
 
 - [Data Accelerators](https://spiceai.org/docs/components/data-accelerators)
+- [Spice Cayenne](https://spiceai.org/docs/components/data-accelerators/cayenne)
+- [DuckDB](https://spiceai.org/docs/components/data-accelerators/duckdb)
 - [Datasets Reference](https://spiceai.org/docs/reference/spicepod/datasets)
 - [Data Refresh](https://spiceai.org/docs/features/data-acceleration/data-refresh)
 - [Indexes](https://spiceai.org/docs/features/data-acceleration/indexes)

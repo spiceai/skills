@@ -60,6 +60,38 @@
           "description": "Should reference GGUF format"
         }
       ]
+    },
+    {
+      "prompt": "My spicepod has a Gemini model with `from: google:gemini-2.5-pro` and `google_api_key: ${ secrets:GOOGLE_API_KEY }`. After upgrading Spice to v2.3.1 the model no longer loads. What changed and how do I fix it?",
+      "expected_output": "Breaking change in v2.3.0: from: google authenticates against Vertex AI and no longer accepts google_api_key. Replace it with google_project, google_location, and exactly one of google_service_account_path, google_service_account_key, or google_application_default_credentials: true",
+      "files": [],
+      "assertions": [
+        {
+          "name": "names_breaking_release",
+          "type": "regex",
+          "value": "2\\.3\\.0",
+          "description": "Should date the change to v2.3.0"
+        },
+        {
+          "name": "sets_project",
+          "type": "contains",
+          "value": "google_project",
+          "description": "Should set google_project"
+        },
+        {
+          "name": "sets_location",
+          "type": "contains",
+          "value": "google_location",
+          "description": "Should set google_location"
+        },
+        {
+          "name": "sets_credential",
+          "type": "regex",
+          "value": "google_service_account_(path|key)|google_application_default_credentials",
+          "description": "Should set one service-account credential"
+        }
+      ],
+      "id": 4
     }
   ]
 }

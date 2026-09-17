@@ -7,6 +7,26 @@ description: Generate accurate SQL for Spice.ai's Apache DataFusion engine (Post
 
 Generate accurate SQL for Spice.ai using your own LLM. This skill provides the schema introspection workflow, type reference, SQL dialect rules, and prompt template needed to produce correct queries on the first attempt — avoiding trial-and-error.
 
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.1). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
+
+| Spice | DataFusion | Dialect changes |
+| --- | --- | --- |
+| v2.0.x | 52.5 | Baseline for this skill |
+| v2.1.x | 54 | Adds `LATERAL` joins and `ANY` / `ALL` subqueries |
+| v2.2.x–v2.3.x | 54.1 | — |
+
+- **Find it**: `spice version` or `spiced --version` for Spice; `SELECT version()` returns the DataFusion version, not the Spice version.
+- **Markers**: unmarked content applies to v2.0.0 and later; later additions are marked `(vX.Y.Z+)`. On an older runtime, read that release line's SQL reference (e.g. `https://spiceai.org/docs/v2.1/reference/sql`); on a newer one, check the [release notes](https://spiceai.org/releases).
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `col =>` in `vector_search` / `text_search` | Renamed in v2.0.0 | `column =>` |
+| S3 metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` (document tables keep `location`, `content`) |
+| `DELETE` or `TRUNCATE` on durable write-back datasets | Breaking in v2.3.0 (rejected) | Writes as one `BEGIN; …; COMMIT;` request |
+| DuckDB v1.5-only SQL on DuckDB-accelerated datasets | Changed in v2.2.1 (bundled DuckDB is v1.4.4) | DuckDB 1.4-compatible SQL |
+
 ## How It Works
 
 1. **Read `spicepod.yaml`** to know which datasets, models, embeddings, and features are configured
@@ -24,7 +44,7 @@ Before generating SQL, read the application's `spicepod.yaml` to understand what
 - **Whether embeddings are configured** (`embeddings:` section) — required for `vector_search()`
 - **Whether columns have `full_text_search` enabled** — required for `text_search()`
 - **Column-level `description` and `metadata`** — semantic hints that improve SQL generation
-- **Whether acceleration is enabled** — JSON functions only work on accelerated (Arrow) datasets
+- **Whether acceleration is enabled, and with which engine** — JSON functions are supported only in DataFusion (Arrow) execution; federated or non-Arrow accelerated sources may not support all of them
 
 > **Do NOT use `ai()`, `embed()`, `vector_search()`, `text_search()`, or `rrf()` unless you have confirmed they are configured in `spicepod.yaml`.** These functions require specific runtime configuration (models, embeddings, full-text indexes) and will fail at runtime if missing.
 
@@ -56,12 +76,14 @@ datasets:
         full_text_search:
           enabled: true # enables text_search on this column
     acceleration:
-      enabled: true # required for JSON functions
+      enabled: true # default arrow engine: full JSON function support
 ```
 
 ## Step 1 — Introspect Schema
 
 Run these queries against Spice to gather context for the prompt. This mirrors what Spice's own `/v1/nsql` endpoint does internally with its `table_schema`, `random_sample`, and `sample_distinct_columns` tools.
+
+> **Fastest path (v2.1.0+):** `curl "http://localhost:8090/v1/nsql/context?include_examples=true"` returns the exact context `/v1/nsql` injects — SQL dialect, dataset schemas, registered functions, and sample rows. Add `&model=<name>` unless exactly one model is configured.
 
 ### List all tables
 
@@ -133,7 +155,7 @@ Include these rules verbatim in your prompt. They prevent the most common text-t
 ### Data types
 
 - Spice uses **Apache Arrow types** internally. SQL types map as follows:
-  - `VARCHAR`, `TEXT`, `CHAR`, `STRING` → `Utf8` (Arrow)
+  - `VARCHAR`, `TEXT`, `CHAR`, `STRING` → `Utf8View` (dataset columns are often `Utf8`)
   - `INT` / `INTEGER` → `Int32`, `BIGINT` → `Int64`
   - `FLOAT` → `Float32`, `DOUBLE` → `Float64`
   - `BOOLEAN` → `Boolean`
@@ -151,19 +173,19 @@ Include these rules verbatim in your prompt. They prevent the most common text-t
 
 ### Timestamps & dates
 
-- `now()` returns `Timestamp(Nanosecond)`.
+- `now()` returns the current UTC time as `Timestamp(Nanosecond, None)`.
 - Use `INTERVAL` for relative time: `now() - INTERVAL '7 days'`.
 - Extract parts with `date_part('year', ts)` or `extract(YEAR FROM ts)`.
 - `date_trunc('month', ts)` truncates to the start of the period.
 - **No `DATEADD` / `DATEDIFF`** — use arithmetic with `INTERVAL` or `date_part`.
-- For Unix timestamps, use `to_unixtime(ts)` (returns seconds as Float64) or `to_timestamp(epoch_secs)`.
+- For Unix timestamps, use `to_unixtime(ts)` (returns seconds as `Int64`) or `to_timestamp(epoch_secs)`.
 - `to_timestamp_millis(ms)`, `to_timestamp_micros(us)`, `to_timestamp_nanos(ns)` for other precisions.
 
 ### String functions
 
 - Use `||` for concatenation (not `CONCAT` with `+`). `concat(a, b)` and `concat_ws(sep, a, b)` also work.
 - `LIKE` is case-sensitive. For case-insensitive matching use `ILIKE` or `lower(col) LIKE lower(pattern)`.
-- **No `~` or `!~` regex operators.** Use `regexp_like(col, pattern)`, `regexp_match(col, pattern)`, `regexp_replace(col, pattern, replacement)`.
+- Regex: PostgreSQL operators `~`, `~*` (case-insensitive), `!~`, `!~*`, or `regexp_like(col, pattern)`, `regexp_match(col, pattern)`, `regexp_replace(col, pattern, replacement)`.
 - `length(s)` returns character count; `octet_length(s)` returns byte count.
 - `trim()`, `ltrim()`, `rtrim()`, `btrim()` for whitespace removal.
 - `split_part(string, delimiter, index)` — index is **1-based**.
@@ -171,7 +193,7 @@ Include these rules verbatim in your prompt. They prevent the most common text-t
 
 ### Aggregation & grouping
 
-- **Every non-aggregated column in SELECT must appear in GROUP BY** (no implicit grouping).
+- **Every non-aggregated column in SELECT must appear in GROUP BY** (or use `GROUP BY ALL`).
 - Use `FILTER (WHERE condition)` to conditionally aggregate: `count(*) FILTER (WHERE status = 'active')`.
 - `BOOL_AND(expr)` / `BOOL_OR(expr)` for boolean aggregation.
 - `STRING_AGG(expr, delimiter)` to concatenate strings within groups.
@@ -194,12 +216,12 @@ Include these rules verbatim in your prompt. They prevent the most common text-t
 
 - CTEs (`WITH ... AS`) are supported and preferred for readability.
 - Correlated subqueries in `WHERE` and `HAVING` are supported.
-- `EXISTS`, `IN`, `NOT IN`, `ANY`, `ALL` subquery operators work.
+- `EXISTS`, `IN`, `NOT IN` subquery operators work; `ANY` / `ALL` subqueries need v2.1.0+.
 
 ### JOINs
 
 - Standard `INNER`, `LEFT`, `RIGHT`, `FULL OUTER`, `CROSS` joins are supported.
-- **No `LATERAL` joins** — use correlated subqueries or CTEs instead.
+- `CROSS JOIN LATERAL`, `JOIN LATERAL ... ON`, and `LEFT JOIN LATERAL` are supported (v2.1.0+). Not supported: `RIGHT`/`FULL` lateral joins, outer-column references in the lateral subquery's `SELECT` list, or `HAVING` inside it — use a CTE or correlated subquery there.
 - When joining datasets from different connectors (federated queries), Spice handles cross-source joins transparently.
 
 ### Window functions
@@ -215,12 +237,11 @@ Include these rules verbatim in your prompt. They prevent the most common text-t
 
 ### Unsupported SQL features
 
-- **No stored procedures, triggers, or user-defined functions via SQL.**
+- **No stored procedures or triggers.** User-defined functions are declared in the `spicepod.yaml` `functions:` section (requires `runtime.functions.enabled: true`) and called like built-ins; list them with `SELECT * FROM list_udfs() WHERE source = 'user'`.
 - **No `CREATE INDEX`** — search indexes are configured in `spicepod.yaml`.
-- **No `UPDATE` or `DELETE`** — only `INSERT INTO` is supported for DML.
-- **No `MERGE` / `UPSERT`.**
+- **Writes depend on the dataset.** Connector writes need `access: read_write`: `INSERT INTO` on write-capable connectors, `UPDATE` / `DELETE FROM` only where the connector supports them (e.g. PostgreSQL, Snowflake, DynamoDB). `MERGE INTO` works only on Cayenne catalog tables. For question answering, generate `SELECT` only.
+- **No `INSERT ... ON CONFLICT`** — upserts are configured with `acceleration.on_conflict` in `spicepod.yaml`.
 - **No `PIVOT` / `UNPIVOT`** — use `CASE WHEN` with aggregation instead.
-- **No `LATERAL` join.**
 
 ## Spice-Specific Functions
 
@@ -229,9 +250,9 @@ Include relevant function signatures in your prompt **only when confirmed availa
 ### AI functions (requires `models:` in spicepod.yaml)
 
 ```sql
--- Text generation — use the model name from spicepod.yaml
+-- Text generation — ai(prompt) needs exactly one model configured; otherwise pass the model `name` from spicepod.yaml
 SELECT ai('Summarize this: ' || content) AS summary FROM docs;
-SELECT ai('Classify: ' || text, 'gpt-5') AS label FROM reviews;
+SELECT ai('Classify: ' || text, 'main_model') AS label FROM reviews;
 
 -- Embeddings — requires `embeddings:` in spicepod.yaml
 SELECT embed('hello world', 'my_embed_model') AS vec;
@@ -275,11 +296,11 @@ SELECT * FROM items WHERE metadata ? 'status';
 SELECT * FROM items WHERE json_contains(metadata, 'status');
 ```
 
-> **Note:** JSON functions only work during DataFusion (Arrow) execution. They may not work on federated sources that do not accelerate locally.
+> **Note:** JSON functions are supported only during DataFusion (Arrow) execution. Federated or non-Arrow accelerated sources may not support all of them, and a federated filter on one usually isn't pushed down — the column is streamed to Spice (a full remote scan).
 
 ### Spark-compatible functions
 
-Spice includes `datafusion-functions-spark`: `array()`, `bit_get()`, `date_add()`, `like()`, `parse_url()`, and others following [Spark SQL semantics](https://spark.apache.org/docs/latest/api/sql/index.html).
+Spice registers Spark-compatible scalar functions — `array()`, `bit_get()`, `date_add()`, `like()`, `parse_url()`, and others — that follow [Spark SQL semantics](https://spark.apache.org/docs/latest/api/sql/index.html).
 
 ## Error Recovery (Retry with Feedback)
 
@@ -297,7 +318,7 @@ Do not repeat the same mistake. Return only corrected SQL.
 Common mistakes the model makes (and the fix to include in retry context):
 
 - **Double-qualifying table names**: `"catalog.schema.table"` instead of `"catalog"."schema"."table"` — tables with schemas and catalogs use separate quoted identifiers
-- **Using unsupported syntax**: `LATERAL`, `~`, `DATEADD` — reference the dialect rules
+- **Using unsupported syntax**: `PIVOT`, `DATEADD`, `INSERT ... ON CONFLICT` — reference the dialect rules
 - **Wrong column names**: the model hallucinated a column — re-include the schema
 
 ## Prompt Template
@@ -310,11 +331,11 @@ You are a SQL expert. Generate a single SQL query for Apache DataFusion (Postgre
 ## Rules
 - DataFusion SQL, PostgreSQL dialect. No MySQL or T-SQL syntax.
 - Use CAST(x AS type) or x::type for type conversion.
-- Timestamps are Timestamp(Nanosecond, None). Use INTERVAL for date math (e.g. now() - INTERVAL '7 days').
-- No DATEADD/DATEDIFF. No ~ regex operator — use regexp_like(). LIKE is case-sensitive; use ILIKE for case-insensitive.
+- SQL TIMESTAMP is Timestamp(Nanosecond, None). Use INTERVAL for date math (e.g. now() - INTERVAL '7 days').
+- No DATEADD/DATEDIFF. Regex: ~, ~*, !~, !~* or regexp_like(). LIKE is case-sensitive; use ILIKE for case-insensitive.
 - String concat: || or concat(). Split: split_part(s, delim, 1-based-index).
-- No UPDATE, DELETE, MERGE, PIVOT, LATERAL, stored procedures.
-- INSERT INTO is the only DML.
+- No PIVOT/UNPIVOT, stored procedures, or RIGHT/FULL LATERAL joins. CROSS/LEFT JOIN LATERAL need Spice v2.1.0+.
+- Generate a read-only SELECT. Write support (INSERT/UPDATE/DELETE/MERGE INTO) varies by dataset.
 - Every non-aggregated SELECT column must be in GROUP BY.
 - Use COALESCE for NULL-safe defaults. Use IS NULL, never = NULL.
 - Double-quote reserved-word identifiers. Single-quote string literals.
@@ -328,7 +349,7 @@ You are a SQL expert. Generate a single SQL query for Apache DataFusion (Postgre
 - rrf(vector_search(...), text_search(...), join_key => 'id') for hybrid search.
 {%- endif %}
 {%- if has_ai %}
-- ai('prompt') or ai('prompt', 'model_name') for LLM text generation in SQL.
+- ai('prompt', 'model_name') for LLM text generation in SQL; ai('prompt') only when exactly one model is configured.
 {%- endif %}
 
 ## Schema
@@ -381,10 +402,10 @@ prompt = f"""You are a SQL expert. Generate a single SQL query for Apache DataFu
 
 ## Rules
 - DataFusion SQL, PostgreSQL dialect.
-- Timestamps are Timestamp(Nanosecond, None). Use INTERVAL for date math.
-- No DATEADD/DATEDIFF. Use regexp_like() not ~. LIKE is case-sensitive; use ILIKE for insensitive.
+- SQL TIMESTAMP is Timestamp(Nanosecond, None). Use INTERVAL for date math.
+- No DATEADD/DATEDIFF. Regex: ~, ~* or regexp_like(). LIKE is case-sensitive; use ILIKE for insensitive.
 - Every non-aggregated SELECT column must be in GROUP BY.
-- No UPDATE, DELETE, MERGE, PIVOT, LATERAL.
+- Read-only SELECT only. No PIVOT/UNPIVOT.
 - For tables with schemas: '"catalog"."schema"."table"' NOT '"catalog.schema.table"'.
 - Columns with capitals must be quoted.
 
@@ -421,18 +442,17 @@ for attempt in range(3):
 
 ## Troubleshooting
 
-| Error                                      | Cause                           | Fix                                                                    |
-| ------------------------------------------ | ------------------------------- | ---------------------------------------------------------------------- |
-| `column X must appear in GROUP BY`         | Non-aggregated column in SELECT | Add missing column to GROUP BY or wrap in aggregate                    |
-| `Cannot cast Utf8 to Timestamp`            | Implicit cast failed            | Use explicit `CAST('...' AS TIMESTAMP)` or `::TIMESTAMP`               |
-| `This feature is not implemented: LATERAL` | Unsupported syntax              | Rewrite with correlated subquery or CTE                                |
-| `No function matches regex_operator ~`     | Wrong regex syntax              | Use `regexp_like(col, pattern)`                                        |
-| `Table not found`                          | Wrong name or schema            | Check with `SHOW TABLES`. Use fully qualified `schema.table` if needed |
-| `Arrow error: Cast error`                  | Type mismatch in operation      | Check types with `arrow_typeof()`, add explicit CAST                   |
-| `JSON function not supported`              | Querying federated source       | Accelerate the dataset locally (`acceleration.enabled: true`)          |
-| `ai() function not found`                  | No model configured             | Add `models:` section to spicepod.yaml                                 |
-| `vector_search: no embedding column`       | No embeddings on column         | Add `embeddings:` to the column in spicepod.yaml                       |
-| `text_search: column not indexed`          | Full-text search not enabled    | Add `full_text_search: enabled: true` to column config                 |
+| Error                                       | Cause                                 | Fix                                                                    |
+| ------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `column X must appear in GROUP BY`          | Non-aggregated column in SELECT       | Add missing column to GROUP BY or wrap in aggregate                    |
+| `Cannot cast Utf8 to Timestamp`             | Implicit cast failed                  | Use explicit `CAST('...' AS TIMESTAMP)` or `::TIMESTAMP`               |
+| `This feature is not implemented` (LATERAL) | Pre-v2.1.0, or `RIGHT`/`FULL` lateral | Use `CROSS`/`LEFT JOIN LATERAL`, a CTE, or a correlated subquery       |
+| `Table not found`                           | Wrong name or schema                  | Check with `SHOW TABLES`. Use fully qualified `schema.table` if needed |
+| `Arrow error: Cast error`                   | Type mismatch in operation            | Check types with `arrow_typeof()`, add explicit CAST                   |
+| JSON function unsupported or slow           | Federated or non-Arrow source         | Accelerate with the default `arrow` engine                             |
+| `ai() function not found`                   | No model configured                   | Add `models:` section to spicepod.yaml                                 |
+| `vector_search: no embedding column`        | No embeddings on column               | Add `embeddings:` to the column in spicepod.yaml                       |
+| `text_search: column not indexed`           | Full-text search not enabled          | Add `full_text_search: enabled: true` to column config                 |
 
 ## Documentation
 

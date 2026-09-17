@@ -111,6 +111,8 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 
 Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.1` with runtime `v2.3.1`). Pin to GitHub release tag `v2.3.1` when you need a fixed surface, or use `trunk` for latest.
 
+The skills are version-aware. Each one names the release line it is written for, tells the agent to check your runtime version (`spice version`) before it recommends configuration, marks features added after v2.0.0 with the release that shipped them (for example `(v2.2.0+)`), and lists removed or deprecated configuration with its replacement. On an older runtime, the agent can then avoid newer settings and use the docs for your release (`https://spiceai.org/docs/v2.2/...`).
+
 ## Available Skills
 
 | Skill | Description |
@@ -122,7 +124,7 @@ Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.1` with ru
 | [spice-acceleration](skills/spice-acceleration/) | Accelerate data locally for sub-second query performance |
 | [spice-accelerators](skills/spice-accelerators/) | Choose and configure acceleration engines (Arrow, DuckDB, SQLite, etc.) |
 | [spice-search](skills/spice-search/) | Search with vector similarity, full-text keywords, or hybrid RRF |
-| [spice-ai](skills/spice-ai/) | Add AI capabilities — tools, NSQL, memory, model routing, evals |
+| [spice-ai](skills/spice-ai/) | Add AI capabilities — tools, NSQL, memory, model routing |
 | [spice-models](skills/spice-models/) | Configure LLM providers (OpenAI, Anthropic, Azure, local GGUF, etc.) |
 | [spice-text-to-sql](skills/spice-text-to-sql/) | Generate SQL for Spice's DataFusion engine and build text-to-SQL workflows |
 | [spice-caching](skills/spice-caching/) | Cache query and search results with TTL and stale-while-revalidate |

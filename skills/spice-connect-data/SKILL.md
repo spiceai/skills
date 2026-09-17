@@ -7,6 +7,24 @@ description: Connect Spice to data sources and query across them with federated 
 
 Spice federates SQL queries across 30+ data sources without ETL. Connect databases, data lakes, warehouses, and APIs, then query across them with standard SQL.
 
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+
+- **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
+- **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
+- **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `schema_inference` dataset field | Removed in v2.2.0 (fails to load) | Delete it — inference is always on |
+| `acceleration.ready_state` (datasets and views) | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
+| Durable write-back with `mode: memory`, retention, a multi-column key, or `DELETE`/`TRUNCATE` | Breaking in v2.3.0 (rejected) | `mode: file`, a single-column `primary_key`, no retention, writes in one `BEGIN; …; COMMIT;` |
+| Metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` |
+| `pg_replication_temporary_slot` | Deprecated in v2.2.0 (ignored) | Delete it |
+| ScyllaDB in the default build | Breaking in v2.3.0 | `--features scylladb` build, or Spice.ai Enterprise |
+
 ## How Federation Works
 
 Configure datasets pointing to different sources. Spice's query planner (built on Apache DataFusion) optimizes and routes queries with filter pushdown and column projection:
@@ -22,7 +40,7 @@ datasets:
     name: orders
     params:
       file_format: parquet
-  - from: snowflake:analytics.sales
+  - from: snowflake:ANALYTICS.PUBLIC.SALES
     name: sales
 ```
 
@@ -54,22 +72,22 @@ datasets:
 | Connector     | From Format             | Status                        |
 | ------------- | ----------------------- | ----------------------------- |
 | PostgreSQL    | `postgres:schema.table` | Stable (native WAL CDC; also Amazon Redshift) |
-| MySQL         | `mysql:schema.table`    | Stable (native binlog CDC)    |
-| DuckDB        | `duckdb:database.table` | Stable                        |
+| MySQL         | `mysql:schema.table`    | Stable (native binlog CDC v2.2.0+) |
+| DuckDB        | `duckdb:database.schema.table` | Stable                 |
 | DynamoDB      | `dynamodb:table`        | Stable (with Streams)         |
 | Azure Cosmos DB | `cosmosdb:database.container` | Release Candidate      |
-| MS SQL Server | `mssql:db.table`        | Beta                          |
+| MS SQL Server | `mssql:database.schema.table` | Beta                    |
 | MongoDB       | `mongodb:collection`    | Alpha (Change Streams)        |
 | ClickHouse    | `clickhouse:db.table`   | Alpha                         |
 | Oracle        | `oracle:schema.table`   | Alpha                         |
-| ScyllaDB      | `scylladb:table`        | Alpha (opt-in build as of v2.3.0; see spice-data-connector) |
+| ScyllaDB      | `scylladb:table`        | Alpha (Spice.ai Enterprise; out of default OSS build in v2.3.0) |
 
 ### Data Warehouses
 
 | Connector               | From Format                       | Status            |
 | ----------------------- | --------------------------------- | ----------------- |
-| Databricks (Delta Lake) | `databricks:catalog.schema.table` | Stable            |
-| Snowflake               | `snowflake:db.schema.table`       | Release Candidate |
+| Databricks              | `databricks:catalog.schema.table` | Stable with `mode: delta_lake`; Beta with `mode: spark_connect` (the default) |
+| Snowflake               | `snowflake:DB.SCHEMA.TABLE`       | Release Candidate |
 | Spark                   | `spark:db.table`                  | Beta              |
 
 ### Data Lakes & Object Storage
@@ -79,7 +97,7 @@ datasets:
 | S3           | `s3://bucket/path/`          | Stable            |
 | Delta Lake   | `delta_lake:/path/to/delta/` | Stable            |
 | File (local) | `file:./path/to/data`        | Stable            |
-| Iceberg      | `iceberg:table`              | Release Candidate (read+write) |
+| Iceberg      | `iceberg:https://<catalog>/v1/namespaces/<ns>/tables/<table>` | Release Candidate (read+write) |
 | DuckLake     | `ducklake:table`             | Beta              |
 | Azure BlobFS | `abfs://container/path/`     | Alpha             |
 | Google Cloud Storage | `gs://bucket/path/`  | Alpha             |
@@ -89,23 +107,26 @@ datasets:
 
 | Connector    | From Format                           | Status            |
 | ------------ | ------------------------------------- | ----------------- |
-| Spice.ai     | `spice.ai:path/to/dataset`            | Stable            |
+| Spice.ai     | `spice.ai/<org>/<app>/datasets/<name>` | Stable           |
 | Dremio       | `dremio:source.table`                 | Stable            |
 | GitHub       | `github:github.com/owner/repo/issues` | Stable            |
-| GraphQL      | `graphql:endpoint`                    | Release Candidate |
+| Git          | `git:https://host/owner/repo.git@<ref>` | Release Candidate |
+| GraphQL      | `graphql:https://host/graphql`        | Release Candidate |
 | ADBC         | `adbc:table`                          | Release Candidate |
-| FlightSQL    | `flightsql:query`                     | Beta              |
-| ODBC         | `odbc:connection`                     | Beta (Spice.ai Enterprise) |
-| SharePoint   | `sharepoint:site/path`                | Beta              |
+| FlightSQL    | `flightsql:catalog.schema.table`      | Beta              |
+| ODBC         | `odbc:path.to.table`                  | Beta (Spice.ai Enterprise) |
+| SharePoint   | `sharepoint:drive:<name>/path:/<folder>` | Beta           |
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
 | Kafka        | `kafka:topic`                         | Alpha             |
-| Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (push) | Alpha       |
+| Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (HTTP push, v2.2.0+) | Alpha |
 | Elasticsearch | `elasticsearch:index`                | Alpha (Spice.ai Enterprise) |
-| IMAP         | `imap:mailbox`                        | Alpha             |
+| IMAP         | `imap:<email_address>`                | Alpha             |
 | localpod     | `localpod:dataset`                    | Alpha             |
 | SMB          | `smb://host/share/path/`              | Alpha             |
 | NFS          | `nfs://host/path/`                    | Alpha (Spice.ai Enterprise) |
+
+Spice.ai Enterprise connectors are not in the default OSS build ([Distributions](https://spiceai.org/docs/reference/distributions)).
 
 ## Common Examples
 
@@ -124,25 +145,25 @@ datasets:
       enabled: true
 ```
 
-For the per-connector `from:` and `params:` reference — S3 and object storage, GitHub (including
-v2.3.0 review/release/repo tables), local files, MySQL CDC, HTTP APIs, BigQuery-via-ADBC, and the
-rest — see spice-data-connector. Databricks Unity Catalog catalogs accept streaming tables and views
-as of v2.3.0.
+For the per-connector `from:` and `params:` reference — S3, GitHub (v2.3.0 review/release/repo
+tables), local files, MySQL CDC, HTTP APIs, BigQuery-via-ADBC, Databricks (Unity Catalog streaming
+tables and views, v2.3.0+), and the rest — see spice-data-connector.
 
 ## File Formats
 
-Connectors reading from object stores (S3, ABFS) or network storage (FTP, SFTP) support:
+File-based connectors (S3, ABFS, GCS, HTTP/S, FTP/SFTP, SMB, NFS, local `file:`) support:
 
-| Format         | `file_format` | Type       |
-| -------------- | ------------- | ---------- |
-| Apache Parquet | `parquet`     | Structured |
-| CSV            | `csv`         | Structured |
-| Markdown       | `md`          | Document   |
-| Text           | `txt`         | Document   |
-| PDF            | `pdf`         | Document   |
-| Microsoft Word | `docx`        | Document   |
+| Format         | `file_format` | Status | Type       |
+| -------------- | ------------- | ------ | ---------- |
+| Apache Parquet | `parquet`     | Stable | Structured |
+| CSV            | `csv`         | Stable | Structured |
+| JSON           | `json`        | Stable | Structured |
+| Markdown       | `md`          | Stable | Document   |
+| Text           | `txt`         | Stable | Document   |
+| PDF            | `pdf`         | Beta   | Document   |
+| Microsoft Word | `docx`        | Alpha  | Document   |
 
-Document files produce a table with `location` and `content` columns:
+Document files produce one row per file with `location` and `content` columns (not `_location`):
 
 ```yaml
 datasets:
@@ -183,7 +204,7 @@ Catalog connectors expose external data catalogs, preserving the source schema h
 
 ```yaml
 catalogs:
-  - from: <connector>
+  - from: <connector>[:<catalog_path>]
     name: <catalog_name>
     params:
       # connector-specific parameters
@@ -193,30 +214,31 @@ catalogs:
 
 ### Supported Catalogs
 
-| Connector       | From Value      | Status |
-| --------------- | --------------- | ------ |
-| Unity Catalog   | `unity_catalog` | Stable |
-| Databricks      | `databricks`    | Beta   |
-| Iceberg         | `iceberg`       | Beta   |
-| Spice.ai        | `spice.ai`      | Beta   |
-| DuckLake        | `ducklake`      | Beta   |
-| AWS Glue        | `glue`          | Alpha  |
-| Snowflake       | `snowflake`     | Alpha  |
-| PostgreSQL      | `pg`            | Beta   |
-| MySQL           | `mysql`         | Alpha  |
-| MS SQL Server   | `mssql`         | Alpha  |
-| ADBC            | `adbc`          | Alpha  |
-| Oracle          | `oracle`        | Alpha  |
+| Connector       | `from`                                                          | Status |
+| --------------- | --------------------------------------------------------------- | ------ |
+| Unity Catalog   | `unity_catalog:https://<host>/api/2.1/unity-catalog/catalogs/<catalog>` | Stable |
+| Databricks      | `databricks:<catalog>`                                          | Beta   |
+| Iceberg         | `iceberg:https://<host>/v1/namespaces/<namespace>`              | Beta   |
+| Spice.ai        | `spice.ai/<org>/<app>`                                          | Beta   |
+| DuckLake        | `ducklake:<metadata>` (e.g. `ducklake:s3://bucket/metadata.ducklake`) | Beta |
+| PostgreSQL      | `pg`                                                            | Beta   |
+| AWS Glue        | `glue` or `glue:<catalog_id>`                                   | Alpha  |
+| Snowflake       | `snowflake:<DATABASE>`                                          | Alpha  |
+| MySQL           | `mysql`                                                         | Alpha  |
+| MS SQL Server   | `mssql`                                                         | Alpha  |
+| ADBC            | `adbc`                                                          | Alpha  |
+| Oracle          | `oracle`                                                        | Alpha  |
 
 ### Catalog Example
 
 ```yaml
 catalogs:
-  - from: unity_catalog
+  # The catalog URL in `from` is required; there is no separate endpoint parameter
+  - from: unity_catalog:https://my-workspace.cloud.databricks.com/api/2.1/unity-catalog/catalogs/main
     name: unity
     params:
-      unity_catalog_endpoint: https://my-workspace.cloud.databricks.com
-      databricks_token: ${ secrets:DATABRICKS_TOKEN }
+      unity_catalog_token: ${ secrets:UC_TOKEN }
+      unity_catalog_credential_vending: enabled # v2.1.0+; or unity_catalog_aws_* etc. in dataset_params
     include:
       - 'my_schema.*'
 ```
@@ -225,11 +247,10 @@ catalogs:
 SELECT * FROM unity.my_schema.customers LIMIT 10;
 ```
 
-### PostgreSQL Catalog CDC
+### PostgreSQL Catalog CDC (v2.2.0+, Alpha)
 
-One block bootstraps and CDC-accelerates every table the `include` patterns match, with no per-table
-config. All of them share one replication slot and publication derived from the catalog `name`, so
-the WAL is decoded once for the catalog rather than once per table.
+One block bootstraps and CDC-accelerates every table the `include` patterns match. All tables share
+one replication slot and publication derived from the catalog `name`, so the WAL is decoded once.
 
 ```yaml
 catalogs:
@@ -244,10 +265,10 @@ catalogs:
       pg_connection_string: postgresql://${ secrets:PG_USER }:${ secrets:PG_PASS }@localhost:5432/mydb
 ```
 
-Needs `wal_level = logical` and the replication privilege; Spice validates both at load and fails
-fast. It also checks the server's free slots against `max_replication_slots` before creating one.
-Alpha in v2.2.0: the configuration may change, and a durable catalog acceleration can come back empty
-after a restart.
+Needs `wal_level = logical`, the replication privilege, and a free slot if the catalog's slot is new
+(all checked at load). Tables without a usable replica identity are skipped with a warning. Alpha:
+configuration may change, and v2.2.0 notes a durable catalog acceleration can come back empty after
+a restart.
 
 ## Views
 
@@ -257,9 +278,9 @@ Views are virtual tables defined by SQL queries — useful for pre-aggregations,
 views:
   - name: daily_sales
     sql: |
-      SELECT DATE(created_at) as date, SUM(amount) as total, COUNT(*) as orders
+      SELECT CAST(created_at AS DATE) as day, SUM(amount) as total, COUNT(*) as orders
       FROM orders
-      GROUP BY DATE(created_at)
+      GROUP BY CAST(created_at AS DATE)
 
   - name: order_details
     sql: |
@@ -286,7 +307,13 @@ Views are read-only and queried like regular tables: `SELECT * FROM daily_sales`
 
 ## Writing Data
 
-Spice supports writing to Apache Iceberg tables and Amazon S3 Tables via `INSERT INTO`:
+Set `access: read_write` on a dataset (or catalog) from a write-capable connector:
+
+| Connector                                 | Statements                                               |
+| ----------------------------------------- | -------------------------------------------------------- |
+| PostgreSQL, Snowflake, DynamoDB           | `INSERT`, `UPDATE`, `DELETE`                             |
+| Iceberg, AWS Glue (incl. Amazon S3 Tables) | `INSERT INTO` (append-only); `iceberg:` also `DELETE FROM` on v2+ tables |
+| DuckLake                                  | `INSERT INTO` (DDL via the catalog with `access: read_write_create`) |
 
 ```yaml
 datasets:
@@ -298,6 +325,10 @@ datasets:
 ```sql
 INSERT INTO transactions SELECT * FROM staging_transactions;
 ```
+
+Accelerated datasets route writes by `acceleration.write_mode` (see spice-acceleration). **Changed in
+v2.3.0:** durable write-back (Cayenne over PostgreSQL) requires `mode: file`, a single-column
+`primary_key`, and no retention, rejects `DELETE`/`TRUNCATE`, and takes writes as one `BEGIN; …; COMMIT;`.
 
 ## Referencing Secrets
 

@@ -5,7 +5,26 @@ description: Configure AI/LLM model providers and connections in Spice — OpenA
 
 # Spice Model Providers
 
-Model providers enable LLM chat completions and inference through a unified OpenAI-compatible API.
+Model providers serve large language models (LLMs) through a unified OpenAI-compatible API.
+
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+
+- **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
+- **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
+- **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `google_api_key` (Google AI Studio) | Breaking in v2.3.0 | `google_project` + `google_location` + one credential |
+| `perplexity:` provider | Removed in v2.0.0 | Another provider |
+| ONNX models, `/v1/predict` | Removed in v2.2.0 | An LLM provider |
+| `spice.ai/<org>/<app>/models/<model>` (ONNX) | Removed in v2.2.0 | `spice.ai:<provider>/<model>` |
+| `openai_<param>` on non-OpenAI providers | Deprecated in v1.5.0 | `<provider>_<param>` (e.g. `hf_temperature`) |
+| `from: anthropic` defaulting to `claude-3-5-sonnet-latest` | Changed in v2.3.0 (retired model) | Default `claude-sonnet-4-6`, or pin `anthropic:<id>` |
+| `evals:` section, `/v1/evals` | Removed in v2.0.0 | Nothing — delete the section |
 
 ## Basic Configuration
 
@@ -22,30 +41,31 @@ models:
 
 ## Supported Providers
 
-| Provider               | From Format                         | Status            |
-| ---------------------- | ----------------------------------- | ----------------- |
-| OpenAI (or compatible) | `openai:gpt-4o`                     | Stable            |
-| Anthropic              | `anthropic:claude-sonnet-4-5`       | Alpha             |
-| Azure OpenAI           | `azure:my-deployment`               | Alpha             |
-| Google (Vertex AI)     | `google:gemini-2.5-pro`             | Alpha             |
-| xAI                    | `xai:grok-4.3`                      | Alpha             |
-| Amazon Bedrock         | `bedrock:anthropic.claude-3`        | Alpha             |
-| Databricks             | `databricks:llama-3-70b`            | Alpha             |
-| Spice.ai               | `spiceai:llama3`                    | Release Candidate |
-| HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct` | Release Candidate |
-| Local file             | `file:./models/llama.gguf`          | Release Candidate |
+| Provider               | From Format                              | Status            |
+| ---------------------- | ---------------------------------------- | ----------------- |
+| OpenAI (or compatible) | `openai:gpt-4o`                          | Stable            |
+| Anthropic              | `anthropic:claude-sonnet-4-5`            | Alpha             |
+| Azure OpenAI           | `azure:gpt-4o-mini`                      | Alpha             |
+| Google (Vertex AI)     | `google:gemini-2.5-pro`                  | Alpha             |
+| xAI                    | `xai:grok-4.3`                           | Alpha             |
+| Amazon Bedrock         | `bedrock:amazon.nova-lite-v1:0`          | Alpha             |
+| Databricks             | `databricks:databricks-llama-4-maverick` | Alpha             |
+| Spice.ai (v2.2.0+)     | `spice.ai:openai/gpt-4o`                 | Release Candidate |
+| HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct`      | Release Candidate |
+| Local file             | `file:./models/llama.gguf`               | Release Candidate |
 
-The `perplexity` provider was **removed** in v2.0.0 — re-point affected models at another
-provider. For xAI, `from: xai` with no model defaults to `grok-4.3`.
+Prefix aliases: `huggingface:` = `hf:`; `spiceai:` = `spice.ai:` (model ids are `<provider>/<model>`).
+The `perplexity` provider is **Removed in v2.0.0**; ONNX/traditional ML models and `/v1/predict` are
+**Removed in v2.2.0** — use an LLM provider instead. `from: xai` with no model defaults to `grok-4.3`.
 
 **Breaking in v2.3.0 — Google models use Vertex AI.** `from: google` no longer accepts
 `google_api_key` (Google AI Studio). Authenticate as a GCP service account with
 `google_project`, `google_location`, and exactly one of `google_service_account_path`,
-`google_service_account_key`, or `google_application_default_credentials`.
+`google_service_account_key`, or `google_application_default_credentials: true`.
 
-Other v2.3.0 model fixes: an Anthropic model without an explicit id resolves again (the retired
-`claude-3-5-sonnet-latest` default was replaced); HuggingFace chat models read `hf_token` again
-(it had been treated as unknown under a `huggingface_` prefix).
+`from: anthropic` with no model id defaults to `claude-sonnet-4-6` (**Changed in v2.3.0**; the old
+`claude-3-5-sonnet-latest` default is retired). HuggingFace chat models take `hf_token`
+(**Changed in v2.3.0**; v2.2.0–v2.2.1 read only `huggingface_token`, still accepted as an alias).
 
 ## Features
 
@@ -56,7 +76,6 @@ Other v2.3.0 model fixes: an Anthropic model without an explicit id resolves aga
 | **Parameterized Prompts** | Jinja templating in system prompts     |
 | **Parameter Overrides**   | Temperature, response format, etc.     |
 | **Memory**                | Persistent memory across conversations |
-| **Evals**                 | Evaluate and track model performance   |
 | **Local Serving**         | CUDA/Metal accelerated local models    |
 
 ## Examples
@@ -83,7 +102,7 @@ models:
       openai_api_key: ${ secrets:GROQ_API_KEY }
 ```
 
-### Google (Vertex AI) — v2.3.0+
+### Google (Vertex AI) (v2.3.0+)
 
 ```yaml
 models:
@@ -121,8 +140,8 @@ models:
     params:
       system_prompt: |
         Write everything in Haiku like a pirate.
-      openai_temperature: 0.1
-      openai_response_format: "{ 'type': 'json_object' }"
+      openai_temperature: 0.1 # prefix = provider prefix, e.g. anthropic_temperature, hf_temperature
+      openai_response_format: { 'type': 'json_object' } # a YAML map, not a quoted string
 ```
 
 ### Local Model (GGUF)
@@ -174,6 +193,5 @@ chat> Hello!
 - [Memory](https://spiceai.org/docs/features/large-language-models/memory)
 - [Parameter Overrides](https://spiceai.org/docs/features/large-language-models/parameter_overrides)
 - [Parameterized Prompts](https://spiceai.org/docs/features/large-language-models/parameterized_prompts)
-- [Evals](https://spiceai.org/docs/features/large-language-models/evals)
 - [Local Model Serving](https://spiceai.org/docs/features/large-language-models/serving)
-- [Web Search](https://spiceai.org/docs/features/web-search) — via OpenAI hosted tools; the `websearch` tool was removed
+- [Web Search](https://spiceai.org/docs/features/web-search) — via OpenAI hosted tools; the `websearch` tool was **Removed in v2.0.0**

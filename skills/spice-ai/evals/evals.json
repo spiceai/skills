@@ -50,7 +50,7 @@
     {
       "id": 3,
       "prompt": "We want to use GPT-4o as our primary model but fall back to Claude if OpenAI is down. How do I configure model failover in Spice?",
-      "expected_output": "Configure both models, then create a worker with type: load_balance and ordered routing",
+      "expected_output": "Configure both models, then create a worker with a load_balance.routing block (no type field) and ordered routing",
       "files": [],
       "assertions": [
         {
@@ -60,10 +60,10 @@
           "description": "Should configure a worker for routing"
         },
         {
-          "name": "uses_load_balance_type",
-          "type": "contains",
-          "value": "type: load_balance",
-          "description": "Should use load_balance worker type"
+          "name": "uses_load_balance_block_without_type",
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*type:\\s*load_balance)[\\s\\S]*load_balance:",
+          "description": "Should use a load_balance block; workers have no type field (unknown worker fields fail Spicepod load)"
         },
         {
           "name": "shows_ordering",
