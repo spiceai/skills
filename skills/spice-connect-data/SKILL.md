@@ -162,6 +162,8 @@ File-based connectors (S3, ABFS, GCS, HTTP/S, FTP/SFTP, SMB, NFS, local `file:`)
 | Text           | `txt`         | Stable | Document   |
 | PDF            | `pdf`         | Beta   | Document   |
 | Microsoft Word | `docx`        | Alpha  | Document   |
+| Microsoft Excel | `xlsx`       | Alpha  | Document   |
+| PowerPoint     | `pptx`        | Alpha  | Document   |
 
 Document files produce one row per file with `location` and `content` columns (not `_location`):
 
@@ -326,9 +328,21 @@ datasets:
 INSERT INTO transactions SELECT * FROM staging_transactions;
 ```
 
-Accelerated datasets route writes by `acceleration.write_mode` (see spice-acceleration). **Changed in
-v2.3.0:** durable write-back (Cayenne over PostgreSQL) requires `mode: file`, a single-column
-`primary_key`, and no retention, rejects `DELETE`/`TRUNCATE`, and takes writes as one `BEGIN; …; COMMIT;`.
+Accelerated datasets route writes by `acceleration.write_mode`. Durable write-back
+(`write_mode: write_back`, Cayenne over PostgreSQL) is covered in spice-acceleration — **Breaking in
+v2.3.0**, it rejects unsafe configurations at load and rejects `DELETE`, `TRUNCATE`, and `MERGE`.
+
+### Deleting from Iceberg
+
+`DELETE FROM` needs an Iceberg v2+ table and is written as an **equality delete file** — "remove rows
+whose key columns equal these values". That key cannot carry float/double columns (`NaN` is not equal
+to itself), nested columns, or any column without a Parquet field ID. A `WHERE` clause reading a
+column outside the key is not expressible exactly, so rather than delete the row beside the one
+selected, Spice **refuses** the statement and names the offending column (**Changed in v2.3.0** —
+earlier builds ran it and could delete rows that did not match). Also refused: a subquery predicate
+(run it first and delete by the values it returns), a volatile predicate such as `random()`, and any
+`WHERE` on a table with no keyable column. `DELETE FROM t` with no condition and a key-columns-only
+`WHERE` both work; `UPDATE` is not supported.
 
 ## Referencing Secrets
 

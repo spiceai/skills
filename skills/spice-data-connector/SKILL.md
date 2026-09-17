@@ -260,12 +260,14 @@ File-based connectors (S3, ABFS, GCS, HTTP/S, FTP/SFTP, SMB, NFS, local `file:`)
 | Text           | `txt`         | Stable | Document   |
 | PDF            | `pdf`         | Beta   | Document   |
 | Microsoft Word | `docx`        | Alpha  | Document   |
+| Microsoft Excel | `xlsx`       | Alpha  | Document   |
+| PowerPoint     | `pptx`        | Alpha  | Document   |
 
-Also `tsv` and `jsonl` (see the File Formats reference), and Alpha document formats `xlsx` / `pptx`.
+Also `tsv` and `jsonl` (see the File Formats reference).
 
 ### Document Formats
 
-Document files produce one row per file with `location` and `content` columns (not `_location`):
+Document files (md, txt, pdf, docx, xlsx, pptx) produce one row per file with `location` and `content` columns (not `_location`):
 
 ```yaml
 datasets:

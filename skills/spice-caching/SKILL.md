@@ -23,7 +23,7 @@ Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime 
 | Old | Change | Use instead |
 | --- | --- | --- |
 | `runtime.results_cache` (`cache_max_size`) | Deprecated in v1.4.0 (auto-migrates) | `runtime.caching.sql_results` (`max_size`) |
-| `engine: pingora` on an OSS build | Changed in v2.2.0 (Enterprise only; falls back to Moka) | `engine: moka` (default) |
+| `engine: pingora` on an OSS build | Breaking in v2.2.0 (Enterprise only; falls back to Moka) | `engine: moka` (default) |
 | Caching-accelerator storage created before v2.0.0 | Breaking in v2.0.0 (errors at startup) | Delete the accelerator file before upgrading |
 | Refresh or DML write evicting cached results | Changed in v2.3.0 when `stale_while_revalidate_ttl` is set (served `STALE`) | Leave the TTL unset or `0s` to keep eviction |
 | Unlabeled `*_cache_evictions` | Changed in v2.1.5 (`reason` label) | Aggregate by `reason` |
@@ -68,7 +68,11 @@ runtime:
 | `eviction_policy`   | `lru`    | `lru` (Least Recently Used) or `tiny_lfu` (higher hit rate for skewed access)         |
 | `item_ttl`          | `1s`     | Cache entry TTL (Time to Live)                                                        |
 | `hashing_algorithm` | `xxh3`   | Hash for cache keys: `xxh3`, `ahash`, `siphash`, `blake3`, `xxh32`, `xxh64`, `xxh128` |
-| `engine`            | `moka`   | `moka`, or `pingora` on Spice.ai Enterprise. **Breaking in v2.2.0**: OSS builds log a warning and fall back to Moka |
+| `engine`            | `moka`   | Cache backend: `moka`, or `pingora` on a Spice.ai Enterprise build (**Breaking in v2.2.0**) |
+
+`engine: pingora` is **not** rejected on an open-source build — it parses, logs a fallback line, and
+runs on Moka. Read the engine off the cache's own startup line (`Initialized sql results cache; … engine: Moka`)
+rather than trusting the configured value. Pingora has no `tiny_lfu`; asking for both warns and uses LRU.
 
 ## SQL Results Extra Parameters
 

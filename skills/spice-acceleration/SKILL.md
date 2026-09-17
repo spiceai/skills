@@ -21,6 +21,7 @@ Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime 
 | Old | Change | Use instead |
 | --- | --- | --- |
 | `acceleration.ready_state` | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
+| `write_mode: write_back` with `mode: memory`, retention, a composite key, or a non-PostgreSQL source | Breaking in v2.3.0 (rejected at load) | See Durable Write-Back |
 | `retention_check_enabled` without `retention_check_interval` | Changed in v2.3.0 (never ran; now logs an error) | Set `retention_check_interval` |
 | `partition_by` with `engine: duckdb` | Removed in v2.2.0 | `engine: cayenne` or `arrow` |
 | `hash_index: enabled` (Arrow) | Ignored since v2.0.0 | `primary_key` |
@@ -134,9 +135,11 @@ expired entries as fallback, so nothing expires them — pair it with a size, it
 runtime warns at startup otherwise). It also serves stale data when the HTTP connector returns a 429/5xx
 after exhausting `max_retries` (v2.3.0+).
 
-`acceleration.enabled: false` discards the rest of the block; the runtime names the discarded settings
-(v2.3.0+). Set `ready_state` on the dataset or view itself — **Deprecated in v2.3.0**:
-`acceleration.ready_state` (still applied, with a load-time warning).
+`acceleration.enabled: false` turns the block off rather than parking it — the dataset federates every
+query — and the runtime names the settings it discards (v2.3.0+). Set `ready_state` on the dataset or
+view itself. **Deprecated in v2.3.0**: `acceleration.ready_state` still applies (it overrides the
+top-level key, even with `enabled: false`, so it is never listed as discarded) and warns at load,
+naming the component.
 
 A file-mode DuckDB acceleration on `refresh_mode: full` grows on every refresh unless `on_full_refresh`
 (v2.1.2+) is set; see spice-accelerators for that parameter.
@@ -216,6 +219,36 @@ DuckDB evicts expired rows reliably on every check from v2.1.4, including a poli
 with an additional condition. Cayenne runs `retention_sql` on `full` and `changes` refreshes (not only
 append) and resolves `now()` once per pass from v2.2.1; under Cayenne `mode: memory`, `retention_sql` is
 ignored with a warning.
+
+## Durable Write-Back
+
+`acceleration.write_mode: write_back` commits a write to the accelerator, then delivers it
+asynchronously to the source. Reconciling a row has to reach the source in one atomic step, so the
+runtime **rejects the dataset at registration** (**Breaking in v2.3.0**) rather than accept a config
+that can lose a committed write. Today only PostgreSQL can deliver it that way, and every one of these is required — the
+dataset is refused at load if any is missing:
+
+```yaml
+datasets:
+  - from: postgres:public.orders
+    name: orders
+    access: read_write       # write_mode only applies to read_write datasets
+    replication:
+      enabled: true          # write-back lags the source; opt in explicitly
+    acceleration:
+      engine: cayenne        # only Cayenne records delivery markers
+      mode: file             # a recreating mode would discard undelivered writes
+      write_mode: write_back
+      refresh_mode: changes  # delivery is driven by the change stream
+      primary_key: id        # single column; composite keys are refused
+      on_conflict:
+        id: upsert           # the delivery worker reconciles on this key
+```
+
+The dataset must also carry no acceleration retention (a prune could drop an acknowledged row before
+it is delivered) and be the sole writer of those source rows. `INSERT`/`UPDATE` must run inside one
+`BEGIN; … COMMIT;`; `DELETE`, `TRUNCATE`, and `MERGE` are rejected. Watch
+`dataset_acceleration_write_back_pending_keys` — a backlog that does not drain is a delivery problem.
 
 ## Constraints and Indexes
 
