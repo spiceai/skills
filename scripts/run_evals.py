@@ -50,7 +50,7 @@ def run_single_eval(skill_name, eval_entry, workspace, with_skill=True):
         # Disable skills so baseline doesn't pick up the plugin via auto-discovery
         cmd.append("--disable-slash-commands")
 
-    # Run baseline from /tmp so it doesn't auto-discover CLAUDE.md or plugins
+    # Run baseline from /tmp so it doesn't auto-discover AGENTS.md or plugins
     run_cwd = "/tmp" if not with_skill else None
 
     start = time.time()
