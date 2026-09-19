@@ -77,7 +77,7 @@ jobs:
 
           # Top-level files
           [ -f README.md ] && cp README.md "$STAGE_DIR/"
-          [ -f CLAUDE.md ] && cp CLAUDE.md "$STAGE_DIR/"
+          [ -f AGENTS.md ] && cp AGENTS.md "$STAGE_DIR/"
 
           # Create zip
           cd "$STAGING"
