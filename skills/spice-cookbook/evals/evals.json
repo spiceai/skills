@@ -102,8 +102,8 @@
         {
           "name": "fetches_pr_head",
           "type": "regex",
-          "value": "--pr 365|pull/365/head|gh pr checkout 365",
-          "description": "Should check out the pull request's head"
+          "value": "(?i)--pr 365|pull/365/head|gh pr checkout 365|check(?:ed|ing)? out[^.\\n]{0,60}365|365[^.\\n]{0,60}check(?:ed|ing)? out",
+          "description": "Should check out the pull request's head, however it words it"
         }
       ]
     },
