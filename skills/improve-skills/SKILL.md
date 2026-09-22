@@ -144,7 +144,7 @@ Constraints: keep under 500 lines, match the existing house style
 (YAML examples, comparison tables, cross-references to sibling skills),
 aim for a neutral net line delta. Mark additions `(vX.Y.Z+)` at the release
 that shipped them, and move removed or deprecated config into the skill's
-Version Compatibility table. See CLAUDE.md "Version Awareness".
+Version Compatibility table. See AGENTS.md "Version Awareness".
 ```
 
 When a run covers a new Spice release, bump every plugin manifest and each

@@ -92,7 +92,7 @@ done
 
 # Copy top-level files
 [ -f "$ROOT/README.md" ] && cp "$ROOT/README.md" "$STAGE_DIR/"
-[ -f "$ROOT/CLAUDE.md" ] && cp "$ROOT/CLAUDE.md" "$STAGE_DIR/"
+[ -f "$ROOT/AGENTS.md" ] && cp "$ROOT/AGENTS.md" "$STAGE_DIR/"
 
 for f in build_benchmark.py grade_eval.py; do
   [ -f "$ROOT/$f" ] && cp "$ROOT/$f" "$STAGE_DIR/"
