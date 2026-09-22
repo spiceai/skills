@@ -187,8 +187,10 @@ it demonstrates. Rewrite steps meant for a person at a terminal:
   you changed. If the recipe itself is broken (config the runtime rejects, a command that no longer
   exists), explain the problem and the workaround, apply the workaround only with the user's OK, and
   suggest reporting it at <https://github.com/spiceai/cookbook/issues>. Don't quietly rewrite recipe
-  files. The checkout is a git repository, so `git -C <cookbook> diff` shows any change and
-  `git -C <cookbook> checkout -- <file>` reverts it.
+  files. The checkout is a git repository, so `git -C <cookbook> status --short` lists what changed and
+  `git -C <cookbook> checkout -- <file>` reverts it. Don't run a bare `git diff` there: a recipe's
+  tracked `.env` may now hold the user's real key, and the diff would print it into this conversation.
+  Diff a specific file you know holds no secrets (`git -C <cookbook> diff -- <file>`).
 
 ## 7. Hand off
 
@@ -211,7 +213,8 @@ When the user asks, or when they only wanted a check:
 - Run `docker compose down`. Add `-v` only if the user wants the volumes gone. The README's `make clean`
   may also delete images and the recipe's `.spice/` directory.
 - Offer to remove files you created, and ask before deleting a `.env.local` that holds the user's keys.
-  Restore tracked files the recipe edited (`git -C <cookbook> status`, then `checkout -- <file>`).
+  Restore tracked files the recipe edited (`git -C <cookbook> status --short`, then
+  `checkout -- <file>`; don't diff `.env` files, which may hold the user's key).
 - Acceleration files in `<recipe>/.spice/` can break the next run with schema errors. Deleting that
   directory is safe; the runtime rebuilds it.
 

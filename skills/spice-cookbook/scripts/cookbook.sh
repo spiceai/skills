@@ -464,11 +464,12 @@ def env_precedence(runtime_version):
 
 def docker_state():
     if not shutil.which("docker"):
-        return {"installed": False, "running": False}
+        return {"installed": False, "running": False, "compose": None, "compose_standalone": False}
     r = run(["docker", "info", "--format", "{{.ServerVersion}}"], timeout=15)
     compose = run(["docker", "compose", "version", "--short"], timeout=15)
     return {"installed": True, "running": r.returncode == 0,
             "compose": compose.stdout.strip() if compose.returncode == 0 else None,
+            "compose_standalone": bool(shutil.which("docker-compose")),
             "error": None if r.returncode == 0 else (r.stderr.strip().splitlines() or [""])[-1][:200]}
 
 
@@ -497,6 +498,14 @@ def compose_ports(d):
 
 def is_tracked(root, path):
     return run(["git", "ls-files", "--error-unmatch", str(path)], cwd=root).returncode == 0
+
+
+def rel_or_abs(path, base):
+    """Path relative to base, or absolute when it sits outside (e.g. an absolute recipe path)."""
+    try:
+        return str(path.relative_to(base)) or "."
+    except ValueError:
+        return str(path)
 
 
 # ---------------------------------------------------------------- commands
@@ -536,7 +545,8 @@ def cmd_list(args):
 def resolve_recipe(root, name):
     s = name.strip()
     s = re.sub(r"^https?://github\.com/spiceai/cookbook/(?:tree|blob)/[^/]+/?", "", s)
-    s = re.sub(r"/?README\.md$", "", s).strip("/")
+    # Trailing slashes only: a leading one belongs to an absolute path.
+    s = re.sub(r"/?README\.md$", "", s).rstrip("/")
     s = re.sub(r"^(\./)+", "", s)
     if s.startswith("cookbook/"):
         s = s[len("cookbook/"):]
@@ -567,7 +577,7 @@ def resolve_recipe(root, name):
 def cmd_inspect(args):
     root = require_checkout(args.dir)
     d = resolve_recipe(root, args.recipe)
-    rel = str(d.relative_to(root)) if root in d.parents or d == root else str(d)
+    rel = rel_or_abs(d, root)
     readme = d / "README.md"
     text = read(readme)
     spice = spice_versions()
@@ -579,7 +589,9 @@ def cmd_inspect(args):
     run_dirs = recipe_files(d)
     pods_text = pods_text_of(run_dirs, text)
     connectors, s3_private = connectors_of(pods_text)
-    docker_needed = bool(compose_files(d)) or bool(re.search(r"docker[ -]compose|docker run", text))
+    # Compose is tracked separately: a daemon can be up while the compose plugin is missing.
+    compose_needed = bool(compose_files(d)) or bool(re.search(r"docker[ -]compose", text))
+    docker_needed = compose_needed or bool(re.search(r"docker run|docker build|docker exec", text))
     docker = docker_state() if docker_needed else None
     blockers, warnings = [], []
 
@@ -600,6 +612,9 @@ def cmd_inspect(args):
     if docker_needed and docker and not docker["running"]:
         blockers.append("The recipe needs Docker, but the Docker daemon isn't reachable."
                         if docker["installed"] else "The recipe needs Docker, which isn't installed.")
+    elif compose_needed and docker and not docker["compose"] and not docker["compose_standalone"]:
+        blockers.append("The recipe runs Docker Compose, but this Docker install has no `docker compose` "
+                        "plugin and no `docker-compose` binary.")
 
     # Secrets, evaluated from each directory `spice run` is started in.
     shell = dict(os.environ)
@@ -631,7 +646,7 @@ def cmd_inspect(args):
             shadowed = [f"{n} in {src}" for n in names for src in precedence
                         if n in sources[src] and (n, src) != (variable, source) and sources[src][n].strip()
                         and not is_placeholder(sources[src][n])] if state in ("empty", "placeholder") else []
-            entry = {"name": key, "referenced_as": ref, "run_dir": str(rd.relative_to(root)) if rd != root else ".",
+            entry = {"name": key, "referenced_as": ref, "run_dir": rel_or_abs(rd, root),
                      "status": state, "variable": variable, "source": source, "accepted_names": names}
             if source in (".env", ".env.local"):
                 f = env_file if source == ".env" else local_file
@@ -665,15 +680,25 @@ def cmd_inspect(args):
     if runtime_v and runtime_v[:2] == (2, 1) and any(s["source"] == ".env" for s in secrets):
         warnings.append("Runtime v2.1.x: values in .env override .env.local and exported variables (fixed in v2.2.0).")
 
+    # A README that calls `python` or `pip` still works through python3/pip3, but the command as
+    # written won't run, so name the substitute instead of staying silent.
+    alternatives = {"python": "python3", "pip": "pip3"}
     tools = readme_commands(text)
     tool_state = {t: bool(shutil.which(t)) for t in tools}
-    if ("python" in tool_state or "pip" in tool_state) and not tool_state.get("python"):
-        tool_state["python3"] = bool(shutil.which("python3"))  # `python -m venv` works as python3
-    missing_tools = [t for t, ok in tool_state.items() if not ok and t not in ("python", "pip")]
-    if not tool_state.get("python", True) and not tool_state.get("python3"):
-        missing_tools.append("python")
+    missing_tools, substitutes = [], []
+    for tool, present in sorted(tool_state.items()):
+        if present:
+            continue
+        alt = alternatives.get(tool)
+        if alt and shutil.which(alt):
+            tool_state[alt] = True
+            substitutes.append((tool, alt))
+        else:
+            missing_tools.append(tool)
     if missing_tools:
         warnings.append(f"The README uses {', '.join(missing_tools)}, not found on PATH.")
+    for tool, alt in substitutes:
+        warnings.append(f"The README calls `{tool}`, which isn't on PATH; `{alt}` is — use it instead.")
 
     ports = {}
     for port in [8090, 50051, *compose_ports(d)]:
@@ -702,7 +727,7 @@ def cmd_inspect(args):
         "run_dirs": [str(rd.relative_to(d)) or "." for rd in run_dirs],
         "readme_writes_spicepod": not run_dirs,
         "connectors": sorted(connectors),
-        "docker": {"needed": docker_needed, "compose_files": compose_files(d),
+        "docker": {"needed": docker_needed, "compose_needed": compose_needed, "compose_files": compose_files(d),
                    "makefile": (d / "Makefile").is_file(), **(docker or {})},
         "env_precedence": precedence,
         "secrets": secrets,
