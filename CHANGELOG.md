@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Add the `spice-cookbook` skill, which sets up and runs recipes from the [Spice.ai cookbook](https://github.com/spiceai/cookbook). It picks a recipe by name or goal, fetches the cookbook (or a pull request or branch), and checks the runtime version, Docker, secrets, tools, and ports with `scripts/cookbook.sh` before running the README steps. The script reports whether each secret is set without printing its value.
+- Fix spice-setup and spicepod-config, which set bind addresses with `spice run -- --http ...`. That fails on every v2 CLI (`argument '--http' cannot be used multiple times`) because `spice run` already passes `--http`. Use `spice run --http-endpoint`, `--flight-endpoint`, and `--metrics-endpoint` instead.
+- Fix spice-search and spice-text-to-sql `rrf()` examples: the score column has been `_fused_score` since v2.0.0, not `fused_score`.
 
 ## 2.3.1
 

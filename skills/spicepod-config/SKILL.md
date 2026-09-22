@@ -128,8 +128,12 @@ has no port setting (it tunes options such as `max_message_size`). Defaults: HTT
 Flight `127.0.0.1:50051`, Prometheus metrics disabled.
 
 ```bash
-spice run -- --http 0.0.0.0:8090 --flight 0.0.0.0:50051 --metrics 0.0.0.0:9090 # same flags on spiced
+spice run --http-endpoint 0.0.0.0:8090 --flight-endpoint 0.0.0.0:50051 --metrics-endpoint 0.0.0.0:9090
+spiced --http 0.0.0.0:8090 --flight 0.0.0.0:50051 --metrics 0.0.0.0:9090   # running spiced directly
 ```
+
+Don't pass `--http` after `--` (`spice run -- --http ...`): `spice run` already sets it, and `spiced` rejects
+the duplicate.
 
 ### CPU Entitlement
 

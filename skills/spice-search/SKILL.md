@@ -24,6 +24,7 @@ Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime 
 | --- | --- | --- |
 | `google_api_key` on `from: google` embeddings | Breaking in v2.3.0 | Vertex AI settings (see spice-models) |
 | `col =>` in `vector_search` / `text_search` | Renamed in v2.0.0 | `column =>` |
+| `fused_score` column from `rrf()` | Renamed in v2.0.0 | `_fused_score` |
 | Scalar `matches` in `/v1/search` responses | Breaking in v2.0.0 | Always an array |
 | `.onnx` embedding weights | Removed in v2.2.0 | `.safetensors` or `pytorch_model.bin` |
 | Full-text index persisted before v2.2.0 | Changed in v2.2.0 (stemming) | Delete the index directory to rebuild |
@@ -211,25 +212,25 @@ Documents appearing across multiple result sets receive higher scores.
 ### Basic Hybrid Search
 
 ```sql
-SELECT id, title, content, fused_score
+SELECT id, title, content, _fused_score
 FROM rrf(
     vector_search(documents, 'machine learning algorithms'),
     text_search(documents, 'neural networks deep learning', content),
     join_key => 'id'
 )
-ORDER BY fused_score DESC
+ORDER BY _fused_score DESC
 LIMIT 5;
 ```
 
 ### Weighted Ranking
 
 ```sql
-SELECT fused_score, title, content
+SELECT _fused_score, title, content
 FROM rrf(
     text_search(posts, 'artificial intelligence', rank_weight => 50.0),
     vector_search(posts, 'AI machine learning', rank_weight => 200.0)
 )
-ORDER BY fused_score DESC
+ORDER BY _fused_score DESC
 LIMIT 10;
 ```
 
@@ -237,7 +238,7 @@ LIMIT 10;
 
 ```sql
 -- Exponential decay (1-hour scale)
-SELECT fused_score, title, created_at
+SELECT _fused_score, title, created_at
 FROM rrf(
     text_search(news, 'breaking news'),
     vector_search(news, 'latest updates'),
@@ -246,11 +247,11 @@ FROM rrf(
     decay_constant => 0.05,
     decay_scale_secs => 3600
 )
-ORDER BY fused_score DESC
+ORDER BY _fused_score DESC
 LIMIT 10;
 
 -- Linear decay (24-hour window)
-SELECT fused_score, content
+SELECT _fused_score, content
 FROM rrf(
     text_search(posts, 'trending'),
     vector_search(posts, 'viral popular'),
@@ -258,7 +259,7 @@ FROM rrf(
     recency_decay => 'linear',
     decay_window_secs => 86400
 )
-ORDER BY fused_score DESC;
+ORDER BY _fused_score DESC;
 ```
 
 ### Cross-Language Search
@@ -267,7 +268,7 @@ Stemming is English-only, so the full-text arm contributes little across languag
 arm up and let RRF do the rest — the recency parameters are the same as above:
 
 ```sql
-SELECT fused_score, text, langs
+SELECT _fused_score, text, langs
 FROM rrf(
     vector_search(posts, 'ultimas noticias', rank_weight => 100),
     text_search(posts, 'news'),
@@ -371,7 +372,7 @@ datasets:
 ```
 
 ```sql
-SELECT id, title, content, fused_score
+SELECT id, title, content, _fused_score
 FROM rrf(
     vector_search(articles, 'machine learning best practices'),
     text_search(articles, 'neural network training', content),
@@ -381,8 +382,8 @@ FROM rrf(
     decay_constant => 0.01,
     decay_scale_secs => 86400
 )
-WHERE fused_score > 0.01
-ORDER BY fused_score DESC
+WHERE _fused_score > 0.01
+ORDER BY _fused_score DESC
 LIMIT 10;
 ```
 
