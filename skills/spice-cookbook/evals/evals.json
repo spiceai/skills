@@ -1,0 +1,131 @@
+{
+  "skill_name": "spice-cookbook",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to try the kafka recipe from the Spice cookbook on my laptop. What do I need, and what are the steps?",
+      "expected_output": "Needs Docker and the cookbook checkout; docker compose up -d (or make) in cookbook/kafka, spice run, query with spice sql, then docker compose down / make clean",
+      "files": [],
+      "assertions": [
+        {
+          "name": "starts_compose_stack",
+          "type": "regex",
+          "value": "docker compose up|\\bmake\\b",
+          "description": "Should start the recipe's Docker Compose stack"
+        },
+        {
+          "name": "runs_spice",
+          "type": "contains",
+          "value": "spice run",
+          "description": "Should start the runtime with spice run"
+        },
+        {
+          "name": "explains_cleanup",
+          "type": "regex",
+          "value": "docker compose down|make clean",
+          "description": "Should say how to stop the containers afterwards"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I'm running the cookbook's ai recipe. OPENAI_API_KEY is exported in my shell, but the gpt-4o-mini model still fails to authenticate. Why?",
+      "expected_output": "The recipe reads ${secrets:SPICE_OPENAI_API_KEY}, which resolves SPICE_OPENAI_API_KEY, not OPENAI_API_KEY; set SPICE_OPENAI_API_KEY in .env.local or export it",
+      "files": [],
+      "assertions": [
+        {
+          "name": "names_spice_prefixed_variable",
+          "type": "contains",
+          "value": "SPICE_OPENAI_API_KEY",
+          "description": "Should identify SPICE_OPENAI_API_KEY as the variable the recipe reads"
+        },
+        {
+          "name": "says_where_to_put_it",
+          "type": "regex",
+          "value": "\\.env\\.local|export SPICE_OPENAI_API_KEY",
+          "description": "Should suggest .env.local or exporting SPICE_OPENAI_API_KEY"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "On Spice v2.1.1 I put my real OpenAI key in .env.local for the cookbook's search recipe, but the runtime still logs 'Incorrect API key provided: <your op***'. What's wrong?",
+      "expected_output": "On v2.1.x, values in .env override .env.local and exported variables, so the recipe's tracked .env placeholder wins; put the key in .env (don't commit it), delete the placeholder line, or upgrade to v2.2.0+",
+      "files": [],
+      "assertions": [
+        {
+          "name": "blames_env_precedence",
+          "type": "regex",
+          "value": "(?i)overrid|precedence|takes priority|wins over|beats",
+          "description": "Should explain that the .env placeholder takes precedence over .env.local"
+        },
+        {
+          "name": "names_fixed_version",
+          "type": "regex",
+          "value": "v?2\\.2(\\.0)?",
+          "description": "Should say the behavior was fixed in v2.2.0 (upgrade path)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Port 8090 is already used by another app on my machine. How do I run a Spice cookbook recipe on different ports and still query it?",
+      "expected_output": "spice run --http-endpoint 127.0.0.1:<port> --flight-endpoint 127.0.0.1:<port> (not spice run -- --http, which fails), then spice sql --endpoint grpc://127.0.0.1:<flight-port> and adjust README commands that hardcode 8090/50051",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_http_endpoint_flag",
+          "type": "contains",
+          "value": "--http-endpoint",
+          "description": "Should use spice run --http-endpoint"
+        },
+        {
+          "name": "uses_flight_endpoint_flag",
+          "type": "contains",
+          "value": "--flight-endpoint",
+          "description": "Should also move the Flight port with --flight-endpoint"
+        },
+        {
+          "name": "points_client_at_new_port",
+          "type": "regex",
+          "value": "spice sql --endpoint",
+          "description": "Should point spice sql at the new Flight port"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Can you run the recipe from spiceai/cookbook PR #365 so I can check it before it merges?",
+      "expected_output": "Fetch the PR head (cookbook.sh fetch --pr 365, git fetch origin pull/365/head, or gh pr checkout 365), find the recipes it changes, then check prerequisites and run",
+      "files": [],
+      "assertions": [
+        {
+          "name": "fetches_pr_head",
+          "type": "regex",
+          "value": "--pr 365|pull/365/head|gh pr checkout 365",
+          "description": "Should check out the pull request's head"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "The evals recipe in the Spice cookbook fails on my v2.3.1 runtime with an error about the evals section. Is the recipe broken?",
+      "expected_output": "The recipe is marked Deprecated in v2.0+: the evals subsystem was removed in v2.0.0, so it only runs on a v1.x runtime",
+      "files": [],
+      "assertions": [
+        {
+          "name": "explains_removal",
+          "type": "regex",
+          "value": "(?i)removed in (spice )?v?2\\.0|deprecated in `?v?2\\.0",
+          "description": "Should explain that evals were removed in v2.0.0"
+        },
+        {
+          "name": "points_to_v1",
+          "type": "regex",
+          "value": "(?i)v1\\.x|v1 runtime|1\\.x release|v1\\.11",
+          "description": "Should say the recipe needs a v1.x runtime"
+        }
+      ]
+    }
+  ]
+}

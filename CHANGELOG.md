@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add the `spice-cookbook` skill, which sets up and runs recipes from the [Spice.ai cookbook](https://github.com/spiceai/cookbook). It picks a recipe by name or goal, fetches the cookbook (or a pull request or branch), and checks the runtime version, Docker, secrets, tools, and ports with `scripts/cookbook.sh` before running the README steps. The script reports whether each secret is set without printing its value.
+
 ## 2.3.1
 
 - Align plugin metadata with Spice.ai OSS runtime `v2.3.1`.

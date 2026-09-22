@@ -118,6 +118,7 @@ The skills are version-aware. Each one names the release line it is written for,
 | Skill | Description |
 | --- | --- |
 | [spice-setup](skills/spice-setup/) | Install Spice, initialize a project, and run the runtime |
+| [spice-cookbook](skills/spice-cookbook/) | Find, set up, and run recipes from the Spice.ai cookbook, including from a pull request |
 | [spicepod-config](skills/spicepod-config/) | Create and configure spicepod.yaml manifests |
 | [spice-connect-data](skills/spice-connect-data/) | Connect to data sources and query across them with federated SQL |
 | [spice-data-connector](skills/spice-data-connector/) | Configure individual data source connectors (PostgreSQL, S3, Snowflake, etc.) |
