@@ -23,6 +23,7 @@ Written for **Spice v2.3.x** (checked against v2.3.1). The SQL dialect is Apache
 | Old | Change | Use instead |
 | --- | --- | --- |
 | `col =>` in `vector_search` / `text_search` | Renamed in v2.0.0 | `column =>` |
+| `fused_score` column from `rrf()` | Renamed in v2.0.0 | `_fused_score` |
 | S3 metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` (document tables keep `location`, `content`) |
 | `DELETE` or `TRUNCATE` on durable write-back datasets | Breaking in v2.3.0 (rejected) | Writes as one `BEGIN; …; COMMIT;` request |
 | DuckDB v1.5-only SQL on DuckDB-accelerated datasets | Changed in v2.2.1 (bundled DuckDB is v1.4.4) | DuckDB 1.4-compatible SQL |
@@ -270,11 +271,11 @@ SELECT id, score FROM text_search(my_table, 'keywords', body_column)
 ORDER BY score DESC LIMIT 10;
 
 -- Hybrid search (Reciprocal Rank Fusion) — requires both above
-SELECT id, fused_score FROM rrf(
+SELECT id, _fused_score FROM rrf(
   vector_search(my_table, 'semantic query'),
   text_search(my_table, 'keyword query', content),
   join_key => 'id'
-) ORDER BY fused_score DESC LIMIT 10;
+) ORDER BY _fused_score DESC LIMIT 10;
 ```
 
 ### JSON functions

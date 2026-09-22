@@ -70,6 +70,7 @@ Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime 
 | Native Windows runtime (`spiced.exe`) | Removed in v2.0.0 | WSL |
 | OpenTelemetry port `50052` | Removed in v1.11.0 | The Flight port `50051` |
 | `spice connect <org>/<pod>` | Deprecated in v2.2.0 | `spice add <org>/<pod>` |
+| `spice run -- --http <addr>` | Fails on every v2 CLI (the CLI already passes `--http`) | `spice run --http-endpoint <addr>` |
 | Browser `Origin` on `/v1/mcp` | Breaking in v2.3.1 (checked, else `403`) | List origins in `runtime.cors.allowed_origins` |
 
 ## Quick Start
@@ -174,7 +175,9 @@ dependencies:
 | Metrics      | Disabled by default (`--metrics 127.0.0.1:9090`) | Prometheus `/metrics`     |
 
 Bind addresses are runtime flags, not Spicepod keys — e.g. to listen on all interfaces:
-`spice run -- --http 0.0.0.0:8090 --flight 0.0.0.0:50051 --metrics 0.0.0.0:9090` (same flags on `spiced`).
+`spice run --http-endpoint 0.0.0.0:8090 --flight-endpoint 0.0.0.0:50051 --metrics-endpoint 0.0.0.0:9090`
+(`spiced` itself takes `--http`, `--flight`, and `--metrics`). Don't pass `--http` after `--`: `spice run`
+already sets it, and `spiced` rejects the duplicate.
 
 ## HTTP API Paths
 
