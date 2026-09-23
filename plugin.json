@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "spiceai-skills",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
   "author": {
     "name": "Spice AI",
