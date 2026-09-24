@@ -43,6 +43,8 @@ usage() {
   echo "  create-project <name> <region> [desc]   Create a project, region us-east-1|us-west-2 (create-app)" >&2
   echo "  update-project <projectId> <json>       Update project with JSON body (update-app)" >&2
   echo "  delete-project <projectId>              Delete a project (delete-app)" >&2
+  echo "  fork-project <projectId> [name] [region] Fork a project; the fork is not deployed" >&2
+  echo "  list-forks <projectId>                  List the forks of a project" >&2
   echo "  list-deployments <projectId> [status]   List deployments" >&2
   echo "  deploy <projectId> [branch] [message]   Create a deployment" >&2
   echo "  list-secrets <projectId>                List secrets (values masked)" >&2
@@ -89,6 +91,20 @@ case "${1:-}" in
     echo "Deleting project $2..." >&2
     api_delete "/v1/projects/$2"
     echo "Project $2 deleted" >&2
+    ;;
+  fork-project)
+    [ -z "${2:-}" ] && { echo "Error: projectId required" >&2; exit 1; }
+    BODY="{"
+    SEP=""
+    if [ -n "${3:-}" ]; then BODY="$BODY${SEP}\"name\":\"$3\""; SEP=","; fi
+    if [ -n "${4:-}" ]; then BODY="$BODY${SEP}\"region\":\"$4\""; SEP=","; fi
+    BODY="$BODY}"
+    echo "Forking project $2..." >&2
+    api_post "/v1/projects/$2/forks" "$BODY"
+    ;;
+  list-forks)
+    [ -z "${2:-}" ] && { echo "Error: projectId required" >&2; exit 1; }
+    api_get "/v1/projects/$2/forks"
     ;;
   list-deployments)
     [ -z "${2:-}" ] && { echo "Error: projectId required" >&2; exit 1; }
