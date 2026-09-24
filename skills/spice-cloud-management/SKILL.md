@@ -11,7 +11,7 @@ Manage Spice.ai Cloud resources through the Management API (control plane) at `h
 
 ## Version Compatibility
 
-Written against the Spice.ai Cloud Management API as documented in September 2026, for projects running **Spice v2.3.x** (checked against v2.3.1). Two versions matter:
+Written against the Spice.ai Cloud Management API as documented in September 2026, for projects running **Spice v2.3.x** (checked against v2.3.2). Two versions matter:
 
 - **The project's runtime**: each deployment resolves the runtime from the project's `update_channel` (`stable`, `preview`, `nightly`) and `version` range unless `image_tag` pins it. Stable can trail the latest OSS release, so check `GET /v1/projects/{projectId}` and the [changelog](https://docs.spice.ai/changelog) before recommending a runtime feature. Cloud APIs have runtime minimums — the MCP API needs v2.0.0+ and `/v1/nsql` needs v2.1.0+.
 - **The API surface**: Cloud API changes are dated by the changelog month, not by a runtime release.

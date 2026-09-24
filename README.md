@@ -109,7 +109,7 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 
 ## Versioning
 
-Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.1` with runtime `v2.3.1`). Pin to GitHub release tag `v2.3.1` when you need a fixed surface, or use `trunk` for latest.
+Skills versions match the Spice.ai OSS runtime they target (e.g. `2.3.2` with runtime `v2.3.2`). Pin to GitHub release tag `v2.3.2` when you need a fixed surface, or use `trunk` for latest.
 
 The skills are version-aware. Each one names the release line it is written for, tells the agent to check your runtime version (`spice version`) before it recommends configuration, marks features added after v2.0.0 with the release that shipped them (for example `(v2.2.0+)`), and lists removed or deprecated configuration with its replacement. On an older runtime, the agent can then avoid newer settings and use the docs for your release (`https://spiceai.org/docs/v2.2/...`).
 

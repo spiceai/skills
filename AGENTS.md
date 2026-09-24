@@ -44,12 +44,12 @@ description: {Concise description (may be multiple short sentences) of when to u
 
 ## Version Awareness
 
-Skills target the Spice runtime release line in `.claude-plugin/plugin.json` (plugin `2.3.1` → Spice
+Skills target the Spice runtime release line in `.claude-plugin/plugin.json` (plugin `2.3.2` → Spice
 v2.3.x). Users run older and newer runtimes, so each Spice skill must let the agent match its advice to
 the user's version:
 
 - **`## Version Compatibility` section** after the intro: the target line (`Written for **Spice
-  v2.3.x** (checked against v2.3.1)`), how to check the runtime version (`spice version`, `spiced --version`, image tag — not
+  v2.3.x** (checked against v2.3.2)`), how to check the runtime version (`spice version`, `spiced --version`, image tag — not
   the Spicepod `version: v2` field or SQL `version()`), and an `Old | Change | Use instead` table of
   removed, renamed, or deprecated config users may still have.
 - **Inline markers**: unmarked content applies to v2.0.0 and later. Mark later additions `(v2.2.0+)`

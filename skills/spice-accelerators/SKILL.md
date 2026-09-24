@@ -9,12 +9,12 @@ Accelerators materialize data locally from connected sources for faster queries 
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.3.x** (checked against v2.3.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
@@ -26,6 +26,8 @@ Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime 
 | `hash_index: enabled` (Arrow) | Ignored since v2.0.0 | `primary_key` |
 | `turso_mvcc` | Removed in v2.0.0 (MVCC always on) | Delete it |
 | `acceleration.ready_state` | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
+| `cayenne_datalake_clustering_columns` | Breaking in v2.3.2 (no longer accepted) | `cayenne_cluster_by` (clusters warm and datalake tiers) |
+| Cayenne datasets with different `cayenne_file_path` values and no shared `cayenne_metadata_dir` | Breaking in v2.3.2 (refused at startup) | The same `cayenne_metadata_dir` on every Cayenne dataset |
 
 ## Basic Configuration
 
@@ -176,8 +178,17 @@ acceleration:
 
 `mode: file` is durable. `mode: memory` (v2.2.0+) is ephemeral: it reloads from the source on restart,
 doesn't support `partition_by`, and errors at a hard per-table RAM bound instead of spilling to disk
-(filtered `DELETE`/`UPDATE`/`INSERT` on it apply correctly from v2.3.1). Cayenne ignores `indexes` with
-a warning; deduplicate with `primary_key` + `on_conflict`.
+(filtered `DELETE`/`UPDATE`/`INSERT` on it apply correctly from v2.3.1).
+
+**Changed in v2.3.2**: Cayenne builds a secondary index per `indexes` entry in both modes (earlier
+releases ignore `indexes` with a warning). It is used only when a query pins every index column to a
+literal with `=` — a range, `IN`, `OR`, or a cast on the column scans as before — and float columns are
+rejected at load. A `unique` entry constrains nothing, so deduplicate with `primary_key` + `on_conflict`.
+`EXPLAIN` shows `lookup_index` on `CayenneAccelerationExec`. See
+[Secondary indexes](https://spiceai.org/docs/components/data-accelerators/cayenne#secondary-indexes).
+
+`cayenne_cluster_by` (v2.3.2+) clusters warm and datalake files on comma-separated columns so filtered
+queries read fewer files; it cannot be combined with `sort_columns` (the dataset fails to load).
 
 Engine-global Cayenne settings go under `runtime.params`; setting one under `acceleration.params` has no
 effect. **Deprecated in v2.2.0**: table-level `cayenne_segment_cache_mb` — Cayenne tables share one
@@ -222,8 +233,9 @@ acceleration:
 
 ## Constraints and Indexes
 
-`indexes` apply on `duckdb`, `sqlite`, `turso`, and `postgres`; `cayenne` ignores them. On `arrow`,
-`primary_key` builds an experimental hash index (the legacy `hash_index: enabled` param is ignored).
+`indexes` apply on `duckdb`, `sqlite`, `turso`, `postgres`, and — from v2.3.2, for exact-key lookups
+only — `cayenne` (see Cayenne above). On `arrow`, `primary_key` builds an experimental hash index (the
+legacy `hash_index: enabled` param is ignored).
 
 ```yaml
 acceleration:
