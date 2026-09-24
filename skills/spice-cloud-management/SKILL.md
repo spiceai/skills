@@ -158,11 +158,12 @@ The body is optional, and any other field is rejected with `400`.
 
 - **Copied:** the spicepod the source deploys (from its GitHub repository, the internal registry, or the stored config), linked connections, project secrets, linked organization secrets, update channel, version range, replica and executor counts, storage size, description, and tags. The platform-managed Postgres CDC replication slot is rebound to the fork.
 - **Not copied:** API keys (the fork gets its own), deployments, the GitHub repository link, the instance size (the fork starts on the default instance), and visibility (forks are private).
+- **GitHub-connected sources:** the spicepod is read from the source's repository, and a fork that cannot read it fails with `502 fork_source_repository_unreadable` instead of copying an older stored spicepod. The API copies only `spicepod.yaml`. It refuses a source that loads other files from the repository — component `ref`s, view `sql_ref`s, model or embedding `files`, or relative `file:` sources — with `422 fork_source_loads_repository_files`. To keep a fork in Git, fork the repository on GitHub, name the fork after the new project, then fork the project in the portal with **Deploy from a fork of the repository**. The portal connects the new project to that repository.
 - **Not deployed:** the `201` response is the new project with its config. Deploy it with `POST /v1/projects/{forkId}/deployments`.
 - **Check `shared_state` first.** The response lists settings copied as-is that name state the source also uses — a replication slot or Kafka consumer group the spicepod names, or a snapshot location. Two projects on one replication slot or consumer group split the changes between them, so change these in the fork's spicepod (`PUT /v1/projects/{forkId}`) before deploying unless the projects should share them.
 - A source on a BYOC cluster or a self-hosted (Cloud Connect) runtime has no placement a fork can share, and neither does one whose region or cluster is no longer available: set `region` or `cluster_name`.
 
-**Status codes:** `201` forked (not deployed), `400` validation error (codes in Troubleshooting), `402 ai_credits_exhausted` (the source runs on hosted AI credits the organization has used up), `404` source not found, `409` name taken or `fork_name_unavailable`, `422 fork_source_has_no_spicepod` or `fork_source_spicepod_invalid`, `429` rate limited
+**Status codes:** `201` forked (not deployed), `400` validation error (codes in Troubleshooting), `402 ai_credits_exhausted` (the source runs on hosted AI credits the organization has used up), `404` source not found, `409` name taken or `fork_name_unavailable`, `422 fork_source_has_no_spicepod`, `fork_source_spicepod_invalid`, or `fork_source_loads_repository_files`, `429` rate limited, `502 fork_source_repository_unreadable`
 
 ## Deployments
 
@@ -479,7 +480,9 @@ When presenting management API results:
 | `400 fork_placement_required`       | The source runs on a BYOC cluster, a self-hosted runtime, or a region or cluster that is gone; set `region` or `cluster_name` for the fork |
 | `400 scheduler_state_location_*`    | The source is distributed; set `scheduler_state_location` to an `s3://` URI outside the source's (`_required`, `_unsupported`, `_overlaps_source`). `_not_applicable` means the source is not distributed, so omit the field |
 | `409 fork_name_unavailable`         | Every default `<source>-fork-N` name is taken; set `name`                                   |
-| `422 fork_source_*`                 | The source has no spicepod or an invalid one; fix the source's spicepod, then fork again     |
+| `422 fork_source_has_no_spicepod` / `fork_source_spicepod_invalid` | The source has no spicepod or an invalid one; fix the source's spicepod, then fork again |
+| `422 fork_source_loads_repository_files` | The source's spicepod loads other files from its GitHub repository; fork the repository on GitHub, then fork the project in the portal, which deploys from the forked repository |
+| `502 fork_source_repository_unreadable` | The source's spicepod could not be read from its GitHub repository; retry, or fix the repository or the GitHub App's access to it |
 | `409` on deployment                 | A deployment is already in progress; wait for it to complete                                |
 | `400` on deployment                 | Project has no spicepod, is paused (`POST .../resume`), or `image_tag` isn't a published version for the channel |
 | `400` on create secret              | Secret name must start with letter/underscore; letters, numbers, underscores only           |
