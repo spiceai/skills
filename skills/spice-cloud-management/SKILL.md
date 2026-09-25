@@ -1,17 +1,17 @@
 ---
 name: spice-cloud-management
-description: Manage Spice.ai Cloud resources via the Management API — projects (formerly apps), deployments, secrets, API keys, and org members. Use this skill whenever the user wants to create or manage a Spice.ai Cloud project or app, trigger a deployment, manage cloud secrets or API keys, list regions or runtime versions, add/remove org members, or automate any Spice.ai Cloud operation. Also use when the user mentions "spice.ai cloud", "deploy to spice", "cloud API", or wants to use the Spice.ai hosted platform. For infrastructure-as-code with Terraform, see spice-terraform.
+description: Manage Spice.ai Cloud resources via the Management API — projects (formerly apps), deployments, project monitors, data reactions (alerts), secrets, API keys, and org members. Use this skill whenever the user wants to create or manage a Spice.ai Cloud project or app, list or configure alerts/monitors, trigger a deployment, manage cloud secrets or API keys, list regions or runtime versions, add/remove org members, or automate any Spice.ai Cloud operation. Also use when the user mentions "spice.ai cloud", "deploy to spice", "cloud API", or wants to use the Spice.ai hosted platform. For infrastructure-as-code with Terraform, see spice-terraform.
 ---
 
 # Spice.ai Cloud Management
 
-Manage Spice.ai Cloud resources through the Management API (control plane) at `https://api.spice.ai`. Create projects, trigger deployments, manage secrets and API keys, and administer organization members.
+Manage Spice.ai Cloud resources through the Management API (control plane) at `https://api.spice.ai`. Create projects, trigger deployments, configure monitors and data reactions, manage secrets and API keys, and administer organization members.
 
-**Renamed in Aug 2026:** apps are now **projects**. The `/v1/projects` routes are canonical; every `/v1/apps` route is still served as a legacy alias (marked deprecated in the OpenAPI spec). Only the list envelope differs — `GET /v1/projects` returns `{"projects": [...]}`, `GET /v1/apps` returns `{"apps": [...]}`. Scope names stay `apps:*`.
+**Renamed in Aug 2026:** apps are now **projects**. The `/v1/projects` routes are canonical; every `/v1/apps` route is still served as a legacy alias (marked deprecated in the OpenAPI spec). Only the list envelope differs — `GET /v1/projects` returns `{"projects": [...]}`, `GET /v1/apps` returns `{"apps": [...]}`. Project-management scopes stay `apps:*`; monitors and reactions have separate scopes below.
 
 ## Version Compatibility
 
-Written against the Spice.ai Cloud Management API as documented in September 2026, for projects running **Spice v2.3.x** (checked against v2.3.1). Two versions matter:
+Written against the Spice.ai Cloud Management API as documented in September 2026, for projects running **Spice v2.3.x** (checked against v2.3.2). Two versions matter:
 
 - **The project's runtime**: each deployment resolves the runtime from the project's `update_channel` (`stable`, `preview`, `nightly`) and `version` range unless `image_tag` pins it. Stable can trail the latest OSS release, so check `GET /v1/projects/{projectId}` and the [changelog](https://docs.spice.ai/changelog) before recommending a runtime feature. Cloud APIs have runtime minimums — the MCP API needs v2.0.0+ and `/v1/nsql` needs v2.1.0+.
 - **The API surface**: Cloud API changes are dated by the changelog month, not by a runtime release.
@@ -182,6 +182,44 @@ curl -X POST https://api.spice.ai/v1/projects/{projectId}/deployments \
 | `debug`          | boolean | No       | Enable debug mode                                        |
 
 Returns `202` with the `queued` deployment; poll `GET .../deployments/{deploymentId}` for status. Returns `409` if a deployment is already in progress, and `400` if the project has no spicepod or is paused (resume with `POST /v1/projects/{projectId}/resume`).
+
+## Monitors and data reactions
+
+Monitors evaluate runtime metrics or dataset status; data reactions fire on matching Drasi queries. List both when asked for project alerts. Use the Management API Bearer token and a project ID from `GET /v1/projects`, not a project API key.
+
+| Resource | Base path | Read scope | Create/delete scope |
+| --- | --- | --- | --- |
+| Monitor | `/v1/projects/{projectId}/monitors` | `monitors:read` | `monitors:write` |
+| Data reaction | `/v1/projects/{projectId}/reactions` | `reactions:read` | `reactions:write` |
+
+On either base path, `GET` lists, `POST` creates, `GET /{alertId}` gets one, and `DELETE /{alertId}` deletes one. `{alertId}` is a UUID. Lists return `{"monitors":[...]}` or `{"reactions":[...]}` with non-deleted items; each has `id`, `name`, `status`, `template_id`, `spec`, and `last_fired_at`. A project outside the token's organization returns `404`. The helper script has no commands for these routes.
+
+```bash
+PROJECT_ID=123
+curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
+  "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors"
+curl -X POST "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors" \
+  -H "Authorization: Bearer $SPICE_API_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"SQL failures","templateId":"query_failures","spec":{"op":"GT","threshold":0}}'
+ALERT_ID="<id-from-201-response>"
+curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
+  "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors/$ALERT_ID"
+curl -X DELETE -H "Authorization: Bearer $SPICE_API_TOKEN" \
+  "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors/$ALERT_ID"
+```
+
+For a reaction, replace `monitors` with `reactions` and use a data template. Creation needs `name`, `templateId`, and `spec` containing `op` (`GT`, `GEQ`, `LT`, `LEQ`, `EQ`, or `NEQ`) and numeric `threshold`.
+
+- Monitor templates: `query_failures`, `llm_failures`, `dataset_refresh_errors`, and `http_5xx` (event rates); `query_latency_p95` (milliseconds); `memory_working_set` (bytes); `dataset_status` (0 initializing, 1 ready, 2 disabled, 3 error, 4 refreshing, 5 shutting down; optional `spec.dataset`).
+- `spec.window` defaults to `5m` (`1m`, `5m`, `15m`, `30m`, `1h`) but does not affect `memory_working_set` or `dataset_status`. `spec.sustainSecs` defaults to 300 seconds (0–86400); `spec.severity` defaults to `critical` (`warn` or `critical`).
+
+Reaction templates are `task_history_error`, `task_history_timeout`, `task_history_slow` (threshold in milliseconds), `dataset_row_match`, and `dataset_query`. For example, POST to `/reactions` with `{"name":"Slow tasks","templateId":"task_history_slow","spec":{"op":"GT","threshold":5000}}`.
+
+`dataset_row_match` needs `spec.dataset`, `column`, and `value`, or nonempty `conditions` with dataset, column, and comparison per condition. `dataset_query` needs `spec.query` and `dataset` or `datasets`; `queryLanguage` defaults to `gql` (`cypher` also works). Dataset reactions conventionally use `{"op":"EQ","threshold":0}`. Creating any reaction requires a ready Drasi data source. Optional `spec.model` transforms results with a spicepod model; monitors reject it.
+
+By default, notifications email the credential's user (the organization owner for machine credentials). Set `target` to `{"type":"email","emails":["team@example.com"]}`, `{"type":"http","url":"https://example.com/alerts"}`, or `{"type":"slack","channelId":"C12345678"}`; Slack must be connected. HTTP target tokens are write-only. Avoid `spec.includeDetails: true` if matching data is sensitive. Creation provisions a live monitor or query and may notify recipients. Names must be unique across both kinds in the project (`409`); the shared limit is 20 active alerts.
+
+Create returns `201` with an `id`; delete returns `200` with `{"ok":true}`. If delete returns `502`, the item is hidden but backend cleanup failed; retry with the same ID. Monitor routes work but are currently absent from the published OpenAPI specification.
 
 ## Secrets
 
@@ -401,6 +439,7 @@ bash scripts/spice-cloud.sh get-api-keys 123
 When presenting management API results:
 - Show project IDs and names in a table for list operations
 - Show deployment status clearly (queued/in_progress/succeeded/failed), with `error_code` and `error_message` for failures
+- Show monitor and reaction IDs, names, statuses, and template IDs; do not print notification targets unless needed
 - Never display secret values — confirm creation/update only
 - Show API keys with a warning about secure storage
 - Give the project's data-plane `endpoint` for queries, and link the portal as `https://spice.ai/<org>/<project>`
