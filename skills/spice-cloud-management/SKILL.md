@@ -221,6 +221,10 @@ By default, notifications email the credential's user (the organization owner fo
 
 Create returns `201` with an `id`; delete returns `200` with `{"ok":true}`. If delete returns `502`, the item is hidden but backend cleanup failed; retry with the same ID. Monitor routes work but are currently absent from the published OpenAPI specification.
 
+### Cluster monitors
+
+Cluster monitors (`cluster_cpu`, `cluster_memory`, `cluster_availability`) are managed per cluster at `/v1/clusters/{clusterId}/monitors`, where `{clusterId}` is the `cluster_name` from `GET /v1/clusters` (e.g. `spicehq-main`). `GET` lists (`{"monitors":[...]}`) and `GET /{alertId}` gets one with `monitors:read` plus org membership; `POST` creates (`201`), `PATCH /{alertId}` updates the rule, destination, or `status` (`active`/`disabled`), and `DELETE /{alertId}` deletes (`200 {"ok":true}`) with `monitors:write` plus org admin. `{alertId}` is a UUID. Creation needs `name`, `templateId`, and `spec` with `op` and numeric `threshold` (same `window`/`sustainSecs`/`severity` defaults as project monitors); names are unique per cluster (`409`). The portal serves equivalent session-authenticated routes under `/api/orgs/{orgName}/clusters/{clusterId}/alerts`, not scriptable with `$SPICE_API_TOKEN`.
+
 ## Secrets
 
 Manage project secrets (encrypted at rest). Values are always masked in API responses. Deploy again for changes to reach the runtime.
