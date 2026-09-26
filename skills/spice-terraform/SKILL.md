@@ -11,7 +11,7 @@ Spice.ai Cloud renamed apps to **projects** in Aug 2026. The provider (latest re
 
 ## Version Compatibility
 
-Written for provider **`spiceai/spiceai` v0.1.x** (v0.1.0 is the only release) and the Spice.ai Cloud API as documented in September 2026; spicepod examples target **Spice v2.3.x** (checked against v2.3.1).
+Written for provider **`spiceai/spiceai` v0.1.x** (v0.1.0 is the only release) and the Spice.ai Cloud API as documented in September 2026; spicepod examples target **Spice v2.3.x** (checked against v2.3.2).
 
 - **Provider**: pin with `version = "~> 0.1"`. v0.1.0 keeps the pre-rename names (`spiceai_app`, `app_id`) and has no `storage_size_gb`. Check the [Registry](https://registry.terraform.io/providers/spiceai/spiceai/latest) for a newer release before using an argument this skill doesn't list.
 - **Runtime**: a project runs the version its update channel resolves unless `image_tag` pins one (Enterprise plan). Stable can trail the latest OSS release — check the [changelog](https://docs.spice.ai/changelog) before relying on a new runtime feature in a spicepod.

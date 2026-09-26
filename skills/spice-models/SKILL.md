@@ -9,12 +9,12 @@ Model providers serve large language models (LLMs) through a unified OpenAI-comp
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.3.x** (checked against v2.3.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.1.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |

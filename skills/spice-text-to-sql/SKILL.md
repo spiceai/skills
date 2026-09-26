@@ -9,7 +9,7 @@ Generate accurate SQL for Spice.ai using your own LLM. This skill provides the s
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.1). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
+Written for **Spice v2.3.x** (checked against v2.3.2). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
 
 | Spice | DataFusion | Dialect changes |
 | --- | --- | --- |
