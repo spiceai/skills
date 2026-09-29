@@ -192,7 +192,7 @@ Monitors evaluate runtime metrics or dataset status; data reactions fire on matc
 | Monitor | `/v1/projects/{projectId}/monitors` | `monitors:read` | `monitors:write` |
 | Data reaction | `/v1/projects/{projectId}/reactions` | `reactions:read` | `reactions:write` |
 
-On either base path, `GET` lists, `POST` creates, `GET /{alertId}` gets one, and `DELETE /{alertId}` deletes one. `{alertId}` is a UUID. Lists return `{"monitors":[...]}` or `{"reactions":[...]}` with non-deleted items; each has `id`, `name`, `status`, `template_id`, `spec`, and `last_fired_at`. A project outside the token's organization returns `404`. The helper script has no commands for these routes.
+On either base path, `GET` lists, `POST` creates, `GET /{alertId}` gets one, and `DELETE /{alertId}` deletes one. `{alertId}` is a UUID. There is no update operation for a project monitor or a data reaction. To change one, delete it and create it again with the new `spec`. The new item gets a new `id`. Only cluster monitors have `PATCH` (see below). Lists return `{"monitors":[...]}` or `{"reactions":[...]}` with non-deleted items; each has `id`, `name`, `status`, `template_id`, `spec`, and `last_fired_at`. A project outside the token's organization returns `404`. The helper script has no commands for these routes.
 
 ```bash
 PROJECT_ID=123
@@ -210,8 +210,11 @@ curl -X DELETE -H "Authorization: Bearer $SPICE_API_TOKEN" \
 
 For a reaction, replace `monitors` with `reactions` and use a data template. Creation needs `name`, `templateId`, and `spec` containing `op` (`GT`, `GEQ`, `LT`, `LEQ`, `EQ`, or `NEQ`) and numeric `threshold`.
 
-- Monitor templates: `query_failures`, `llm_failures`, `dataset_refresh_errors`, and `http_5xx` (event rates); `query_latency_p95` (milliseconds); `memory_working_set` (bytes); `dataset_status` (0 initializing, 1 ready, 2 disabled, 3 error, 4 refreshing, 5 shutting down; optional `spec.dataset`).
+- Monitor templates: `query_failures`, `llm_failures`, `dataset_refresh_errors`, `http_5xx`, and `flight_failures` (event rates); `query_latency_p99` (milliseconds); `memory_working_set` (bytes); `container_cpu` (percent of the CPU limit of the project, and available only on a managed project that has a CPU limit); `dataset_status` (0 initializing, 1 ready, 2 disabled, 3 error, 4 refreshing, 5 shutting down; optional `spec.dataset`).
+- `query_latency_p95` stays available to the monitors that already use it, but you cannot create a new monitor with it. Use `query_latency_p99`.
 - `spec.window` defaults to `5m` (`1m`, `5m`, `15m`, `30m`, `1h`) but does not affect `memory_working_set` or `dataset_status`. `spec.sustainSecs` defaults to 300 seconds (0–86400); `spec.severity` defaults to `critical` (`warn` or `critical`).
+
+Not all templates are available to all projects. `POST` gives `404` with the code `monitor_template_unavailable` when the project is not managed, when the organization does not have the template, or when the template is closed to new monitors (`query_latency_p95`). The one code does not tell you which of these applies. No route lists the available templates, so try a `POST`, or look at the templates that the monitors of other projects in the organization use.
 
 Reaction templates are `task_history_error`, `task_history_timeout`, `task_history_slow` (threshold in milliseconds), `dataset_row_match`, and `dataset_query`. For example, POST to `/reactions` with `{"name":"Slow tasks","templateId":"task_history_slow","spec":{"op":"GT","threshold":5000}}`.
 
@@ -219,7 +222,7 @@ Reaction templates are `task_history_error`, `task_history_timeout`, `task_histo
 
 By default, notifications email the credential's user (the organization owner for machine credentials). Set `target` to `{"type":"email","emails":["team@example.com"]}`, `{"type":"http","url":"https://example.com/alerts"}`, or `{"type":"slack","channelId":"C12345678"}`; Slack must be connected. HTTP target tokens are write-only. Avoid `spec.includeDetails: true` if matching data is sensitive. Creation provisions a live monitor or query and may notify recipients. Names must be unique across both kinds in the project (`409`); the shared limit is 20 active alerts.
 
-Create returns `201` with an `id`; delete returns `200` with `{"ok":true}`. If delete returns `502`, the item is hidden but backend cleanup failed; retry with the same ID. Monitor routes work but are currently absent from the published OpenAPI specification.
+Create returns `201` with an `id`; delete returns `200` with `{"ok":true}`. If delete returns `502`, the item is hidden but backend cleanup failed; retry with the same ID.
 
 ### Cluster monitors
 
