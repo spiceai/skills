@@ -9,8 +9,6 @@ set -e
 #      (e.g. "Spice v2.3.x" and "v2.3.1" for plugin version 2.3.1).
 #   3. No skill links trunk docs (spiceai.org/docs/next/), which match no release.
 #
-# improve-skills is exempt from 2 and 3: it maintains the skills, not Spice.
-#
 # Usage:
 #   ./scripts/check_versions.sh     # prints a JSON summary; exits 1 on any problem
 
@@ -42,6 +40,7 @@ def versions_in(node):
 
 
 manifests = [
+    ".github/plugin/marketplace.json",
     ".claude-plugin/marketplace.json",
     ".codex-plugin/plugin.json",
     ".cursor-plugin/plugin.json",
@@ -58,7 +57,7 @@ for path in manifests:
         if found != version:
             problems.append(f"{path}: version {found} != {version}")
 
-skills = sorted(p for p in (root / "skills").glob("*/SKILL.md") if p.parent.name != "improve-skills")
+skills = sorted((root / "skills").glob("*/SKILL.md"))
 for skill in skills:
     text = skill.read_text()
     section = re.search(r"^## Version Compatibility\n(.*?)(?=^## )", text, re.S | re.M)

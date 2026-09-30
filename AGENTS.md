@@ -22,6 +22,12 @@ README.md
 - Must include `SKILL.md` with frontmatter (`name`, `description`) and usage docs
 - Keep `SKILL.md` under 500 lines — put detailed reference material in separate files
 - Scripts use `#!/bin/bash`, `set -e`, stderr for status, stdout for JSON output
+- Only public runtime skills belong in `skills/`, which plugin loaders discover
+  automatically. Keep private maintainer skills in the gitignored `.private/skills/`
+  directory; never commit or package them.
+- Distribution changes must pass `make check test-distribution release-preview`.
+  See `docs/publishing.md`: GitHub release automation prepares Claude, OpenAI,
+  Copilot, and Grok submissions; it does not imply external marketplace approval.
 
 ## SKILL.md Format
 
@@ -60,5 +66,6 @@ the user's version:
   `/docs/next/` — it tracks trunk, not a release.
 - **On a new Spice release**: bump every plugin manifest, update each skill's `checked against`
   release (and the target line when the minor changes), add markers for new features, and move newly
-  removed or deprecated config into the table. `make check-versions` verifies the manifests agree and
+  removed or deprecated config into the table. Include `.github/plugin/marketplace.json` when
+  updating catalogs. `make check-versions` verifies the manifests agree and
   each skill names the plugin's release line and exact version.

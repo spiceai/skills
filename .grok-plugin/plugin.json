@@ -1,5 +1,5 @@
 {
-  "name": "spiceai-skills",
+  "name": "spiceai",
   "version": "2.3.2",
   "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
   "author": {

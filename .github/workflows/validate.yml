@@ -1,0 +1,39 @@
+name: Validate Plugin
+
+on:
+  pull_request:
+  push:
+    branches: [trunk]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check plugin metadata and release compatibility
+        run: make check
+
+      - name: Test packaging and publishing safeguards
+        run: make test-distribution
+
+      - name: Build the marketplace submission preview
+        run: make release-preview
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spiceai-submission-preview
+          path: dist/preview/*
+          if-no-files-found: error
+          retention-days: 14
