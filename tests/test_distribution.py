@@ -33,6 +33,10 @@ class DistributionTests(unittest.TestCase):
         }}
         self.env.update(GIT_AUTHOR_DATE="2026-09-30T00:00:00Z", GIT_COMMITTER_DATE="2026-09-30T00:00:00Z")
         self.run_cmd("git", "init", "-q")
+        # Auto-maintenance can outlive git commit and race TemporaryDirectory
+        # cleanup. These short-lived fixture repos do not need housekeeping.
+        self.run_cmd("git", "config", "maintenance.auto", "false")
+        self.run_cmd("git", "config", "gc.auto", "0")
         self.run_cmd("git", "config", "user.email", "test@example.invalid")
         self.run_cmd("git", "config", "user.name", "Distribution Test")
         self.run_cmd("git", "add", ".")
