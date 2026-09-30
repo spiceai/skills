@@ -1,0 +1,97 @@
+{
+  "skill_name": "connectors",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to connect Spice to my PostgreSQL database running on localhost. The table is public.users. My credentials are in environment variables PG_USER and PG_PASS.",
+      "expected_output": "Dataset config with from: postgres:public.users, pg_host, pg_port, and secret references for credentials",
+      "files": [],
+      "assertions": [
+        {
+          "name": "correct_from_format",
+          "type": "contains",
+          "value": "postgres:public.users",
+          "description": "Should use correct postgres from format"
+        },
+        {
+          "name": "references_env_secrets",
+          "type": "regex",
+          "value": "\\$\\{\\s*env:PG_",
+          "description": "Should reference environment variables for credentials"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have a folder of markdown files documenting our architecture decisions. I want to load them into Spice so I can search over them later.",
+      "expected_output": "Use file connector with file_format: md, produces location and content columns",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_file_connector",
+          "type": "contains",
+          "value": "from: file:",
+          "description": "Should use the file connector"
+        },
+        {
+          "name": "specifies_md_format",
+          "type": "contains",
+          "value": "file_format: md",
+          "description": "Should specify markdown file format"
+        },
+        {
+          "name": "mentions_content_column",
+          "type": "contains",
+          "value": "content",
+          "description": "Should mention the content column produced by document formats"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "What connectors does Spice support? I'm trying to figure out if I can connect to Snowflake and also read from Kafka topics.",
+      "expected_output": "List supported connectors, confirm Snowflake (Release Candidate) and Kafka (Alpha) with from formats",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_snowflake",
+          "type": "contains",
+          "value": "snowflake:",
+          "description": "Should mention Snowflake connector and format"
+        },
+        {
+          "name": "mentions_kafka",
+          "type": "contains",
+          "value": "kafka:",
+          "description": "Should mention Kafka connector and format"
+        }
+      ]
+    },
+    {
+      "prompt": "We run Spice v2.1.5 and want to stream changes from a MySQL table into a DuckDB acceleration with refresh_mode: changes. How do I set that up?",
+      "expected_output": "Explain that native MySQL binlog CDC (refresh_mode: changes on mysql:) needs Spice v2.2.0 or later, so v2.1.5 must upgrade first (spice upgrade) or use Debezium; show the MySQL dataset with refresh_mode: changes, primary_key, and an on_conflict upsert map",
+      "files": [],
+      "assertions": [
+        {
+          "name": "states_minimum_version",
+          "type": "regex",
+          "value": "v?2\\.2(\\.0)?",
+          "description": "Should say native MySQL CDC needs v2.2.0+"
+        },
+        {
+          "name": "recommends_upgrade",
+          "type": "regex",
+          "value": "(?i)upgrad",
+          "description": "Should tell a v2.1.5 user to upgrade (or use an older-version alternative)"
+        },
+        {
+          "name": "uses_changes_mode",
+          "type": "contains",
+          "value": "refresh_mode: changes",
+          "description": "Should show refresh_mode: changes"
+        }
+      ],
+      "id": 4
+    }
+  ]
+}

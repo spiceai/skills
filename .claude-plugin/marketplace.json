@@ -8,11 +8,8 @@
   },
   "plugins": [
     {
-      "name": "skills",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/spiceai/skills.git"
-      },
+      "name": "spiceai",
+      "source": "./",
       "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
       "version": "2.3.2",
       "homepage": "https://spiceai.org",
