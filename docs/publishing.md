@@ -71,7 +71,7 @@ it does not reproduce or bypass marketplace safety scans.
 
 ## Network and credential disclosure for reviewers
 
-The package contains instructions and two bundled helpers, with no hosted MCP server or install hooks.
+The package contains instructions and three bundled helpers, with no hosted MCP server or install hooks.
 Cloud management uses `https://api.spice.ai` with a user-provided personal/OAuth access token;
 OAuth exchange uses `https://spice.ai/api/oauth/token`. Runtime SQL, search, and inference use
 the user's existing local runtime or Cloud project endpoints and project API keys as appropriate.
@@ -81,6 +81,10 @@ their own credentials. Credentials are not included in the package.
 The cookbook helper reads or fetches `https://github.com/spiceai/cookbook` (including a requested
 branch/PR); cookbook workflows can run recipe dependencies and examples after inspecting their
 requirements. Those recipes are outside this plugin archive and must be considered during review.
+The setup helper (`skills/setup/scripts/spice-local.sh`) runs only the user's installed `spice` CLI
+(`version`, `init`, `validate`, `run`), copies a bundled sample CSV into the project, and makes HTTP
+requests to the local runtime on `127.0.0.1`. It refuses to start a runtime when `spice version`
+reports none, because `spice run` would download one, and it stops only the process it started.
 Documentation links point to Spice AI and the relevant upstream providers. Runtime installation
 and upgrades are user-managed prerequisites; `setup` and `cookbook` stop if the runtime is missing.
 

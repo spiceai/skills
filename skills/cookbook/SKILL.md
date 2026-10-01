@@ -114,7 +114,7 @@ thing you'll handle here.
   `.env` beats both, so a placeholder in the recipe's `.env` hides the user's real key. On v2.1.x, put
   the value in `.env` itself or delete the placeholder line, or upgrade. `inspect` applies the installed
   runtime's precedence, and `ignored_values` names any real value that loses to a placeholder.
-- **Names**: `${secrets:NAME}` accepts `SPICE_NAME` or `NAME`. A recipe that reads `SPICE_OPENAI_API_KEY`
+- **Names**: `${ secrets:NAME }` accepts `SPICE_NAME` or `NAME`. A recipe that reads `SPICE_OPENAI_API_KEY`
   therefore ignores an exported `OPENAI_API_KEY`. `inspect` flags that case as `similar_in_shell`.
 - **Getting a value in without seeing it**: when the value is already in the shell or a CLI, write it
   to `.env.local` without echoing it:
@@ -175,6 +175,8 @@ it demonstrates. Rewrite steps meant for a person at a terminal:
 - **"In a new terminal, run `spice sql`"**: pipe the query in, `echo "SELECT ...;" | spice sql` (add
   `--endpoint` if you moved ports), or use the HTTP API, which returns JSON:
   `curl -s -X POST http://127.0.0.1:8090/v1/sql -H 'Content-Type: text/plain' -d 'SELECT ...'`.
+  Keep the raw SQL body. A JSON body needs exactly `Content-Type: application/json` and
+  `"parameters": []`; `{"sql": "..."}` alone returns `400 Invalid JSON: missing field 'parameters'`.
 - **Other REPLs** (`spice chat`): use the matching HTTP endpoint, e.g. `/v1/chat/completions`.
 - **Long-running producers** (streaming data into a file, a load generator): run them in the background
   for a bounded time, then continue.
@@ -228,6 +230,7 @@ When the user asks, or when they only wanted a check:
 | `argument '--http <BIND_ADDRESS>' cannot be used multiple times` | `spice run -- --http ...` | `spice run --http-endpoint ...` |
 | 401 or `Incorrect API key` from a model provider | A placeholder or empty key is being used | Re-run `inspect`; fix the variable name, the file, or the v2.1.x precedence |
 | `spice sql` can't connect | Runtime still starting, crashed, or on other ports | Check `/v1/ready` and the log; pass `--endpoint` |
+| `400 Invalid JSON: missing field 'parameters'` from `/v1/sql` | JSON body without `parameters` | Send raw SQL, or add `"parameters": []` |
 | Unknown field or invalid parameter at startup | Runtime older than the recipe | `spice upgrade`, or a recipe within the runtime's version |
 | Schema mismatch after re-running a recipe | Stale acceleration files | Delete `<recipe>/.spice/` and restart |
 | `Cannot connect to the Docker daemon` | Docker isn't running | Start Docker Desktop, OrbStack, or colima |

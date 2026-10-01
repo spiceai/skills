@@ -4,7 +4,38 @@ Open [Agent Skills](https://github.com/vercel-labs/skills) and plugins for AI co
 
 This is the **Spice.ai Marketplace**: packaged skills/plugins any compatible harness can load. The format works across Claude Code, Cursor, Codex, Grok, OpenCode, Pi, and other agents that support the open Agent Skills / plugin standard — not Claude-only.
 
+## Start here
+
+Ask your agent to set up Spice, for example "set up Spice in `./my_app` and show me a SQL result".
+The [setup](skills/setup/) skill is the entry point. It checks your existing installation, creates a
+spicepod with a local sample dataset (or your own file), starts the runtime, waits for `/v1/ready`,
+and finishes only when a query returns rows. Then it hands off to the specialists:
+
+```text
+setup → spicepod, secrets → connectors + datasets → acceleration, accelerators, cache, search, models, chat, sql, sdk
+```
+
+[cookbook](skills/cookbook/) runs ready-made recipes instead of your own project, and
+[cloud](skills/cloud/) and [terraform](skills/terraform/) manage Spice.ai Cloud. You install Spice
+itself by following the [installation docs](https://spiceai.org/docs/installation); the skills check
+`spice version` and never install or upgrade it.
+
 ## Installation
+
+| Agent | Install |
+| --- | --- |
+| Claude Code | `/plugin marketplace add spiceai/skills`, then `/plugin install spiceai@spiceai` |
+| OpenAI Codex | `codex plugin marketplace add spiceai/skills`, then `codex plugin add spiceai@spiceai` |
+| GitHub Copilot | `copilot plugin marketplace add spiceai/skills`, then `copilot plugin install spiceai@spiceai` |
+| Grok Build | `grok plugin marketplace add spiceai/skills`, then `grok plugin install spiceai --trust` |
+| Cursor, Grok Bot, OpenCode, Pi, others | `npx skills add spiceai/skills -a <agent>` (`cursor`, `opencode`, `pi`, ...) |
+
+Plugin installs invoke skills as `/spiceai:setup` (Claude Code) or `$spiceai:setup` (Codex);
+`npx skills add` installs them without the namespace (`$setup`). The sections below cover
+global installs, project auto-discovery, and maintainer publishing.
+
+<details>
+<summary>Per-agent installation details and maintainer publishing notes</summary>
 
 ### OpenAI Codex
 
@@ -142,6 +173,8 @@ To auto-suggest the plugin for all contributors, add this to your project's `.cl
 }
 ```
 
+</details>
+
 ## Versioning
 
 Pull requests validate metadata, private-skill exclusion, and packaging, and produce a submission
@@ -159,7 +192,7 @@ The skills are version-aware. Each one names the release line it is written for,
 
 | Skill | Description |
 | --- | --- |
-| [setup](skills/setup/) | Check an existing Spice installation, initialize a project, and run the runtime |
+| [setup](skills/setup/) | **Start here.** Take a directory to a running runtime that answers SQL with rows, using an existing installation; CLI, ports, and `/v1/sql` reference |
 | [cookbook](skills/cookbook/) | Find, set up, and run recipes from the Spice.ai cookbook, including from a pull request |
 | [spicepod](skills/spicepod/) | Create and configure spicepod.yaml manifests |
 | [datasets](skills/datasets/) | Connect to data sources and query across them with federated SQL |
@@ -181,7 +214,7 @@ related commands; configuration topics are not invented CLI subcommands.
 
 | Skill | CLI, API, or SDK surface |
 | --- | --- |
-| `setup` | Existing installation, `spice init`, `spice run`, `spice version` |
+| `setup` | Existing installation, `spice init`, `spice validate`, `spice run`, `spice version`, `/v1/ready` |
 | `sql` | `spice sql`, `/v1/sql`, `/v1/nsql`, SDK SQL methods |
 | `search` | `spice search`, `/v1/search`, SDK search methods |
 | `chat` / `models` | `spice chat`, `spice models`, OpenAI-compatible APIs and provider configuration |

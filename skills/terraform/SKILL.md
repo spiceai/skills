@@ -83,8 +83,8 @@ resource "spiceai_app" "analytics" {
       name = "events"
       params = {
         pg_host = "db.example.com"
-        pg_user = "$${secrets:PG_USER}"
-        pg_pass = "$${secrets:PG_PASS}"
+        pg_user = "$${ secrets:PG_USER }"
+        pg_pass = "$${ secrets:PG_PASS }"
       }
       acceleration = {
         enabled              = true
@@ -343,15 +343,15 @@ resource "spiceai_app" "myapp" {
       name = "events"
       params = {
         pg_host = "db.example.com"
-        pg_user = "$${secrets:PG_USER}"
-        pg_pass = "$${secrets:PG_PASS}"
+        pg_user = "$${ secrets:PG_USER }"
+        pg_pass = "$${ secrets:PG_PASS }"
       }
     }]
     models = [{
       from = "openai:gpt-4o"
       name = "assistant"
       params = {
-        openai_api_key = "$${secrets:OPENAI_API_KEY}"
+        openai_api_key = "$${ secrets:OPENAI_API_KEY }"
       }
     }]
   })
@@ -413,7 +413,7 @@ When generating Terraform configurations:
 - Mark secret values and API keys as `sensitive`
 - Include `triggers` on deployments to auto-redeploy on changes
 - Use `depends_on` to ensure secrets exist before deploying
-- Reference secrets in spicepod with `$${secrets:NAME}` (double `$` for Terraform escaping)
+- Reference secrets in spicepod with `$${ secrets:NAME }` (double `$` for Terraform escaping)
 
 ## Troubleshooting
 
@@ -426,7 +426,7 @@ When generating Terraform configurations:
 | Deployment `failed`                    | Read `error_message`; a project needs a valid `spicepod` before it can deploy   |
 | `409` on deployment                    | Previous deployment still in progress; wait or check status                     |
 | Spicepod YAML syntax errors            | Use `yamlencode()` for type safety; validate YAML before applying               |
-| `$$` showing in spicepod               | Use `$${secrets:NAME}` in Terraform — the double `$` escapes to single `$`     |
+| `$$` showing in spicepod               | Use `$${ secrets:NAME }` in Terraform — the double `$` escapes to single `$`     |
 | Cannot delete org owner                | Organization owners cannot be modified or removed via Terraform or the API      |
 | Provider not found                     | Check `source = "spiceai/spiceai"` and run `terraform init`                     |
 
