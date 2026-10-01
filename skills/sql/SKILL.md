@@ -37,9 +37,15 @@ Use this skill for SQL authoring, execution, and text-to-SQL. Keep the user's se
 | Interface | Operation |
 | --- | --- |
 | CLI | `spice sql` for a REPL; inspect `spice sql --help` for the installed CLI's one-shot and endpoint flags |
-| Runtime HTTP | `POST /v1/sql` with the SQL statement as the request body |
+| Runtime HTTP | `POST /v1/sql` with the SQL statement as the raw request body |
 | Runtime NSQL | `POST /v1/nsql` when the user wants the runtime's configured model to generate SQL |
 | SDK | Use the installed client's SQL method and parameter binding; see `sdk` |
+
+`/v1/sql` reads the body as raw SQL unless `Content-Type` is exactly `application/json`. A JSON body
+must carry `parameters`: `{"sql": "SELECT * FROM t WHERE id = $1", "parameters": [42]}`, named
+`:id` with `{"id": 42}`, or `[]` when unused. `{"sql": "..."}` alone returns
+`400 Invalid JSON: missing field 'parameters'`, and `application/json; charset=utf-8` sends the JSON
+text to the SQL parser. Bind user-supplied values as parameters rather than splicing them into SQL.
 
 Confirm local versus Cloud endpoints and the selected project before executing. Cloud runtime
 requests use a project API key, not a Cloud Management API token. Generating SQL does not authorize

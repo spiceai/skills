@@ -44,7 +44,7 @@ datasets:
     name: customers
     params:
       pg_host: db.example.com
-      pg_user: ${secrets:PG_USER}
+      pg_user: ${ secrets:PG_USER }
   - from: s3://bucket/orders/
     name: orders
     params:
@@ -362,6 +362,19 @@ params:
   pg_user: ${ env:PG_USER }
   pg_pass: ${ secrets:PG_PASSWORD }
 ```
+
+## Verify
+
+Check each source on its own before debugging a federated query, view, or write:
+
+```bash
+curl -s http://127.0.0.1:8090/v1/ready                  # "ready" once every component has loaded
+curl -s 'http://127.0.0.1:8090/v1/datasets?status=true' # every dataset "status": "Ready"
+curl -s -X POST http://127.0.0.1:8090/v1/sql -H 'Content-Type: text/plain' -d 'SELECT * FROM orders LIMIT 1'
+```
+
+Then run the join or view. A dataset with `"status": "Error"` reports why in `error_message`.
+setup's `spice-local.sh verify <dir> --dataset orders --dataset customers` checks several at once.
 
 ## Documentation
 

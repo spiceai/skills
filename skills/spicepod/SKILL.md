@@ -89,10 +89,40 @@ auto-migrate; `v1beta1` is no longer accepted.
 
 ## Quick Start
 
+A manifest that loads anywhere without credentials or network access: one local CSV, accelerated in
+memory. setup's `spice-local.sh init` writes exactly this, with a 20-row sample, and verifies it.
+
 ```yaml
 version: v2
 kind: Spicepod
-name: quickstart
+name: my_app
+
+secrets:
+  - from: env
+    name: env
+
+datasets:
+  - from: file:./data/sales.csv
+    name: sales
+    params:
+      file_format: csv
+    acceleration:
+      enabled: true
+```
+
+It works when the runtime serves rows, not when `spice validate` passes (it passes with no datasets
+at all): `GET /v1/ready` returns `ready`, and
+`curl -s -X POST http://127.0.0.1:8090/v1/sql -H 'Content-Type: text/plain' -d 'SELECT * FROM sales LIMIT 5'`
+returns rows.
+
+### With a Database and a Model
+
+Swap in real sources once the local manifest runs, so credential problems stay separate from setup ones:
+
+```yaml
+version: v2
+kind: Spicepod
+name: my_app
 
 secrets:
   - from: env
@@ -242,7 +272,8 @@ Server Ports), then `curl http://localhost:9090/metrics`.
 ## Dependencies
 
 Reference other Spicepods by Spicerack slug; `spice add spiceai/quickstart` downloads the pod into
-`spicepods/` and records the dependency:
+`spicepods/` and records the dependency. That pod is still `version: v1` (auto-migrated) and loads
+taxi trips from public S3, so it needs network access; for an offline first run, use the local Quick Start.
 
 ```yaml
 dependencies:

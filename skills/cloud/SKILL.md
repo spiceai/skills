@@ -262,7 +262,7 @@ curl -X POST https://api.spice.ai/v1/projects/{projectId}/secrets \
   -d '{"name": "OPENAI_API_KEY", "value": "sk-..."}'
 ```
 
-Upsert operation — creates if new, updates if exists. Name must start with a letter or underscore; letters, numbers, and underscores only. Reference it in the spicepod as `${secrets:OPENAI_API_KEY}`.
+Upsert operation — creates if new, updates if exists. Name must start with a letter or underscore; letters, numbers, and underscores only. Reference it in the spicepod as `${ secrets:OPENAI_API_KEY }`.
 
 ### Delete Secret
 
@@ -303,7 +303,7 @@ Runtime (data-plane) requests go to the project's `endpoint` (returned by `GET /
 ```bash
 ENDPOINT="https://<project-endpoint-host>"  # the project's endpoint
 
-# SQL query
+# SQL query: raw SQL body (a JSON body needs "parameters": [], else 400)
 curl "$ENDPOINT/v1/sql" \
   -H "X-API-Key: <api-key>" \
   -H "Content-Type: text/plain" \
@@ -394,7 +394,7 @@ curl -X PUT https://api.spice.ai/v1/projects/123 \
   -H "Content-Type: application/json" \
   -d '{"spicepod": {"version": "v2", "kind": "Spicepod", "name": "analytics-project",
        "datasets": [{"from": "postgres:public.orders", "name": "orders",
-         "params": {"pg_host": "db.example.com", "pg_user": "analytics", "pg_pass": "${secrets:PG_PASS}"}}]}}'
+         "params": {"pg_host": "db.example.com", "pg_user": "analytics", "pg_pass": "${ secrets:PG_PASS }"}}]}}'
 
 # 5. Deploy
 curl -X POST https://api.spice.ai/v1/projects/123/deployments \

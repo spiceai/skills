@@ -30,7 +30,7 @@
     {
       "id": 2,
       "prompt": "I'm running the cookbook's ai recipe. OPENAI_API_KEY is exported in my shell, but the gpt-4o-mini model still fails to authenticate. Why?",
-      "expected_output": "The recipe reads ${secrets:SPICE_OPENAI_API_KEY}, which resolves SPICE_OPENAI_API_KEY, not OPENAI_API_KEY; set SPICE_OPENAI_API_KEY in .env.local or export it",
+      "expected_output": "The recipe reads ${ secrets:SPICE_OPENAI_API_KEY }, which resolves SPICE_OPENAI_API_KEY, not OPENAI_API_KEY; set SPICE_OPENAI_API_KEY in .env.local or export it",
       "files": [],
       "assertions": [
         {

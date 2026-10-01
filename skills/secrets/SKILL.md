@@ -63,7 +63,9 @@ secrets:
 
 ## Referencing Secrets
 
-Use `${ store_name:KEY_NAME }` syntax in component parameters:
+Use `${ store_name:KEY_NAME }` syntax in component parameters. Spaces inside the braces are optional —
+`${secrets:KEY}` and `${ secrets:KEY }` resolve the same, so don't rewrite a user's working references;
+these skills use the spaced form.
 
 ```yaml
 datasets:
@@ -84,7 +86,7 @@ Also works within strings:
 
 ```yaml
 params:
-  mysql_connection_string: mysql://${env:USER}:${env:PASSWORD}@localhost:3306/db
+  mysql_connection_string: mysql://${ env:USER }:${ env:PASSWORD }@localhost:3306/db
 ```
 
 ## Searching All Stores

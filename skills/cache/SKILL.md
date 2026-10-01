@@ -165,6 +165,10 @@ curl -H "cache-control: max-stale=60" -XPOST http://localhost:8090/v1/sql -d 'SE
 curl -H "cache-control: only-if-cached" -XPOST http://localhost:8090/v1/sql -d 'SELECT 1'
 ```
 
+These send raw SQL, which `/v1/sql` reads as the query. Keep that form when adding headers: a JSON body
+needs exactly `Content-Type: application/json` and a `parameters` field (`[]` when unused), and
+`{"sql": "..."}` alone returns `400 Invalid JSON: missing field 'parameters'`.
+
 ### Spice CLI
 
 `--cache-control` takes only `cache` (default) or `no-cache` — `spice sql` silently treats any other

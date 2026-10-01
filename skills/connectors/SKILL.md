@@ -302,6 +302,21 @@ SELECT * FROM partitioned_data WHERE year = '2024' AND month = '01';
 - `name: myschema.foo` creates `spice.myschema.foo`
 - Use `.` to organize datasets into schemas
 
+## Verify a New Dataset
+
+After adding or changing a dataset (`spice run` reloads `spicepod.yaml`), confirm it serves rows
+before building on it. `spice validate` only checks syntax; it passes with a wrong path or host.
+
+```bash
+curl -s http://127.0.0.1:8090/v1/ready                  # "ready"; 503 "not ready" while loading or failing
+curl -s 'http://127.0.0.1:8090/v1/datasets?status=true' # this dataset should show "status": "Ready"
+curl -s -X POST http://127.0.0.1:8090/v1/sql -H 'Content-Type: text/plain' -d 'SELECT * FROM my_dataset LIMIT 1'
+```
+
+A dataset with `"status": "Error"` has an `error_message` (path or format matching no files, a missing
+secret, an unreachable host); fix that first. setup's `spice-local.sh verify <dir> --dataset my_dataset`
+runs all three checks.
+
 ## Documentation
 
 - [Data Connectors](https://spiceai.org/docs/components/data-connectors)

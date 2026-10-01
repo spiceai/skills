@@ -29,6 +29,39 @@ README.md
   See `docs/publishing.md`: GitHub release automation prepares Claude, OpenAI,
   Copilot, and Grok submissions; it does not imply external marketplace approval.
 
+## Skill Graph
+
+`setup` is the single entry point for "get Spice working". It owns the closed loop — existing
+installation → spicepod → seeded local dataset → `spice run` → `/v1/ready` → rows from `/v1/sql` —
+with `skills/setup/scripts/spice-local.sh`, then hands off:
+
+```text
+setup → spicepod, secrets → connectors + datasets → acceleration, accelerators, cache, search, models, chat, sql, sdk
+```
+
+`cookbook` is the recipe track, not greenfield bootstrap. `cloud` and `terraform` cover Spice.ai Cloud.
+Keep each skill self-contained: skills can be installed one at a time, so a skill may mention another
+skill's helper but must not depend on it.
+
+## Workflow Skills
+
+A skill that sets something up or runs something must end on a verified result, not on a command
+that merely succeeded. Treat these as regressions when reviewing or auditing skills:
+
+- A Quick Start that stops at `spice init`, `spice validate`, or a started process. `spice validate`
+  passes with zero datasets and with missing data files; done means `/v1/ready` returns `ready`, each
+  dataset reports `Ready` in `/v1/datasets?status=true`, and a query returns rows.
+- A `/v1/sql` JSON body without `"parameters"` (the runtime returns 400), or a JSON example without
+  the note that the raw SQL body is the default.
+- Stopping runtimes with `pkill spiced` instead of the PID that was started.
+- Optional services such as `--metrics-endpoint` in a first-run command.
+- Secret references other than `${ store:KEY }` (spaced) in new or edited examples.
+- A new reference-only skill for a workflow: bundle a script with explicit exit checks instead.
+
+Skills never install or upgrade Spice: they check `spice version`, and installation stays with the
+user (`validate_plugin.py` rejects remote-installer patterns). Describe runtime bugs by symptom and
+workaround; report root causes upstream rather than documenting them in skills.
+
 ## SKILL.md Format
 
 ```markdown
