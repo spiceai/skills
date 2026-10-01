@@ -1,0 +1,417 @@
+---
+name: search
+description: Search data using vector similarity, full-text keywords, or hybrid methods with Reciprocal Rank Fusion (RRF). Use this skill whenever the user wants to set up semantic search, full-text search, or hybrid search in Spice — including configuring embedding models and providers, enabling full_text_search on columns, writing vector_search/text_search/rrf SQL queries, using the /v1/search HTTP API, configuring vector engines (S3 Vectors), tuning RRF parameters (rank_weight, recency_decay), or setting up chunking for long documents. Also use when the user asks about search relevance, BM25 scoring, or embedding configuration.
+---
+
+# Search Data
+
+Spice provides integrated search capabilities: vector (semantic) search, full-text (keyword) search, and hybrid search with Reciprocal Rank Fusion (RRF) — all via SQL functions and HTTP APIs. Search indexes are built on top of accelerated datasets.
+
+Vector and full-text indexes serve from a warm in-memory tier by default (v2.2.0+), with no
+configuration: writes go to the warm tier and the durable store together, and queries read the warm
+tier first, falling back to the durable store.
+
+## Version Compatibility
+
+Written for **Spice v2.3.x** (checked against v2.3.2). Check the user's runtime version before recommending configuration:
+
+- **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
+- **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
+- **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.2.
+
+| Old | Change | Use instead |
+| --- | --- | --- |
+| `google_api_key` on `from: google` embeddings | Breaking in v2.3.0 | Vertex AI settings (see models) |
+| `col =>` in `vector_search` / `text_search` | Renamed in v2.0.0 | `column =>` |
+| `fused_score` column from `rrf()` | Renamed in v2.0.0 | `_fused_score` |
+| Scalar `matches` in `/v1/search` responses | Breaking in v2.0.0 | Always an array |
+| `.onnx` embedding weights | Removed in v2.2.0 | `.safetensors` or `pytorch_model.bin` |
+| Full-text index persisted before v2.2.0 | Changed in v2.2.0 (stemming) | Delete the index directory to rebuild |
+
+## Search interfaces
+
+Use `spice search` for CLI requests, `POST /v1/search` for runtime HTTP requests, and the installed
+SDK's search method for application code (see `sdk`). Inspect CLI help or the SDK's matching release
+before translating flags and option names. Keep the same datasets, query, filters, limits, and
+requested output columns across interfaces. Cloud searches use the project's runtime endpoint and
+API key. The YAML and SQL examples below configure the data that those interfaces search.
+
+## Search Methods
+
+| Method               | When to Use                                            | Requires                                    |
+| -------------------- | ------------------------------------------------------ | ------------------------------------------- |
+| **Vector search**    | Semantic similarity, RAG, recommendations              | Embedding model + column embeddings         |
+| **Full-text search** | Keyword/phrase matching, exact terms                   | `full_text_search.enabled: true` on columns |
+| **Hybrid (RRF)**     | Best of both — combines rankings from multiple methods | Multiple search methods configured          |
+| **Lexical (LIKE/=)** | Exact pattern or value matching                        | Nothing extra                               |
+
+## Set Up Vector Search
+
+### 1. Define an Embedding Model
+
+```yaml
+embeddings:
+  - name: local_embeddings
+    from: huggingface:huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+
+  - name: openai_embeddings
+    from: openai:text-embedding-3-small
+    params:
+      openai_api_key: ${ secrets:OPENAI_API_KEY }
+```
+
+> **HuggingFace sentence-transformers need v2.2.1+.** Earlier builds padded every input to 128
+> tokens, which swamped short inputs (MTEB SciFact nDCG@10 with `all-MiniLM-L6-v2`: 0.018 before,
+> 0.640 after; 0.645 published). Full-text search and `model2vec` models were unaffected.
+
+### Supported Embedding Providers
+
+| Provider       | From Format                                                         | Status            |
+| -------------- | ------------------------------------------------------------------- | ----------------- |
+| OpenAI         | `openai:text-embedding-3-large`                                     | Release Candidate |
+| HuggingFace    | `huggingface:huggingface.co/sentence-transformers/all-MiniLM-L6-v2` | Release Candidate |
+| Local file     | `file:model.safetensors`                                            | Release Candidate |
+| Azure OpenAI   | `azure:text-embedding-3-small`                                      | Alpha             |
+| Google (Vertex AI) | `google:gemini-embedding-001`                                    | Alpha             |
+| Amazon Bedrock | `bedrock:amazon.titan-embed-text-v2:0`                              | Alpha             |
+| Databricks     | `databricks:endpoint`                                               | Alpha             |
+| Model2Vec      | `model2vec:model-name`                                              | Alpha             |
+
+**Breaking in v2.3.0**: `from: google` embeddings use Vertex AI and no longer accept `google_api_key` —
+set `google_project`, `google_location`, and exactly one of `google_service_account_path`,
+`google_service_account_key`, or `google_application_default_credentials: true` (see models).
+
+### 2. Configure Dataset Columns for Embeddings
+
+```yaml
+datasets:
+  - from: postgres:documents
+    name: docs
+    acceleration:
+      enabled: true
+    columns:
+      - name: content
+        embeddings:
+          - from: local_embeddings
+            row_id: id
+            chunking:
+              enabled: true
+              target_chunk_size: 512
+              overlap_size: 64
+```
+
+### Embedding Methods
+
+| Method                 | Description                              | When to Use                                  |
+| ---------------------- | ---------------------------------------- | -------------------------------------------- |
+| **Accelerated**        | Precomputed and stored                   | Faster queries, frequently searched datasets |
+| **JIT (Just-in-Time)** | Computed at query time (no acceleration) | Large or rarely queried datasets             |
+| **Passthrough**        | Pre-existing embeddings used directly    | Source already has `<col>_embedding` columns |
+
+### 3. Query via HTTP API
+
+```bash
+curl -X POST http://localhost:8090/v1/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "datasets": ["docs"],
+    "text": "cutting edge AI",
+    "where": "author=\"jeadie\"",
+    "additional_columns": ["title", "state"],
+    "limit": 5
+  }'
+```
+
+| Field                | Required | Description                                |
+| -------------------- | -------- | ------------------------------------------ |
+| `text`               | Yes      | Search text                                |
+| `datasets`           | No       | Datasets to search (null = all searchable) |
+| `additional_columns` | No       | Extra columns to return                    |
+| `where`              | No       | SQL filter predicate                       |
+| `limit`              | No       | Max results per dataset                    |
+
+To retrieve full documents (not just chunks), include the embedded source column (e.g. `content`) in `additional_columns`.
+
+### 4. Query via SQL UDTF
+
+```sql
+SELECT id, title, score
+FROM vector_search(docs, 'cutting edge AI')
+WHERE state = 'Open'
+ORDER BY score DESC
+LIMIT 5;
+```
+
+**`vector_search` signature:**
+
+```sql
+vector_search(
+  table STRING,          -- Dataset name (required)
+  query STRING,          -- Search text (required)
+  column STRING,         -- Column (optional if single embedding column)
+  limit INTEGER,         -- Max results (default: 1000; a vector engine sets its own)
+  include_score BOOLEAN  -- Include score column (default: TRUE)
+) RETURNS TABLE
+```
+
+> **Limitation**: `vector_search` UDTF does not yet support chunked embedding columns. Use the HTTP API for chunked data.
+
+## Set Up Full-Text Search
+
+Full-text search uses **BM25 scoring** (powered by Tantivy) for keyword relevance ranking.
+
+The built-in engine analyzes text with Tantivy's `en_stem` tokenizer (v2.2.0+): terms are lowercased
+and reduced to their English (Snowball) stem, so `running` matches `run` and `runs`; positions are
+kept, so phrase queries work. Stemming is always on, has no parameter, and is English-only. An index
+persisted with `index_store: file` before v2.2.0 keeps its old analysis and logs a warning — delete
+the index directory to rebuild. The default `index_store: memory` rebuilds on every start.
+
+### 1. Enable Indexing on Columns
+
+```yaml
+datasets:
+  - from: postgres:articles
+    name: articles
+    acceleration:
+      enabled: true
+    columns:
+      - name: title
+        full_text_search:
+          enabled: true
+          row_id:
+            - id
+      - name: body
+        full_text_search:
+          enabled: true
+```
+
+### 2. Query via SQL UDTF
+
+```sql
+SELECT id, title, score
+FROM text_search(articles, 'search keywords', body)
+ORDER BY score DESC
+LIMIT 5;
+```
+
+**`text_search` signature:**
+
+```sql
+text_search(
+  table STRING,          -- Dataset name (required)
+  query STRING,          -- Keywords/phrase (required)
+  column STRING,         -- Column (required if multiple indexed columns)
+  limit INTEGER,         -- Max results (default: 1000)
+  include_score BOOLEAN  -- Include score column (default: TRUE)
+) RETURNS TABLE
+```
+
+## Hybrid Search with RRF
+
+Reciprocal Rank Fusion merges rankings from multiple search methods. Each query runs independently, then results are combined:
+
+```
+RRF Score = Σ(rank_weight / (k + rank))
+```
+
+Documents appearing across multiple result sets receive higher scores.
+
+### Basic Hybrid Search
+
+```sql
+SELECT id, title, content, _fused_score
+FROM rrf(
+    vector_search(documents, 'machine learning algorithms'),
+    text_search(documents, 'neural networks deep learning', content),
+    join_key => 'id'
+)
+ORDER BY _fused_score DESC
+LIMIT 5;
+```
+
+### Weighted Ranking
+
+```sql
+SELECT _fused_score, title, content
+FROM rrf(
+    text_search(posts, 'artificial intelligence', rank_weight => 50.0),
+    vector_search(posts, 'AI machine learning', rank_weight => 200.0)
+)
+ORDER BY _fused_score DESC
+LIMIT 10;
+```
+
+### Recency-Boosted Search
+
+```sql
+-- Exponential decay (1-hour scale)
+SELECT _fused_score, title, created_at
+FROM rrf(
+    text_search(news, 'breaking news'),
+    vector_search(news, 'latest updates'),
+    time_column => 'created_at',
+    recency_decay => 'exponential',
+    decay_constant => 0.05,
+    decay_scale_secs => 3600
+)
+ORDER BY _fused_score DESC
+LIMIT 10;
+
+-- Linear decay (24-hour window)
+SELECT _fused_score, content
+FROM rrf(
+    text_search(posts, 'trending'),
+    vector_search(posts, 'viral popular'),
+    time_column => 'created_at',
+    recency_decay => 'linear',
+    decay_window_secs => 86400
+)
+ORDER BY _fused_score DESC;
+```
+
+### Cross-Language Search
+
+Stemming is English-only, so the full-text arm contributes little across languages. Weight the vector
+arm up and let RRF do the rest — the recency parameters are the same as above:
+
+```sql
+SELECT _fused_score, text, langs
+FROM rrf(
+    vector_search(posts, 'ultimas noticias', rank_weight => 100),
+    text_search(posts, 'news'),
+    time_column => 'created_at'
+)
+```
+
+### `rrf` Parameters
+
+| Parameter                 | Type        | Required | Description                                                  |
+| ------------------------- | ----------- | -------- | ------------------------------------------------------------ |
+| `query_1`, `query_2`, ... | Search UDTF | Yes (2+) | `vector_search` or `text_search` calls (variadic)            |
+| `join_key`                | String      | No       | Join column (default: inferred primary key, else auto-hash)  |
+| `k`                       | Float       | No       | Smoothing parameter (default: 60.0, lower = more aggressive) |
+| `time_column`             | String      | No       | Timestamp column for recency boosting                        |
+| `recency_decay`           | String      | No       | `'exponential'` (default) or `'linear'`                      |
+| `decay_constant`          | Float       | No       | Rate for exponential decay (default: 0.01)                   |
+| `decay_scale_secs`        | Float       | No       | Time scale for exponential decay (default: 86400)            |
+| `decay_window_secs`       | Float       | No       | Window for linear decay (default: 86400)                     |
+| `rank_weight`             | Float       | No       | Per-query weight (specified inside search calls)             |
+
+## Vector Engines
+
+Store and index embeddings at scale with a vector engine (`vectors.engine`): `s3_vectors`, `duckdb`
+(HNSW via DuckDB VSS; requires `acceleration.engine: duckdb`), or `elasticsearch` (Spice.ai
+Enterprise). S3 Vectors example:
+
+```yaml
+datasets:
+  - from: postgres:documents
+    name: docs
+    acceleration:
+      enabled: true
+    columns:
+      - name: content
+        embeddings:
+          - from: embed_model
+            row_id: id
+        metadata:
+          vectors: non-filterable
+      - name: category
+        metadata:
+          vectors: filterable # enable filtering on this column
+    vectors:
+      enabled: true
+      engine: s3_vectors
+      params:
+        s3_vectors_bucket: my-bucket
+        s3_vectors_aws_region: us-east-1
+```
+
+## Lexical Search (SQL)
+
+Standard SQL filtering:
+
+```sql
+SELECT * FROM my_table WHERE column LIKE '%substring%';
+SELECT * FROM my_table WHERE column = 'exact value';
+SELECT * FROM my_table WHERE regexp_like(column, '^spice.*ai$');
+```
+
+## CLI Search
+
+```bash
+spice search --limit 5                 # opens a REPL; type queries at the search> prompt
+spice search --cache-control no-cache  # bypass the results cache (cache | no-cache)
+```
+
+## Complete Example
+
+```yaml
+version: v2
+kind: Spicepod
+name: search_app
+
+secrets:
+  - from: env
+    name: env
+
+embeddings:
+  - name: embeddings
+    from: huggingface:huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+
+datasets:
+  - from: file:articles.parquet
+    name: articles
+    acceleration:
+      enabled: true
+      engine: duckdb
+    columns:
+      - name: title
+        full_text_search:
+          enabled: true
+          row_id:
+            - id
+      - name: content
+        embeddings:
+          - from: embeddings
+        full_text_search:
+          enabled: true
+```
+
+```sql
+SELECT id, title, content, _fused_score
+FROM rrf(
+    vector_search(articles, 'machine learning best practices'),
+    text_search(articles, 'neural network training', content),
+    join_key => 'id',
+    time_column => 'published_at',
+    recency_decay => 'exponential',
+    decay_constant => 0.01,
+    decay_scale_secs => 86400
+)
+WHERE _fused_score > 0.01
+ORDER BY _fused_score DESC
+LIMIT 10;
+```
+
+## Troubleshooting
+
+| Issue                                     | Solution                                                             |
+| ----------------------------------------- | -------------------------------------------------------------------- |
+| `vector_search` returns no results        | Verify embeddings configured on column and model is loaded           |
+| Poor vector relevance on a HuggingFace model | Upgrade to v2.2.1 — earlier builds padded every input to 128 tokens |
+| `text_search` returns no results          | Check `full_text_search.enabled: true`; acceleration must be enabled |
+| Poor hybrid search relevance              | Tune `rank_weight` per query and `k`, or wrap the search in `rerank()` |
+| Results missing recent content            | Add `time_column` and `recency_decay` to RRF                         |
+| Chunked vector search not working via SQL | Use HTTP API instead (UDTF doesn't support chunked columns yet)      |
+
+## Documentation
+
+- [Search Overview](https://spiceai.org/docs/features/search)
+- [Vector Search](https://spiceai.org/docs/features/search/vector-search)
+- [Full-Text Search](https://spiceai.org/docs/features/search/full-text)
+- [Search SQL Reference](https://spiceai.org/docs/reference/sql/search)
+- [Embedding Models](https://spiceai.org/docs/components/embeddings)
+- [Vector Engines](https://spiceai.org/docs/components/vectors)
+- [Search API](https://spiceai.org/docs/api/HTTP/post-search)

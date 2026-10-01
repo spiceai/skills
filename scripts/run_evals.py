@@ -3,9 +3,9 @@
 
 Usage:
   python scripts/run_evals.py                    # run all skills
-  python scripts/run_evals.py spice-setup        # run one skill
+  python scripts/run_evals.py setup        # run one skill
   python scripts/run_evals.py --grade            # run + grade
-  python scripts/run_evals.py --skill spice-ai   # alternate syntax
+  python scripts/run_evals.py --skill chat   # alternate syntax
 """
 import argparse
 import json

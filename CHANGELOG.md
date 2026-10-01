@@ -2,7 +2,29 @@
 
 ## Unreleased
 
-- Add project forks to spice-cloud-management. `POST /v1/projects/{projectId}/forks` creates a project from another project's spicepod, connections, secrets, and runtime settings, in the same place or in another region or cluster, and `GET /v1/projects/{projectId}/forks` lists a project's forks. Project responses include `forked_from`. The skill documents the fields, the `shared_state` check before the first deployment of a fork, how a source connected to a GitHub repository is forked, and the error codes. It adds a workflow to copy or move a project to another region, `fork-project` and `list-forks` commands in `scripts/spice-cloud.sh`, and an eval.
+- Add project forks to cloud. `POST /v1/projects/{projectId}/forks` creates a project from another project's spicepod, connections, secrets, and runtime settings, in the same place or in another region or cluster, and `GET /v1/projects/{projectId}/forks` lists a project's forks. Project responses include `forked_from`. The skill documents the fields, the `shared_state` check before the first deployment of a fork, how a source connected to a GitHub repository is forked, and the error codes. It adds a workflow to copy or move a project to another region, `fork-project` and `list-forks` commands in `scripts/spice-cloud.sh`, and an eval.
+- Make `setup` the single entry point that takes an agent from an empty directory to a verified SQL
+  result. Its Quick Start used to stop at an empty `spice init`, which `spice validate` reports as `OK`
+  with zero datasets. The new `scripts/spice-local.sh` checks the existing installation, seeds a local
+  dataset (a bundled 20-row CSV, or `--data` for the user's file), starts `spice run` in the background
+  on free loopback ports, waits for `/v1/ready`, and verifies that each dataset is `Ready` and a query
+  returns rows. It never installs software, refuses to start when the runtime is missing, detects a
+  different runtime already holding port 8090, and stops only the PID it started. `verify` returns a
+  ready-to-show report: directory, PID, addresses, log path, dataset status, sample rows, and why the
+  ports moved when they did. The skill defines
+  what counts as working, lists the anti-patterns (stopping after `spice init`, treating
+  `spice validate` as proof, `pkill spiced`, metrics on the first run), and explains a failed
+  user-run install whose download URL contains `/download//`.
+- Document `/v1/sql` request bodies in setup, sql, cache, cookbook, and cloud: a raw SQL body works,
+  while a JSON body needs `"parameters"` (`[]` when unused) and exactly `Content-Type: application/json`.
+  `{"sql": "..."}` alone returns `400 Invalid JSON: missing field 'parameters'`.
+- Use one secret placeholder style, `${ store:KEY }`, across datasets, secrets, cookbook, cloud, and
+  terraform. The secrets skill notes that spaces inside the braces are optional.
+- Make spicepod's Quick Start a credential-free local CSV, keeping PostgreSQL and OpenAI as the next
+  example, and note that the `spiceai/quickstart` pod is `version: v1` and loads data from public S3.
+- Add a "Verify" section to connectors and datasets: `/v1/ready`, then dataset status, then `SELECT … LIMIT 1`.
+- AGENTS.md and the README lead with the skill graph from setup; the README's per-agent install details
+  are collapsed under a summary table. AGENTS.md lists workflow-skill regressions to check for.
 - Add the `spice-cookbook` skill, which sets up and runs recipes from the [Spice.ai cookbook](https://github.com/spiceai/cookbook). It picks a recipe by name or goal, fetches the cookbook (or a pull request or branch), and checks the runtime version, Docker, secrets, tools, and ports with `scripts/cookbook.sh` before running the README steps. The script reports whether each secret is set without printing its value.
 - Fix spice-setup and spicepod-config, which set bind addresses with `spice run -- --http ...`. That fails on every v2 CLI (`argument '--http' cannot be used multiple times`) because `spice run` already passes `--http`. Use `spice run --http-endpoint`, `--flight-endpoint`, and `--metrics-endpoint` instead.
 - Fix spice-search and spice-text-to-sql `rrf()` examples: the score column has been `_fused_score` since v2.0.0, not `fused_score`.

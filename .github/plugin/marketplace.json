@@ -1,0 +1,21 @@
+{
+  "name": "spiceai",
+  "owner": {
+    "name": "Spice AI",
+    "email": "hello@spice.ai"
+  },
+  "metadata": {
+    "description": "Skills for working with the Spice.ai runtime"
+  },
+  "plugins": [
+    {
+      "name": "spiceai",
+      "source": "./",
+      "version": "2.3.2",
+      "description": "Spice.ai CLI, Cloud API, and SDK workflows for SQL, search, AI, and data acceleration",
+      "homepage": "https://spiceai.org",
+      "repository": "https://github.com/spiceai/skills",
+      "license": "MIT"
+    }
+  ]
+}

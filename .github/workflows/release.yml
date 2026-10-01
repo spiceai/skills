@@ -1,91 +1,59 @@
 name: Release Plugin
 
 on:
+  push:
+    tags: ['v*']
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, matching every plugin manifest (for example v2.3.2)
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: plugin-release-${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  package:
+  release:
+    if: github.repository == 'spiceai/skills'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Extract version from plugin.json
-        id: version
-        run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['version'])")
-          NAME=$(python3 -c "import json; print(json.load(open('.claude-plugin/plugin.json'))['name'])")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Package plugin
-        run: |
-          ARCHIVE_NAME="${{ steps.version.outputs.name }}-plugin-${{ steps.version.outputs.version }}"
-          STAGING=$(mktemp -d)
-          STAGE_DIR="$STAGING/$ARCHIVE_NAME"
+      - name: Test distribution safeguards
+        run: make test-distribution
 
-          # Claude
-          mkdir -p "$STAGE_DIR/.claude-plugin"
-          cp .claude-plugin/plugin.json "$STAGE_DIR/.claude-plugin/"
-          cp .claude-plugin/marketplace.json "$STAGE_DIR/.claude-plugin/"
+      - name: Build and validate release artifacts
+        run: python3 scripts/prepare_release.py --tag "$RELEASE_TAG"
 
-          # Cursor
-          if [ -d .cursor-plugin ]; then
-            mkdir -p "$STAGE_DIR/.cursor-plugin"
-            cp .cursor-plugin/*.json "$STAGE_DIR/.cursor-plugin/"
-          fi
+      - name: Preserve submission artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: spiceai-${{ env.RELEASE_TAG }}-distribution
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
 
-          # Codex
-          if [ -d .codex-plugin ]; then
-            mkdir -p "$STAGE_DIR/.codex-plugin"
-            cp .codex-plugin/*.json "$STAGE_DIR/.codex-plugin/"
-          fi
-
-          # Grok
-          if [ -d .grok-plugin ]; then
-            mkdir -p "$STAGE_DIR/.grok-plugin"
-            cp .grok-plugin/*.json "$STAGE_DIR/.grok-plugin/"
-          fi
-
-          # Portable Agent Plugins + Codex/ChatGPT repo marketplace
-          [ -f plugin.json ] && cp plugin.json "$STAGE_DIR/"
-          if [ -f .agents/plugins/marketplace.json ]; then
-            mkdir -p "$STAGE_DIR/.agents/plugins"
-            cp .agents/plugins/marketplace.json "$STAGE_DIR/.agents/plugins/"
-          fi
-
-          # Skills
-          mkdir -p "$STAGE_DIR/skills"
-          for skill_dir in skills/*/; do
-            skill_name=$(basename "$skill_dir")
-            dest="$STAGE_DIR/skills/$skill_name"
-            mkdir -p "$dest"
-            [ -f "$skill_dir/SKILL.md" ] && cp "$skill_dir/SKILL.md" "$dest/"
-            [ -d "$skill_dir/scripts" ] && cp -r "$skill_dir/scripts" "$dest/"
-            [ -d "$skill_dir/references" ] && cp -r "$skill_dir/references" "$dest/"
-            [ -d "$skill_dir/examples" ] && cp -r "$skill_dir/examples" "$dest/"
-            [ -d "$skill_dir/evals" ] && cp -r "$skill_dir/evals" "$dest/"
-            if [ -d "$skill_dir/config" ]; then
-              mkdir -p "$dest/config"
-              find "$skill_dir/config" -maxdepth 1 -type f ! -name '*.local.*' \
-                -exec cp {} "$dest/config/" \;
-            fi
-          done
-
-          # Top-level files
-          [ -f README.md ] && cp README.md "$STAGE_DIR/"
-          [ -f AGENTS.md ] && cp AGENTS.md "$STAGE_DIR/"
-
-          # Create zip
-          cd "$STAGING"
-          zip -r "$GITHUB_WORKSPACE/$ARCHIVE_NAME.zip" "$ARCHIVE_NAME"
-
-      - name: Upload release asset
+      - name: Attach artifacts and marketplace instructions to GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          ARCHIVE_NAME="${{ steps.version.outputs.name }}-plugin-${{ steps.version.outputs.version }}.zip"
-          gh release upload "${{ github.event.release.tag_name }}" "$ARCHIVE_NAME" --clobber
+        run: python3 scripts/publish_release.py

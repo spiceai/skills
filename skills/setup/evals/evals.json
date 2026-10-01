@@ -1,0 +1,279 @@
+{
+  "skill_name": "setup",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to try out Spice.ai on my Mac. Walk me through installing it and getting a basic project running so I can query some data.",
+      "expected_output": "Link the official installation documentation for user-managed provisioning. Verify the existing CLI and runtime with spice version, then seed a dataset (not an empty spice init), start the runtime, poll /v1/ready, and run a query that returns rows. Do not provide or execute an installer.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "links_installation_prerequisite",
+          "type": "contains",
+          "value": "https://spiceai.org/docs/installation",
+          "description": "Direct installation requests to the official documentation for the user to perform."
+        },
+        {
+          "name": "includes_init_command",
+          "type": "contains",
+          "value": "spice init",
+          "description": "Should include spice init to create a project"
+        },
+        {
+          "name": "includes_run_command",
+          "type": "contains",
+          "value": "spice run",
+          "description": "Should include spice run to start the runtime"
+        },
+        {
+          "name": "checks_runtime_before_launch",
+          "type": "contains",
+          "value": "spice version",
+          "description": "Check that the runtime exists before using a CLI command that can auto-install it."
+        },
+        {
+          "name": "does_not_supply_remote_installer",
+          "type": "regex",
+          "value": "(?is)\\A(?!.*(?:install\\.spiceai\\.org|DownloadString|brew\\s+install)).*\\Z",
+          "description": "Do not reintroduce remote installer execution through an install one-liner or a package manager."
+        },
+        {
+          "name": "seeds_a_dataset",
+          "type": "regex",
+          "value": "(?is)((?:spice-local\\.sh[\\\"']?|\\$\\{?\\w+\\}?[\\\"']?)\\s+init|datasets:\\s*\\n\\s*-\\s*from:|sales\\.csv|--data\\s)",
+          "description": "Add a dataset instead of stopping at an empty spicepod."
+        },
+        {
+          "name": "waits_for_readiness",
+          "type": "regex",
+          "value": "(?is)(/v1/ready|(?:spice-local\\.sh[\\\"']?|\\$\\{?\\w+\\}?[\\\"']?)\\s+(start|ready))",
+          "description": "Poll readiness rather than assuming a started process is ready."
+        },
+        {
+          "name": "verifies_rows",
+          "type": "regex",
+          "value": "(?is)((?:spice-local\\.sh[\\\"']?|\\$\\{?\\w+\\}?[\\\"']?)\\s+verify|select\\s+\\S.{0,80}\\s+from\\s+\\w)",
+          "description": "Finish with a query that returns rows."
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "What port does the Spice HTTP API run on by default? And what are all the API endpoints I can hit?",
+      "expected_output": "Port 8090, list of endpoints including /v1/sql, /v1/search, /v1/nsql, /v1/chat/completions, /v1/embeddings, /v1/datasets, /v1/models, /health",
+      "files": [],
+      "assertions": [
+        {
+          "name": "mentions_port_8090",
+          "type": "contains",
+          "value": "8090",
+          "description": "Should mention the default HTTP port 8090"
+        },
+        {
+          "name": "lists_sql_endpoint",
+          "type": "contains",
+          "value": "/v1/sql",
+          "description": "Should list the SQL endpoint"
+        },
+        {
+          "name": "lists_search_endpoint",
+          "type": "contains",
+          "value": "/v1/search",
+          "description": "Should list the search endpoint"
+        },
+        {
+          "name": "explains_sql_body",
+          "type": "regex",
+          "value": "(?is)(parameters|text/plain|raw sql)",
+          "description": "Say that /v1/sql takes raw SQL, or that a JSON body needs parameters."
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I'm getting 'command not found' when I try to run spice. I installed it earlier today on Linux. What's wrong?",
+      "expected_output": "Check the existing binary under $HOME/.spice/bin before suggesting a PATH fix; use export PATH only if it exists. If absent, explain the installation prerequisite without reinstalling.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "diagnoses_path_issue",
+          "type": "contains",
+          "value": ".spice/bin",
+          "description": "Should identify the PATH issue and mention .spice/bin"
+        },
+        {
+          "name": "provides_export_command",
+          "type": "contains",
+          "value": "export PATH",
+          "description": "Should provide the export PATH command"
+        },
+        {
+          "name": "checks_existing_binary",
+          "type": "regex",
+          "value": "(?is)(exists|existence|executable|test\\s+-x|ls\\s|if\\s+\\[)",
+          "description": "Verify the existing installation rather than blindly changing PATH or reinstalling."
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I installed the Spice CLI on my laptop, but spice version says Runtime version: not installed. Please start a local runtime for my project. What should happen next?",
+      "expected_output": "Stop before spice run because it would automatically download the missing runtime. Explain that runtime installation is a user-managed prerequisite and link the official installation documentation. Do not offer to bypass this with spice install, an installer, or another skill.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "recognizes_missing_runtime",
+          "type": "contains",
+          "value": "not installed",
+          "description": "Recognize that CLI-only installation does not satisfy the runtime prerequisite."
+        },
+        {
+          "name": "explains_automatic_download",
+          "type": "regex",
+          "value": "(?is)(auto.{0,40}(install|download)|(install|download).{0,60}(auto|on its own|by itself|side effect))",
+          "description": "Explain why starting the CLI would provision missing code."
+        },
+        {
+          "name": "hands_off_provisioning",
+          "type": "contains",
+          "value": "https://spiceai.org/docs/installation",
+          "description": "Provide the installation prerequisite documentation."
+        },
+        {
+          "name": "stops_before_missing_runtime_launch",
+          "type": "regex",
+          "value": "(?is)(?:(?:haven['’]t|have not|won['’]t|will not|do not|don['’]t|can['’]t|cannot|am not|['’]m not).{0,70}(?:start|run)|stop.{0,30}(?:here|before))",
+          "description": "Explicitly stop rather than start the missing runtime. Any later launch guidance must be conditional on rechecking an installed runtime (review this condition semantically)."
+        },
+        {
+          "name": "does_not_supply_installer_commands",
+          "type": "regex",
+          "value": "(?ism)\\A(?!.*(?:install\\.spiceai\\.org|DownloadString|brew\\s+install|^\\s*spice\\s+(?:install|upgrade)\\b|(?:curl|wget)[^\\n]*\\|\\s*(?:/bin/)?(?:ba)?sh\\b)).*\\Z",
+          "description": "Reject provisioning commands while allowing read-only local HTTP checks and conditional guidance for an already installed runtime."
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Spice CLI and runtime v2.3.2 are already installed on my laptop. Show me how to start a local development runtime with HTTP, Flight, and Prometheus metrics. I only need to access it from this laptop.",
+      "expected_output": "Check spice version and start the existing runtime with HTTP, Flight, and metrics bound to 127.0.0.1. No installation, upgrade, or externally exposed endpoints.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "http_loopback",
+          "type": "contains",
+          "value": "127.0.0.1:8090",
+          "description": "Bind HTTP locally."
+        },
+        {
+          "name": "flight_loopback",
+          "type": "contains",
+          "value": "127.0.0.1:50051",
+          "description": "Bind Flight locally."
+        },
+        {
+          "name": "metrics_loopback",
+          "type": "contains",
+          "value": "127.0.0.1:9090",
+          "description": "Bind metrics locally."
+        },
+        {
+          "name": "no_wildcard_launch",
+          "type": "regex",
+          "value": "(?is)\\A(?!.*spice\\s+run[^`]*0\\.0\\.0\\.0).*\\Z",
+          "description": "Do not launch development services on wildcard interfaces."
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Spice CLI and runtime v2.3.2 are installed on this machine. Set up Spice in ./my_app and show me a SQL result.",
+      "expected_output": "Run preflight, create the project and seed a local dataset (spice-local.sh init or a datasets entry with the sample CSV), start spice run in the background, poll /v1/ready, verify the dataset is Ready and a query returns rows, and report directory, PID, ports, log path, and sample rows. No metrics endpoint on the first run, no pkill.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "seeds_before_running",
+          "type": "regex",
+          "value": "(?is)((?:spice-local\\.sh[\\\"']?|\\$\\{?\\w+\\}?[\\\"']?)\\s+init|datasets:\\s*\\n\\s*-\\s*from:|sales\\.csv|--data\\s)",
+          "description": "Seed a dataset before starting, instead of running an empty spicepod."
+        },
+        {
+          "name": "polls_ready",
+          "type": "regex",
+          "value": "(?is)(/v1/ready|(?:spice-local\\.sh[\\\"']?|\\$\\{?\\w+\\}?[\\\"']?)\\s+(start|ready))",
+          "description": "Wait for /v1/ready instead of sleeping or assuming."
+        },
+        {
+          "name": "queries_rows",
+          "type": "regex",
+          "value": "(?is)((?:spice-local\\.sh[\\\"']?|\\$\\{?\\w+\\}?[\\\"']?)\\s+verify|/v1/sql|select\\s+\\S.{0,80}\\s+from\\s+\\w)",
+          "description": "Prove the setup with a query."
+        },
+        {
+          "name": "reports_pid_and_log",
+          "type": "regex",
+          "value": "(?is)(pid.{0,200}log|log.{0,200}pid)",
+          "description": "Tell the user how to find and stop what was started."
+        },
+        {
+          "name": "no_metrics_on_first_run",
+          "type": "regex",
+          "value": "(?is)\\A(?!.*spice\\s+run[^\\n]*--metrics-endpoint).*\\Z",
+          "description": "Don't add optional services to the first run."
+        },
+        {
+          "name": "no_pkill_command",
+          "type": "regex",
+          "value": "(?im)\\A(?![\\s\\S]*^\\s*(?:sudo\\s+)?pkill\\s+spiced)[\\s\\S]*\\Z",
+          "description": "Never stop runtimes with pkill spiced."
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I'm calling my local Spice runtime with curl -X POST localhost:8090/v1/sql -H 'Content-Type: application/json' -d '{\"sql\": \"SELECT * FROM sales LIMIT 5\"}' and I get 400 Invalid JSON: missing field `parameters`. What's wrong?",
+      "expected_output": "A JSON body needs a parameters field ([] when unused), or send the raw SQL body with Content-Type text/plain.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "adds_parameters",
+          "type": "regex",
+          "value": "\\\"parameters\\\"\\s*:\\s*(\\[\\]|\\{\\})",
+          "description": "Show the JSON body with an empty parameters array or object."
+        },
+        {
+          "name": "offers_raw_sql",
+          "type": "regex",
+          "value": "(?is)(text/plain|raw sql)",
+          "description": "Mention the raw SQL body, which needs no JSON."
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "I ran spice init my_app, then spice run, and spice validate says OK, but show tables in spice sql only lists the runtime's own tables. Is my setup broken?",
+      "expected_output": "Not broken but empty: spice init writes a spicepod with no datasets, and validate checks syntax only. Add a dataset (spice-local.sh init on the empty pod, or a datasets entry), then confirm /v1/ready and a query that returns rows.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "diagnoses_empty_spicepod",
+          "type": "regex",
+          "value": "(?is)(no datasets|empty spicepod|empty pod|datasets=0|zero datasets|without (any )?datasets)",
+          "description": "Recognize the empty spicepod."
+        },
+        {
+          "name": "validate_is_not_proof",
+          "type": "regex",
+          "value": "(?is)validate.{0,160}(syntax|doesn't|does not|isn't|is not|only|not proof|zero datasets|no datasets)",
+          "description": "Explain that validate passing doesn't mean data loads."
+        },
+        {
+          "name": "adds_a_dataset",
+          "type": "regex",
+          "value": "(?is)(spice-local\\.sh\\s+init|datasets:\\s*\\n\\s*-\\s*from:|from:\\s*file:)",
+          "description": "Add a dataset to the existing spicepod."
+        }
+      ]
+    }
+  ]
+}

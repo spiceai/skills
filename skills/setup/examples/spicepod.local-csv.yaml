@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/spiceai/spiceai/trunk/.schema/spicepod.schema.json
+version: v2
+kind: Spicepod
+name: my_app
+
+secrets:
+  - from: env
+    name: env
+
+datasets:
+  - from: file:./data/sales.csv
+    name: sales
+    params:
+      file_format: csv
+    acceleration:
+      enabled: true

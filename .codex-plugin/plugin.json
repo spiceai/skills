@@ -1,5 +1,5 @@
 {
-  "name": "spiceai-skills",
+  "name": "spiceai",
   "version": "2.3.2",
   "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
   "author": {
@@ -22,15 +22,20 @@
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Spice.ai Skills",
-    "shortDescription": "Skills for the Spice.ai runtime",
-    "longDescription": "Agent Skills for Spice.ai \u2014 data federation, acceleration, search, AI/LLM, and cloud management. Aligns with Spice OSS runtime v2.3.1.",
+    "displayName": "spiceai",
+    "shortDescription": "Spice.ai data and AI workflows",
+    "longDescription": "Build and manage Spice.ai applications through the CLI, Cloud APIs, and official SDKs. Skills cover runtime setup, Spicepod configuration, data connectors, federated SQL, data acceleration, vector and full-text search, AI models, caching, secrets, cloud management, and Terraform. Includes cookbook guidance and Python, JavaScript/TypeScript, Go, Rust, Java, and .NET client integration. Runtime guidance targets Spice v2.3.x, checked against v2.3.2, and directs the agent to check your installed version before recommending configuration. Runtime setup uses an existing Spice installation; installation and upgrades are user-managed. Running commands requires a compatible environment with shell access. Cloud and data-source workflows require your own accounts and locally configured credentials. This package contains skills and helper scripts; it does not include a hosted MCP server.",
     "developerName": "Spice AI",
     "category": "Developer Tools",
     "capabilities": [
       "Skills"
     ],
     "websiteURL": "https://spiceai.org",
+    "supportURL": "https://github.com/spiceai/skills/issues",
+    "privacyPolicyURL": "https://docs.spice.ai/legal/privacy",
+    "termsOfServiceURL": "https://docs.spice.ai/legal/terms-of-service",
+    "composerIcon": "./assets/spiceai-logo.svg",
+    "logo": "./assets/spiceai-logo.svg",
     "defaultPrompt": [
       "Help me set up Spice.ai and connect a data source",
       "Configure spicepod.yaml for federated SQL across Postgres and S3",
