@@ -1,0 +1,76 @@
+# Serve Snowflake, Postgres, and S3 data to agents with an OpenAI model on Spice.ai Cloud.
+# Replace hosts, accounts, tables, and secret names with the user's; delete what the scenario lacks.
+# Secrets are references only: `spice-launch.sh secrets` stores the values in Spice Cloud.
+version: v2
+kind: Spicepod
+name: agent-data
+
+datasets:
+  # Warehouse facts. Snowflake paths are UPPERCASE and its columns come back UPPERCASE,
+  # so agents must double-quote them ("O_TOTALPRICE"). Accelerate hot, small tables so a
+  # stream of agent questions does not keep the warehouse awake.
+  - from: snowflake:ANALYTICS.PUBLIC.ORDERS
+    name: sf_orders
+    description: Orders from the Snowflake warehouse, one row per order. Columns are UPPERCASE; double-quote them in SQL.
+    params:
+      snowflake_account: myorg-myaccount
+      snowflake_username: SPICE_READER
+      snowflake_password: ${ secrets:SNOWFLAKE_PASSWORD }
+      snowflake_warehouse: COMPUTE_WH
+      snowflake_role: ANALYST
+    acceleration:
+      enabled: true
+      refresh_check_interval: 1h
+
+  # Operational data, federated: queries push filters and aggregates down to Postgres.
+  - from: postgres:public.customers
+    name: pg_customers
+    description: Customers from the production Postgres database; id is the customer key, segment is SMB, MidMarket, or Enterprise.
+    params:
+      pg_host: db.example.com
+      pg_port: "5432"
+      pg_db: app
+      pg_user: spice_reader
+      pg_pass: ${ secrets:PG_PASS }
+      pg_sslmode: verify-full
+
+  # Lake data on S3, accelerated in memory (keep the accelerated total well under half of the
+  # instance memory limit; the default Cloud instance has 4 GiB).
+  - from: s3://acme-lake/support_tickets/
+    name: s3_tickets
+    description: Support tickets exported daily as Parquet; customer_id joins pg_customers.id.
+    params:
+      file_format: parquet
+      s3_auth: key
+      s3_region: us-east-1
+      s3_key: ${ secrets:AWS_ACCESS_KEY_ID }
+      s3_secret: ${ secrets:AWS_SECRET_ACCESS_KEY }
+    acceleration:
+      enabled: true
+      refresh_check_interval: 15m
+
+views:
+  # One well-described table for the cross-source question agents ask most.
+  - name: customer_tickets
+    description: Ticket counts per customer and segment, joining Postgres customers to S3 tickets.
+    sql: |
+      SELECT c.id AS customer_id, c.segment, COUNT(t.customer_id) AS tickets
+      FROM pg_customers c
+      LEFT JOIN s3_tickets t ON t.customer_id = c.id
+      GROUP BY c.id, c.segment
+
+models:
+  - from: openai:gpt-4o-mini
+    name: assistant
+    params:
+      openai_api_key: ${ secrets:OPENAI_API_KEY }
+      tools: auto # sql, table_schema, list_datasets, search, ...; unset means no tools
+      system_prompt: |
+        You answer questions about orders, customers, and support tickets. Use the sql tool,
+        double-quote column names, and say which dataset each answer came from.
+
+runtime:
+  mcp:
+    allowed_hosts: ["*"] # without it, /v1/mcp answers 403 "Host header is not allowed" on Spice Cloud
+  query:
+    timeout: 30s # (v2.2.0+) bound runaway agent queries

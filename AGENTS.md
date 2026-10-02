@@ -39,7 +39,11 @@ with `skills/setup/scripts/spice-local.sh`, then hands off:
 setup → spicepod, secrets → connectors + datasets → acceleration, accelerators, cache, search, models, chat, sql, sdk
 ```
 
-`cookbook` is the recipe track, not greenfield bootstrap. `cloud` and `terraform` cover Spice.ai Cloud.
+`launch` is the Spice.ai Cloud counterpart: it takes a scenario to a deployed, verified, monitored
+project with `skills/launch/scripts/spice-launch.sh` — create or fork → secrets → deploy (confirming
+the endpoint serves the new spicepod) → verify (rows, model answers, MCP) → monitors → fire drill →
+runbook. `cookbook` is the recipe track, not greenfield bootstrap. `cloud` and `terraform` cover
+individual Spice.ai Cloud operations and infrastructure as code.
 Keep each skill self-contained: skills can be installed one at a time, so a skill may mention another
 skill's helper but must not depend on it.
 

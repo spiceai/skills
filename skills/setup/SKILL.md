@@ -252,7 +252,8 @@ setup            installed? → spicepod → seeded dataset → running → read
  ├─ datasets     federation across sources, views, catalogs, writes
  └─ optional     acceleration / accelerators, cache, search, models / chat, sql, sdk
 cookbook         a ready-made recipe instead of the user's own project
-cloud, terraform Spice.ai Cloud instead of a local runtime
+launch           the scenario deployed to Spice.ai Cloud, verified, monitored, and handed off
+cloud, terraform Spice.ai Cloud resources one call at a time, or as infrastructure as code
 ```
 
 After changing the spicepod (a new source, acceleration, a model), run `spice-local.sh ready` and
