@@ -1,0 +1,192 @@
+{
+  "skill_name": "launch",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to serve data to AI agents. The data lives in Snowflake, Postgres, and S3, and we use OpenAI for models. Set up a new Spice project for this in ./agent-data, deploy it to Spice Cloud in our acme org as project `agent-data`, test that it really works end to end, and set up monitoring and alerts so it can run in production. Postgres is db.example.com (database app, user spice_reader, tables public.orders and public.customers); the password is the org secret PG_PASS. S3 is s3://acme-lake/tickets/ (Parquet). We don't have the Snowflake credentials yet. The OpenAI key is the org secret OPENAI_API_KEY; our org secrets are linked to acme/launch-base. Alerts go to oncall@acme.com.",
+      "expected_output": "Designs a spicepod (Postgres and S3 datasets with descriptions, Snowflake pending, an OpenAI model with tools, runtime.mcp.allowed_hosts [\"*\"] and a query timeout), forks the base project to inherit the linked org secrets, deploys and confirms the endpoint serves the new spicepod, verifies rows from each source, a tool-grounded model answer, and an MCP session, creates the production monitors with the email target, runs a fire drill, writes RUNBOOK.md and AGENT-CONNECT.md, and reports Snowflake as pending.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_launch_helper",
+          "type": "regex",
+          "value": "spice-launch\\.sh\\s+(preflight|create|deploy|verify|monitors)",
+          "description": "Drives the workflow with the bundled helper"
+        },
+        {
+          "name": "forks_base_for_org_secrets",
+          "type": "regex",
+          "value": "(?i)(--base\\s+acme/launch-base|fork)",
+          "description": "Uses the base project so linked org secrets reach the new project"
+        },
+        {
+          "name": "secret_references",
+          "type": "regex",
+          "value": "\\$\\{\\s*secrets:\\s*(PG_PASS|OPENAI_API_KEY)\\s*\\}",
+          "description": "References credentials as ${ secrets:NAME }"
+        },
+        {
+          "name": "mcp_allowed_hosts",
+          "type": "regex",
+          "value": "allowed_hosts",
+          "description": "Adds runtime.mcp.allowed_hosts so MCP works on Spice Cloud"
+        },
+        {
+          "name": "verifies_end_to_end",
+          "type": "regex",
+          "value": "(?i)(spice-launch\\.sh\\s+verify|/v1/mcp|tools/call)",
+          "description": "Proves rows, model, and MCP instead of stopping at a succeeded deployment"
+        },
+        {
+          "name": "monitors_with_target",
+          "type": "regex",
+          "value": "(?i)monitors[\\s\\S]{0,200}oncall@acme\\.com",
+          "description": "Creates monitors that notify the requested address"
+        },
+        {
+          "name": "snowflake_pending",
+          "type": "regex",
+          "value": "(?i)snowflake[\\s\\S]{0,300}(pending|not yet|once|stand-?in|later)",
+          "description": "Reports Snowflake as pending rather than done"
+        },
+        {
+          "name": "sdk_snippet_identity",
+          "type": "regex",
+          "value": "Accept-Encoding[\"']?\\s*[:=]\\s*[\"']?identity",
+          "description": "Any OpenAI SDK snippet sends Accept-Encoding: identity (non-streaming chat completions 502 otherwise)"
+        }
+      ],
+      "expectations": [
+        "The project is a managed Spice Cloud project whose latest deployment succeeded and whose endpoint serves every dataset as Ready",
+        "SQL over the project endpoint returns rows from the Postgres and S3 datasets",
+        "The OpenAI model answers a data question with the correct number (tool use over the data)",
+        "An MCP client can run the sql tool several times in one session without losing it",
+        "Active monitors cover query failures, HTTP 5xx, memory, and model failures and notify the requested address",
+        "A test alert was actually delivered during the task",
+        "Snowflake is reported as pending, not as working",
+        "No secret values appear in files",
+        "Every client instruction handed to the user (MCP config, OpenAI SDK snippet, curl) works as written against the live endpoint",
+        "The run never reads the user's mailbox, chat, or other accounts; it asks the user to confirm alert delivery",
+        "An on-call runbook (RUNBOOK.md) is handed off, since the user asked to run it in production"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I've got a demo with a retail prospect tomorrow morning. Spin up a Spice demo on Spice Cloud (acme org, project `retail-demo`, in ./retail-demo): an assistant that answers questions about their sales and can search product documentation. We don't have their data yet, so use public sample data and make it obvious it's sample data. Use OpenAI; the key is our org secret OPENAI_API_KEY, linked to acme/launch-base. Email me at me@acme.com if anything breaks during the demo. I'll drive it from Claude Code, so give me the exact connection steps.",
+      "expected_output": "Uses the demo profile with clearly labeled public stand-ins (sales Parquet and Markdown docs with full-text search) from the public demo bucket with s3_auth: public, an OpenAI model with tools, deploys and verifies search and a tool-grounded answer, creates the demo monitors to the email, and gives the claude mcp add command from AGENT-CONNECT.md.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "public_sample_data",
+          "type": "regex",
+          "value": "spiceai-demo-datasets",
+          "description": "Uses the public demo bucket as a stand-in"
+        },
+        {
+          "name": "s3_auth_public",
+          "type": "regex",
+          "value": "s3_auth:\\s*public",
+          "description": "Sets s3_auth: public so ambient AWS credentials can't break it"
+        },
+        {
+          "name": "labels_sample_data",
+          "type": "regex",
+          "value": "(?i)(sample|stand-?in)",
+          "description": "Makes it obvious the data is sample data"
+        },
+        {
+          "name": "full_text_search",
+          "type": "regex",
+          "value": "full_text_search",
+          "description": "Configures search over the documentation"
+        },
+        {
+          "name": "claude_code_steps",
+          "type": "regex",
+          "value": "claude mcp add --transport http",
+          "description": "Gives exact Claude Code connection steps"
+        },
+        {
+          "name": "demo_profile",
+          "type": "regex",
+          "value": "--profile\\s+demo",
+          "description": "Uses the demo profile"
+        }
+      ],
+      "expectations": [
+        "The project is deployed and serves every dataset as Ready",
+        "SQL returns rows from a public sample sales dataset",
+        "A documentation search returns results",
+        "The model answers a data question with the correct number",
+        "The data is labeled as sample data",
+        "Exact Claude Code connection steps are given (claude mcp add --transport http <endpoint>/v1/mcp with an API key header)",
+        "Active monitors notify the requested email",
+        "Every client instruction handed to the user (MCP config, OpenAI SDK snippet, curl) works as written against the live endpoint",
+        "The run never reads the user's mailbox, chat, or other accounts; it asks the user to confirm alert delivery"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We're greenfielding an internal analytics agent platform on Spice Cloud. Spice reads our Postgres (db.example.com, database app, user spice_reader; the password is the org secret PG_PASS, linked to acme/launch-base), mostly the events and accounts tables, and our engineers will connect their own agents from Claude Code and Cursor over MCP; we don't need a model inside Spice. Make it production-grade in the acme org as project `analytics-mcp` (in ./analytics-mcp): alerts to oncall@acme.com, prove the alerts actually get delivered, and leave us a runbook our on-call can use.",
+      "expected_output": "Production profile without a model, one replica because MCP sessions do not survive multiple replicas, large tables federated rather than accelerated in memory, pg_sslmode verify-full (or a flagged exception), the production monitor set to the email, a fire drill that fires, and RUNBOOK.md with each alert's meaning and first response.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "production_profile",
+          "type": "regex",
+          "value": "--profile\\s+production",
+          "description": "Uses the production profile"
+        },
+        {
+          "name": "one_replica_for_mcp",
+          "type": "regex",
+          "value": "(?i)(1 replica|one replica|replicas?:?\\s*1)",
+          "description": "Keeps one replica because MCP sessions break across replicas"
+        },
+        {
+          "name": "fire_drill",
+          "type": "regex",
+          "value": "fire-drill",
+          "description": "Proves alert delivery"
+        },
+        {
+          "name": "runbook",
+          "type": "regex",
+          "value": "RUNBOOK\\.md",
+          "description": "Leaves a runbook"
+        },
+        {
+          "name": "verify_full",
+          "type": "regex",
+          "value": "verify-full",
+          "description": "Addresses Postgres certificate verification"
+        },
+        {
+          "name": "no_model",
+          "type": "regex",
+          "value": "(?is)\\A(?!.*\\bmodels:\\s*\\n\\s*-\\s*from:).*\\Z",
+          "description": "Does not add a model to the spicepod"
+        },
+        {
+          "name": "asks_user_to_confirm_delivery",
+          "type": "regex",
+          "value": "(?i)(confirm|check)[^.\\n]{0,80}(arriv|receiv|inbox|delivered)",
+          "description": "Asks the user to confirm the drill alert arrived instead of checking their mailbox"
+        }
+      ],
+      "expectations": [
+        "The project is deployed, healthy, and serves every dataset as Ready",
+        "SQL returns rows from the Postgres tables",
+        "No model is configured in Spice",
+        "An MCP client can run the sql tool several times in one session without losing it",
+        "A production alert set is active: query failures, HTTP 5xx, memory, p99 latency, and CPU",
+        "Alert delivery was proven during the task",
+        "A runbook explains each alert's meaning and first response and gives operational commands",
+        "The Postgres TLS situation is handled honestly",
+        "Every client instruction handed to the user (MCP config, OpenAI SDK snippet, curl) works as written against the live endpoint",
+        "The run never reads the user's mailbox, chat, or other accounts; it asks the user to confirm alert delivery",
+        "The MCP session check passes with the project's replica count (one replica unless MCP is not used)"
+      ]
+    }
+  ]
+}

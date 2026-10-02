@@ -15,8 +15,10 @@ and finishes only when a query returns rows. Then it hands off to the specialist
 setup → spicepod, secrets → connectors + datasets → acceleration, accelerators, cache, search, models, chat, sql, sdk
 ```
 
-[cookbook](skills/cookbook/) runs ready-made recipes instead of your own project, and
-[cloud](skills/cloud/) and [terraform](skills/terraform/) manage Spice.ai Cloud. You install Spice
+To go further — a scenario such as "serve our Snowflake, Postgres, and S3 data to agents with OpenAI"
+deployed to Spice.ai Cloud, tested end to end, monitored with alerts, and handed off with a runbook —
+use [launch](skills/launch/). [cookbook](skills/cookbook/) runs ready-made recipes instead of your own
+project, and [cloud](skills/cloud/) and [terraform](skills/terraform/) manage Spice.ai Cloud resources. You install Spice
 itself by following the [installation docs](https://spiceai.org/docs/installation); the skills check
 `spice version` and never install or upgrade it.
 
@@ -193,6 +195,7 @@ The skills are version-aware. Each one names the release line it is written for,
 | Skill | Description |
 | --- | --- |
 | [setup](skills/setup/) | **Start here.** Take a directory to a running runtime that answers SQL with rows, using an existing installation; CLI, ports, and `/v1/sql` reference |
+| [launch](skills/launch/) | Take a scenario to a Spice.ai Cloud project that is deployed, verified (rows, model answers, MCP), monitored with alerts and a fire drill, and handed off with a runbook; for demos, POCs, and greenfield production |
 | [cookbook](skills/cookbook/) | Find, set up, and run recipes from the Spice.ai cookbook, including from a pull request |
 | [spicepod](skills/spicepod/) | Create and configure spicepod.yaml manifests |
 | [datasets](skills/datasets/) | Connect to data sources and query across them with federated SQL |
@@ -220,6 +223,7 @@ related commands; configuration topics are not invented CLI subcommands.
 | `chat` / `models` | `spice chat`, `spice models`, OpenAI-compatible APIs and provider configuration |
 | `datasets` / `connectors` | Dataset and catalog configuration, `spice datasets`, `/v1/datasets` |
 | `cloud` | Available `spice cloud` commands and the Cloud Management API |
+| `launch` | `spice cloud project`/`deploy`/`status`/`logs`, Management API monitors and forks, `/v1/sql`, `/v1/chat/completions`, `/v1/mcp` |
 | `sdk` | Client construction, endpoints, credentials, typed results, and language-specific methods |
 | `spicepod`, `acceleration`, `accelerators`, `cache`, `secrets` | Runtime configuration and related operations |
 | `terraform` / `cookbook` | Infrastructure as code and documented recipe workflows |
