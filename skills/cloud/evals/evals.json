@@ -46,6 +46,38 @@
           "description": "Should emphasize zero-downtime approach"
         }
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "My Spice.ai Cloud project 123 runs in us-east-1. Make a copy of it in us-west-2 called analytics-west, with the same datasets, connections, and secrets, and get it running.",
+      "expected_output": "Fork the project with POST /v1/projects/123/forks and {\"name\": \"analytics-west\", \"region\": \"us-west-2\"} instead of recreating it by hand, check shared_state in the response, then deploy the fork with POST /v1/projects/{forkId}/deployments because a fork is not deployed on creation",
+      "files": [],
+      "assertions": [
+        {
+          "name": "forks_project",
+          "type": "regex",
+          "value": "(/v1/(projects|apps)/[^/\\s]+/forks|fork-project)",
+          "description": "Should fork the source project rather than recreate it"
+        },
+        {
+          "name": "targets_region",
+          "type": "regex",
+          "value": "\"region\"\\s*:\\s*\"us-west-2\"|fork-project \\S+ \\S+ us-west-2",
+          "description": "Should place the fork in us-west-2"
+        },
+        {
+          "name": "deploys_fork",
+          "type": "regex",
+          "value": "(?i)(/deployments|\\bdeploy\\b)",
+          "description": "Should deploy the fork, which forking does not do"
+        },
+        {
+          "name": "checks_shared_state",
+          "type": "regex",
+          "value": "shared_state",
+          "description": "Should check the settings the fork shares with its source before deploying"
+        }
+      ]
     }
   ]
 }

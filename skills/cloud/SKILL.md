@@ -1,11 +1,11 @@
 ---
 name: cloud
-description: Manage Spice.ai Cloud resources through spice cloud and the Management API — projects, deployments, monitors, data reactions, secrets, API keys, and organization members. Use for Cloud project lifecycle, deployments, organization context, regions, and infrastructure automation. Use sql, search, chat, or sdk for runtime data and inference APIs, and terraform for infrastructure as code.
+description: Manage Spice.ai Cloud resources through spice cloud and the Management API — projects, project forks, deployments, monitors, data reactions, secrets, API keys, and organization members. Use for Cloud project lifecycle (including fork, copy, or move to another region or cluster), deployments, organization context, regions, and infrastructure automation. Use sql, search, chat, or sdk for runtime data and inference APIs, and terraform for infrastructure as code.
 ---
 
 # Spice.ai Cloud Management
 
-Manage Spice.ai Cloud resources through the Management API (control plane) at `https://api.spice.ai`. Create projects, trigger deployments, configure monitors and data reactions, manage secrets and API keys, and administer organization members.
+Manage Spice.ai Cloud resources through the Management API (control plane) at `https://api.spice.ai`. Create and fork projects, trigger deployments, configure monitors and data reactions, manage secrets and API keys, and administer organization members.
 
 **Renamed in Aug 2026:** apps are now **projects**. The `/v1/projects` routes are canonical; every `/v1/apps` route is still served as a legacy alias (marked deprecated in the OpenAPI spec). Only the list envelope differs — `GET /v1/projects` returns `{"projects": [...]}`, `GET /v1/apps` returns `{"apps": [...]}`. Project-management scopes stay `apps:*`; monitors and reactions have separate scopes below.
 
@@ -82,13 +82,15 @@ curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
 
 Manage Spice.ai Cloud projects.
 
-| Operation      | Method   | Path                       | Scope         |
-| -------------- | -------- | -------------------------- | ------------- |
-| List projects  | `GET`    | `/v1/projects`             | `apps:read`   |
-| Create project | `POST`   | `/v1/projects`             | `apps:write`  |
-| Get project    | `GET`    | `/v1/projects/{projectId}` | `apps:read`   |
-| Update project | `PUT`    | `/v1/projects/{projectId}` | `apps:write`  |
-| Delete project | `DELETE` | `/v1/projects/{projectId}` | `apps:delete` |
+| Operation      | Method   | Path                             | Scope         |
+| -------------- | -------- | -------------------------------- | ------------- |
+| List projects  | `GET`    | `/v1/projects`                   | `apps:read`   |
+| Create project | `POST`   | `/v1/projects`                   | `apps:write`  |
+| Get project    | `GET`    | `/v1/projects/{projectId}`       | `apps:read`   |
+| Update project | `PUT`    | `/v1/projects/{projectId}`       | `apps:write`  |
+| Delete project | `DELETE` | `/v1/projects/{projectId}`       | `apps:delete` |
+| Fork project   | `POST`   | `/v1/projects/{projectId}/forks` | `apps:write`  |
+| List forks     | `GET`    | `/v1/projects/{projectId}/forks` | `apps:read`   |
 
 ### Create Project
 
@@ -145,6 +147,19 @@ curl -X DELETE https://api.spice.ai/v1/projects/{projectId} \
 ```
 
 Deletes the project and tears down its runtime resources. Returns `204`.
+
+### Fork Project (Sep 2026)
+
+Create a project from another's config via `POST /v1/projects/{projectId}/forks` (`apps:write`); list with `GET .../forks`. Optional body fields: `name`, `region`, `cluster_name`, `scheduler_state_location` (required for a distributed source). The fork is **not deployed**; check `shared_state` before `POST /v1/projects/{forkId}/deployments`. Project responses include `forked_from`. Portal: **Create Project → Fork a project** or **Settings → Forks**.
+
+```bash
+curl -X POST https://api.spice.ai/v1/projects/123/forks \
+  -H "Authorization: Bearer $SPICE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "analytics-west", "region": "us-west-2"}'
+```
+
+Details (what is copied, GitHub-connected sources, status codes): [references/project-forks.md](references/project-forks.md).
 
 ## Deployments
 
@@ -407,6 +422,10 @@ curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
   "https://api.spice.ai/v1/projects/123/deployments?limit=1"
 ```
 
+### Copy or Move a Project to Another Region
+
+Fork into the target region, fix any `shared_state`, deploy the fork, then point clients at the fork's `endpoint` and API keys. To finish a **move**, delete the source only after the user confirms. Full steps: [references/project-forks.md](references/project-forks.md#copy-or-move-a-project-to-another-region).
+
 ### Rotate API Keys (Zero Downtime)
 
 ```bash
@@ -433,37 +452,20 @@ curl -X POST https://api.spice.ai/v1/projects/123/api-keys \
 A helper script is bundled at `scripts/spice-cloud.sh` (relative to this skill directory) for common operations. It calls the canonical `/v1/projects` routes; the older `*-app` command names still work as aliases.
 
 ```bash
-# Set your token (personal access token or OAuth access token)
 export SPICE_API_TOKEN="your-token"
-
-# List projects (JSON under "projects")
 bash scripts/spice-cloud.sh list-projects
-
-# Create project
 bash scripts/spice-cloud.sh create-project my-project us-west-2
-
-# Deploy project
+bash scripts/spice-cloud.sh fork-project 123 analytics-west us-west-2   # name/region optional
+bash scripts/spice-cloud.sh list-forks 123
 bash scripts/spice-cloud.sh deploy 123
-
-# Add secret
 bash scripts/spice-cloud.sh add-secret 123 DB_PASSWORD secret123
-
-# List deployments
 bash scripts/spice-cloud.sh list-deployments 123
-
-# Get API keys
 bash scripts/spice-cloud.sh get-api-keys 123
 ```
 
 ## Present Results to User
 
-When presenting management API results:
-- Show project IDs and names in a table for list operations
-- Show deployment status clearly (queued/in_progress/succeeded/failed), with `error_code` and `error_message` for failures
-- Show monitor and reaction IDs, names, statuses, and template IDs; do not print notification targets unless needed
-- Never display secret values — confirm creation/update only
-- Show API keys with a warning about secure storage
-- Give the project's data-plane `endpoint` for queries, and link the portal as `https://spice.ai/<org>/<project>`
+When presenting management API results: show project IDs/names in a table; for a fork, name the source, that it is not deployed yet, and any `shared_state`; show deployment status (`queued`/`in_progress`/`succeeded`/`failed`) with `error_code`/`error_message` on failure; show monitor/reaction IDs, names, statuses, and template IDs (omit notification targets unless needed); never display secret values; warn on API keys; give the data-plane `endpoint` and portal link `https://spice.ai/<org>/<project>`.
 
 ## Troubleshooting
 
@@ -475,6 +477,7 @@ When presenting management API results:
 | `403 image_tag_requires_enterprise` | Omit `image_tag`; select the runtime with `update_channel` and `version` instead            |
 | `404 Project not found`             | Verify `projectId` with `GET /v1/projects` in the right organization                        |
 | `409 Conflict` on create project    | Project name already exists (names compare case-insensitively)                              |
+| Fork errors (`fork_*`, `scheduler_state_location_*`) | See [references/project-forks.md](references/project-forks.md#fork-error-codes) |
 | `409` on deployment                 | A deployment is already in progress; wait for it to complete                                |
 | `400` on deployment                 | Project has no spicepod, is paused (`POST .../resume`), or `image_tag` isn't a published version for the channel |
 | `400` on create secret              | Secret name must start with letter/underscore; letters, numbers, underscores only           |
@@ -483,8 +486,4 @@ When presenting management API results:
 
 ## Documentation
 
-- [Management API Reference](https://docs.spice.ai/api/management-api/management)
-- [OpenAPI Specification](https://api.spice.ai/openapi.json)
-- [Runtime API Reference](https://docs.spice.ai/api)
-- [Spice.ai Cloud Changelog](https://docs.spice.ai/changelog)
-- [Spice.ai Cloud](https://spice.ai)
+[Management API](https://docs.spice.ai/api/management-api/management) · [OpenAPI](https://api.spice.ai/openapi.json) · [Runtime API](https://docs.spice.ai/api) · [Changelog](https://docs.spice.ai/changelog) · [spice.ai](https://spice.ai)
