@@ -3,6 +3,23 @@
 ## Unreleased
 
 - Add project forks to cloud. `POST /v1/projects/{projectId}/forks` creates a project from another project's spicepod, connections, secrets, and runtime settings, in the same place or in another region or cluster, and `GET /v1/projects/{projectId}/forks` lists a project's forks. Project responses include `forked_from`. The skill documents the fields, the `shared_state` check before the first deployment of a fork, how a source connected to a GitHub repository is forked, and the error codes. It adds a workflow to copy or move a project to another region, `fork-project` and `list-forks` commands in `scripts/spice-cloud.sh`, and an eval.
+- Add the `launch` skill: from a plain-language scenario ("serve Snowflake, Postgres, and S3 data to
+  agents with OpenAI") to a Spice.ai Cloud project that is designed, deployed, verified, monitored,
+  and documented. `scripts/spice-launch.sh` creates the managed project (or forks a base project to
+  inherit linked org secrets), stores secrets without printing them or putting them on a command
+  line, and deploys. It watches the new instance and stops early on an unresolved secret, a dataset
+  stuck in Error, or a model that fails to load, instead of waiting out a rollout that stays
+  `in_progress` while the old version serves. `verify` proves rows from every dataset and view, a
+  model answer grounded in the data, embeddings and search, and an MCP session across several tool
+  calls, and records a p50/p99 baseline. `monitors` creates the demo, POC, or production alert set in
+  place, and `fire-drill` proves an alert is delivered. `handoff` writes `RUNBOOK.md` and
+  `AGENT-CONNECT.md`. The skill documents what live testing found: Cloud MCP needs
+  `runtime.mcp.allowed_hosts: ["*"]`, multiple replicas break MCP sessions, OpenAI SDK clients need
+  `Accept-Encoding: identity` for non-streaming chat completions, org secrets reach a project only
+  when linked, Cloud's schema needs search `row_id`s as lists, resizing needs private compute, and
+  local or private-network sources are rejected before deploy. The skill never reads the user's
+  mailbox or chat to confirm an alert; it asks them.
+
 - Make `setup` the single entry point that takes an agent from an empty directory to a verified SQL
   result. Its Quick Start used to stop at an empty `spice init`, which `spice validate` reports as `OK`
   with zero datasets. The new `scripts/spice-local.sh` checks the existing installation, seeds a local
