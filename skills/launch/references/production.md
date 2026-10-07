@@ -73,10 +73,10 @@ Cloud managed projects running Spice v2.3.x (checked against v2.3.2).
 - **One replica means a short gap on each deploy.** In testing, a 1-replica deploy answered 5xx
   for about 9 seconds while the instance switched (4 of 25 one-second probes). Deploy outside busy
   hours, or keep SQL/HTTP-only workloads on 2 replicas.
-- **Outage alerts may not be available.** If the org cannot create `instance_health` or
-  `dataset_status` monitors (`template_unavailable`), a dead instance sends no alert: the rate
-  monitors need the runtime to report. Run an external canary every few minutes until those
-  templates are available, for example a scheduler that runs `spice-launch.sh status DIR` or
+- **Availability requires observed signals.** Instance-health and dataset-status monitors are
+  released for managed projects. An enabled monitor or quiet failure counter does not prove a
+  healthy endpoint. Inspect telemetry and investigate unavailable prerequisites. Run an external
+  canary every few minutes, for example a scheduler that runs `spice-launch.sh status DIR` or
   `curl -sf -H "X-API-Key: $SPICE_API_KEY" ENDPOINT/v1/ready` and alerts when it fails.
 - **Replicas and MCP.** An MCP session (`Mcp-Session-Id`) lives in the memory of the instance that
   created it, and with more than one replica, requests in a session reach other instances: in

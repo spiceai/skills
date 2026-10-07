@@ -28,8 +28,8 @@ and exits 1 with `error`, `hints`, and `next` when something is wrong.
 | `secrets DIR [--set NAME]` | Makes each `${ secrets:NAME }` the spicepod uses available to the project: links the org secret of that name, or stores the value from the environment, `.env.local`, or `.env` as a project secret. Fails on a secret it finds nowhere |
 | `deploy DIR [--timeout S] [--init-timeout S]` | Uploads the spicepod, deploys (resuming a paused project), and watches the new instance. It stops early on an unresolved secret, a dataset stuck in Error, a federated dataset stuck Initializing, or a model that fails to load, then confirms the endpoint serves the new spicepod |
 | `verify DIR [--sql Q]... [--ask Q --expect A] [--search T] [--nsql Q]` | Checks readiness, rows from every dataset and view, model answers (including a tool-grounded answer), embeddings, and an MCP session of several `sql` calls. Measures p50/p99 latency |
-| `monitors DIR --profile P [--email E]... [--slack C] [--webhook URL]` | Creates or updates the profile's alert set in place. Templates the org can't use are reported, not fatal |
-| `fire-drill DIR` | Proves alert delivery: a temporary monitor fires on deliberate failed queries (about 2–3 minutes), or on memory above 1% where the org lacks that template, then is deleted. **Sends one real alert** |
+| `monitors DIR --profile P [--email E]... [--slack C] [--webhook URL] [--enable-disabled]` | Creates or updates the profile's alerts in place and reads them back. Preserves disabled state unless explicitly approved; reports incomplete coverage |
+| `fire-drill DIR [--webhook-token-env VAR \| --webhook-no-token]` | Tests metric evaluation using failed queries, or a temporary memory condition when that template is unavailable. Records recovery, then deletes the monitor. Sends real notifications; recipients must confirm delivery |
 | `handoff DIR` | Writes `RUNBOOK.md` and `AGENT-CONNECT.md` from the live project; a re-run replaces only the text between its markers |
 | `status DIR` | One-shot health: deployment, instances, unhealthy datasets, alerts and when they last fired, recent problems |
 | `pause DIR` | Tears the runtime down and keeps the project, secrets, keys, and monitors; the next `deploy` resumes it |
@@ -83,8 +83,9 @@ success only when all of these hold:
    answers a data question with the right number; agents can call the MCP `sql` tool. `verify`
    checks these.
 4. A latency baseline (p50/p99 over uncached queries) is recorded.
-5. Monitors for the profile are active with the user's notification targets, and, with the user's
-   consent, a fire drill has delivered an alert.
+5. Monitors for the profile are enabled and read back with the user's notification targets. Signal
+   coverage is checked separately; disabled or unavailable monitors are explicit gaps. With the
+   user's consent, a fire drill fires and recipients confirm arrival at each destination.
 6. `RUNBOOK.md` and `AGENT-CONNECT.md` exist, and the user has the final report (below).
 
 ## Workflow
@@ -269,7 +270,7 @@ from this machine) over uncached queries; `monitors` derives its latency thresho
 
 ```bash
 spice-launch.sh monitors ./acme-agent-data --profile production --email oncall@acme.com --slack C0123ABCD
-spice-launch.sh fire-drill ./acme-agent-data   # only after the user agrees to one real alert
+spice-launch.sh fire-drill ./acme-agent-data   # only after approval for firing and recovery notifications
 ```
 
 `references/monitoring.md` lists each alert's meaning, units, thresholds, and first response.
@@ -281,12 +282,19 @@ Notes:
 - Targets: email, a Slack channel ID (Slack must be connected to the org, else `422`), and an HTTPS
   webhook (`--webhook-token-env VAR` for its bearer token). Without targets, alerts email the
   credential's user, or the org owner for a machine credential.
-- Some templates need early access (`template_unavailable` in the output). Report them as not
-  available; don't retry.
+- Templates are released for managed projects. `template_unavailable` means check project kind,
+  configured models/acceleration, and effective CPU limit. Report the gap; repeated POSTs do not
+  repair prerequisites. `monitoring_incomplete` is not production completion.
 - Re-running `monitors` updates the `launch:` monitors' conditions and targets in place (keeping
-  edited descriptions) and never touches others.
-- About 15–20 minutes after a redeploy, CPU and memory alerts can fire once for the replaced
-  instance and resolve within minutes. `references/monitoring.md` shows how to recognize it.
+  edited descriptions) and never touches others. Disabled monitors remain disabled and block
+  completion; use `--enable-disabled` only after approval. Profile changes report old alerts as
+  `outside_profile`; removal is a separate, approved action.
+- Enabled is not healthy: inspect current metrics, readiness, dataset state, and missing-signal
+  warnings. Replacement-instance false alarms were addressed upstream; treat a current missing
+  signal as a coverage problem, not automatically as a harmless redeploy artifact.
+- For a saved webhook, `fire-drill --webhook-token-env VAR` supplies its write-only token for the
+  temporary alert. Use `--webhook-no-token` only for an unauthenticated destination. The portal's
+  **Send test notification** uses saved credentials but tests delivery, not metric evaluation.
 - Confirming delivery is the user's job: ask whether the alert arrived. Never search their mailbox,
   chat, or other accounts for it, even when a connected tool could.
 
@@ -372,13 +380,14 @@ rollbacks, channel and version pinning, and capacity.
 | `Memory usage at 90% ... while loading` in `problems` | An acceleration larger than the instance | Federate it or narrow it with `refresh_sql`; raise `--memory` only with private compute |
 | `deploy`: `could not start the deployment`, `400 Invalid spicepod configuration` | Cloud checks the published Spicepod schema, which is stricter than `spice validate` | Write search `row_id`s as lists; compare other fields with the [Spicepod reference](https://spiceai.org/docs/reference/spicepod) |
 | `Resource limits can only be updated when private compute is enabled` | The org has no private compute | Keep the default size; federate or narrow accelerations |
-| CPU and memory alerts fire about 15–20 minutes after a deploy, naming an old instance, then resolve | Telemetry from the replaced instance stops | Not an outage; see `references/monitoring.md` |
+| CPU or memory reports missing telemetry | Signal coverage lost for a stable instance name | Check running instances and telemetry; missing data is not recovery; see `references/monitoring.md` |
 | `/v1/mcp` → `403 Host header is not allowed` | `runtime.mcp.allowed_hosts` missing | Add `["*"]` and deploy |
 | MCP calls fail with `404 Session not found` mid-conversation; `verify` reports `session_not_found` | More than one replica: a session lives in one instance | `spice cloud project update --replicas 1` (scale CPU/memory instead), deploy |
 | An OpenAI SDK client gets `502 Bad Gateway` from `/v1/chat/completions` while curl works; `verify` shows a WARN for `Accept-Encoding: gzip` | Non-streaming chat completions fail when the client asks for a compressed response, which the OpenAI SDKs do by default | Send `Accept-Encoding: identity` (Python `default_headers`, TypeScript `defaultHeaders`; AGENT-CONNECT.md does), or stream |
 | `verify`: model answers but the data question is wrong | `tools` missing or too narrow, or a vague dataset description | `tools: auto`, better `description:` fields, a view |
 | `monitors`: `create_failed` with 422 | Slack is not connected to the org | Connect Slack in org settings, or use email or a webhook |
-| `monitors`: `update_failed` with 403 | Updating a monitor needs org admin | An admin's credential, or delete and recreate in the portal |
+| `monitors`: `update_failed` with 403 | Updating a monitor needs org admin | Use an admin's credential with `monitors:write`; retain the same alert ID |
+| `monitors`: disabled / `verification_failed` / `monitoring_incomplete` | Disabled alert, mismatched saved fields, or missing prerequisites | Inspect GET and repair the reported gap; approve re-enabling separately |
 | `fire-drill` never fires | No live deployment, or evaluation lag | Confirm `status` is healthy; retry with `--timeout 600` |
 | `management_token_missing` | No credential the helper can read | Step 1: `login` (sign-in or sign-up with a device code) |
 | `org_not_accessible` | An OAuth client from another org | OAuth clients act only in their own org; use that org's client |

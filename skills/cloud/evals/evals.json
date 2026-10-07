@@ -78,6 +78,79 @@
           "description": "Should check the settings the fork shares with its source before deploying"
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Update existing monitor 22222222-2222-4222-8222-222222222222 on our managed Spice Cloud project 123. It uses query_latency_p99; change its threshold to 2500 ms and notify both oncall@example.com and Slack channel C0123ABCD. Keep its other condition settings and enabled state. Slack is connected. Show the Management API requests and how you verify the update. Do not recreate the alert.",
+      "expected_output": "GET the existing UUID, preserve its enabled state and other spec fields, PATCH that same monitor with the complete modified spec and the email plus Slack targets array, then GET again to verify. Requires monitors:write and org admin. Does not delete/recreate or claim delivery from PATCH success.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_patch",
+          "type": "regex",
+          "value": "PATCH",
+          "description": "Updates the existing monitor rather than replacing it"
+        },
+        {
+          "name": "same_monitor_route",
+          "type": "regex",
+          "value": "/v1/projects/123/monitors/22222222-2222-4222-8222-222222222222",
+          "description": "Uses the original project and alert ID"
+        },
+        {
+          "name": "multiple_destinations",
+          "type": "regex",
+          "value": "\"targets\"",
+          "description": "Uses the full targets array for email and Slack"
+        },
+        {
+          "name": "admin_role",
+          "type": "regex",
+          "value": "(?i)admin",
+          "description": "States the monitor update role requirement"
+        }
+      ],
+      "expectations": [
+        "Reads the current alert and uses its complete spec rather than resetting window, sustain, or severity defaults",
+        "Preserves status instead of enabling a disabled alert without approval",
+        "Reads back the same UUID after PATCH and verifies threshold plus both destinations",
+        "Does not send DELETE or POST to recreate the existing monitor",
+        "Does not treat enabled configuration or successful PATCH as proof of evaluation or notification delivery"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Our managed Spice Cloud project 123 has accelerated sales.orders and sales.customers datasets and an OpenAI model. Set up an Error-state monitor for both datasets, refresh-error monitoring, and model-failure monitoring using the Management API. Explain units and prerequisites. Our CPU monitor is active but GET says evaluation_unavailable_reason is cpu_limit_missing. Is it healthy? Can I use the Management Bearer token to send a test notification and read episode history?",
+      "expected_output": "All three requested templates are released for appropriately configured managed projects. Dataset status uses EQ 3 with a datasets list supporting dotted names, refresh errors count recorded errors per window, and current LLM failures use a per-second rate. Missing CPU limit means it cannot evaluate, not healthy. Test notifications and episode history are portal-session features, not public /v1 routes. Distinguishes pending #5634 changes from shipped behavior.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "dataset_status_template",
+          "type": "regex",
+          "value": "dataset_status",
+          "description": "Uses the released dataset-status template"
+        },
+        {
+          "name": "multiple_datasets",
+          "type": "regex",
+          "value": "\"datasets\"",
+          "description": "Scopes the Error-state monitor to both datasets"
+        },
+        {
+          "name": "cpu_observation_gap",
+          "type": "regex",
+          "value": "cpu_limit_missing",
+          "description": "Explains unavailable evaluation separately from enabled state"
+        }
+      ],
+      "expectations": [
+        "Does not claim llm_failures, dataset_refresh_errors, or dataset_status requires early access",
+        "Uses EQ threshold 3 for Error and both dotted dataset names",
+        "Distinguishes refresh-error counts from current request-failure rate units",
+        "Does not claim CPU is healthy because its configuration is active",
+        "Does not invent public /v1 test, events, observation-state, or catalog endpoints",
+        "Requests consent before real test notifications and asks recipients to confirm arrival"
+      ]
     }
   ]
 }

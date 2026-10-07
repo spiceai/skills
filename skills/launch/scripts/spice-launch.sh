@@ -18,8 +18,9 @@ set -e
 #   spice-launch.sh verify    [DIR] [--sql SQL]... [--ask QUESTION] [--search TEXT] [--nsql QUESTION]
 #                             [--samples N] [--no-model] [--no-mcp]
 #   spice-launch.sh monitors  [DIR] [--profile P] [--email ADDR]... [--slack CHANNEL_ID] [--webhook URL]
-#                             [--webhook-token-env VAR] [--latency-ms N] [--query-failure-rate R] [--dry-run]
-#   spice-launch.sh fire-drill [DIR] [--timeout SECS]
+#                             [--webhook-token-env VAR] [--latency-ms N] [--query-failure-rate R] [--enable-disabled] [--dry-run]
+#   spice-launch.sh fire-drill [DIR] [--timeout SECS] [--webhook-token-env VAR | --webhook-no-token]
+#                             sends firing and recovery notifications; requires user approval
 #   spice-launch.sh handoff   [DIR]
 #   spice-launch.sh status    [DIR]
 #   spice-launch.sh pause     [DIR]
@@ -1602,7 +1603,7 @@ def targets_from(a):
     env = local_env(project_dir(a.dir))
     targets = []
     if a.email:
-        targets.append({"type": "email", "emails": a.email})
+        targets.append({"type": "email", "emails": a.email, "recipientUserIds": []})
     if a.slack:
         targets.append({"type": "slack", "channelId": a.slack})
     if a.webhook:
@@ -1621,6 +1622,44 @@ def list_alerts(ctx, pid):
     if code != 200:
         fail(f"could not list monitors (HTTP {code}: {error_text(data)})")
     return {m["name"].lower(): m for m in data.get("monitors", []) if isinstance(m, dict) and m.get("name")}
+
+
+def alert_targets(monitor):
+    targets = monitor.get("targets") or []
+    if not targets and isinstance(monitor.get("target"), dict):
+        targets = [monitor["target"]]
+    return [{k: v for k, v in t.items() if k != "token"} for t in targets]
+
+
+def verify_monitor(ctx, pid, alert_id, spec, targets):
+    code, monitor = api(ctx, "GET", f"/v1/projects/{pid}/monitors/{alert_id}")
+    if code != 200 or not isinstance(monitor, dict):
+        return "could not read back the monitor"
+    if monitor.get("status") != "active":
+        return "monitor is disabled; use --enable-disabled only with the user's approval"
+    if monitor.get("evaluation_unavailable_reason"):
+        return f"monitor cannot evaluate: {monitor['evaluation_unavailable_reason']}"
+    if any((monitor.get("spec") or {}).get(k) != v for k, v in spec.items()):
+        return "saved condition does not match the requested condition"
+    if targets:
+        saved = {t.get("type"): t for t in alert_targets(monitor)}
+        if set(saved) != {t["type"] for t in targets}:
+            return "saved notification destination types do not match"
+        for target in targets:
+            actual = saved[target["type"]]
+            for key, value in target.items():
+                if key == "token":
+                    continue
+                observed = actual.get(key, "POST" if key == "method" else None)
+                if key == "emails":
+                    if {e.lower() for e in observed or []} != {e.lower() for e in value}:
+                        return "saved email recipients do not match"
+                elif key == "recipientUserIds":
+                    if set(observed or []) != set(value):
+                        return "saved member recipients do not match"
+                elif observed != value:
+                    return f"saved {target['type']} destination does not match"
+    return None
 
 
 def cmd_monitors(a):
@@ -1658,43 +1697,73 @@ def cmd_monitors(a):
             continue
         current = existing.get(name.lower())
         if current:
-            patch = {"spec": body_spec, **({"targets": targets} if targets else {})}  # keeps edited descriptions
-            same = all(current.get("spec", {}).get(k) == v for k, v in body_spec.items()) and not targets
+            expected_targets = targets or alert_targets(current)
+            if current.get("template_id") != template:
+                rows.append({**row, "id": current["id"], "status": "verification_failed",
+                             "error": "Existing monitor has a different template; review it before changing its signal."})
+                continue
+            if current.get("status") == "disabled" and not a.enable_disabled:
+                rows.append({**row, "id": current["id"], "status": "disabled",
+                             "note": "Preserved disabled state; --enable-disabled requires the user's approval."})
+                continue
+            patch = {"spec": body_spec, **({"targets": targets} if targets else {}),
+                     **({"status": "active"} if a.enable_disabled else {})}
+            same = all(current.get("spec", {}).get(k) == v for k, v in body_spec.items()) and not targets and current.get("status") == "active"
             if same:
-                rows.append({**row, "id": current["id"], "status": "unchanged"})
+                err = verify_monitor(ctx, pid, current["id"], body_spec, expected_targets)
+                rows.append({**row, "id": current["id"], "status": "verification_failed" if err else "unchanged",
+                             **({"error": err} if err else {})})
                 continue
             code, resp = api(ctx, "PATCH", f"/v1/projects/{pid}/monitors/{current['id']}", patch)
-            rows.append({**row, "id": current["id"], "status": "updated" if code == 200 else "update_failed",
-                         **({} if code == 200 else {"error": error_text(resp)})})
+            if code != 200:
+                rows.append({**row, "id": current["id"], "status": "update_failed",
+                             "error": f"HTTP {code}: {error_text(resp)}"})
+                continue
+            err = verify_monitor(ctx, pid, current["id"], body_spec, expected_targets)
+            rows.append({**row, "id": current["id"], "status": "verification_failed" if err else "updated",
+                         **({"error": err} if err else {})})
             continue
         body = {"name": name, "description": description, "templateId": template, "spec": body_spec,
                 **({"targets": targets} if targets else {})}
         code, resp = api(ctx, "POST", f"/v1/projects/{pid}/monitors", body)
         if code == 201:
-            rows.append({**row, "id": resp.get("id"), "status": "created",
-                         "targets": [t.get("type") for t in resp.get("targets") or []]})
+            err = verify_monitor(ctx, pid, resp.get("id"), body_spec, targets)
+            rows.append({**row, "id": resp.get("id"), "status": "verification_failed" if err else "created",
+                         "targets": [t.get("type") for t in alert_targets(resp)],
+                         **({"error": err} if err else {})})
         elif code == 404 and "unavailable" in error_text(resp):
             rows.append({**row, "status": "template_unavailable",
-                         "note": "This organization or project cannot use this template yet."})
+                          "note": "Check managed project kind, models, acceleration, and effective CPU limit."})
         else:
             rows.append({**row, "status": "create_failed", "error": f"HTTP {code}: {error_text(resp)}"})
-    failed = [r for r in rows if r["status"] in ("create_failed", "update_failed")]
+    failed = [r for r in rows if r["status"] in ("create_failed", "update_failed", "verification_failed", "disabled")]
     live = [r for r in rows if r["status"] in ("created", "updated", "unchanged")]
+    selected = {r["name"].lower() for r in rows}
+    outside_profile = [{"id": m["id"], "name": m["name"], "status": m.get("status")}
+                       for name, m in existing.items() if name.startswith(PREFIX) and name not in selected and name != DRILL.lower()]
     if not a.dry_run:
         ctx.save(profile=profile, monitors={r["name"]: r.get("id") for r in live},
-                 monitor_targets=[{k: v for k, v in t.items() if k != "token"} for t in targets] or "default",
+                 monitor_targets=[{k: v for k, v in t.items() if k != "token"} for t in targets] or "preserved for existing alerts; default for new alerts",
                  monitor_rows=rows)
     result = {"project": ctx.ref, "profile": profile, "monitors": rows,
+              "outside_profile": outside_profile,
               "targets": [{k: v for k, v in t.items() if k != "token"} for t in targets] or
-                         "default (the credential's user; a machine credential notifies the org owner)",
+                          "preserved for existing alerts; new alerts email the credential's user (org owner for machine credentials)",
               "latency_threshold_ms": latency_ms,
               "latency_basis": None if a.latency_ms or not basis else
-                  f"max(5 x probe p99 {baseline} ms, 2 x slowest --sql {slowest} ms)"}
+                   f"max(5 x probe p99 {baseline} ms, 2 x slowest --sql {slowest} ms)"}
+    if a.dry_run:
+        emit({**result, "status": "planned"})
     if failed:
         fail("some monitors could not be created or updated", **result,
              hints=["Slack targets need Slack connected to the organization (HTTP 422).",
-                    "Monitor updates need organization admin (403)."])
-    emit({**result, "status": "monitored", "next": f"spice-launch.sh fire-drill {ctx.dir}  (sends one real alert)"})
+                     "Monitor updates need organization admin (403).",
+                     "Disabled monitors stay disabled unless --enable-disabled is approved."])
+    if not live:
+        fail("no requested monitor is enabled and verified", **result)
+    incomplete = any(r["status"] == "template_unavailable" for r in rows)
+    emit({**result, "status": "monitoring_incomplete" if incomplete else "monitored",
+          "next": f"spice-launch.sh fire-drill {ctx.dir}  (sends firing and recovery notifications)"})
 
 
 def cmd_fire_drill(a):
@@ -1702,22 +1771,32 @@ def cmd_fire_drill(a):
     pid = ctx.project_id()
     endpoint, key, _ = data_plane(ctx)
     existing = list_alerts(ctx, pid)
+    launch_monitors = sorted((m for m in existing.values()
+                              if m.get("name", "").startswith(PREFIX) and m["name"] != DRILL and m.get("status") == "active"),
+                             key=lambda m: m["name"].lower() != (PREFIX + "query failures").lower())
+    if not launch_monitors:
+        fail("fire drill requires an enabled launch monitor; run monitors first")
+    targets = next((alert_targets(m) for m in launch_monitors if alert_targets(m)), [])
+    webhook = next((t for t in targets if t.get("type") == "http"), None)
+    if webhook:
+        if a.webhook_token_env:
+            token = local_env(ctx.dir).get(a.webhook_token_env)
+            if not token:
+                fail(f"--webhook-token-env {a.webhook_token_env} is not set")
+            webhook["token"] = token
+        elif not a.webhook_no_token:
+            fail("webhook tokens cannot be read back; supply --webhook-token-env VAR or --webhook-no-token for an unauthenticated destination",
+                 hints=["The portal's Send test notification uses the saved token but checks delivery only."])
     stale = existing.get(DRILL.lower())
     if stale:
-        api(ctx, "DELETE", f"/v1/projects/{pid}/monitors/{stale['id']}")
-    # Send to the launch monitors' targets (query failures first). HTTP targets are skipped: their token is write-only.
-    launch_monitors = sorted((m for m in existing.values() if m.get("name", "").startswith(PREFIX)),
-                             key=lambda m: m["name"] != PREFIX + "query failures")
-    targets = next(([t for t in m.get("targets") or [] if t.get("type") in ("email", "slack")]
-                    for m in launch_monitors if any(t.get("type") in ("email", "slack") for t in m.get("targets") or [])),
-                   [])
-    # Template availability differs by organization. Failed queries exercise the real failure path; where that
-    # template is unavailable, memory above 1% of the limit is always true and fires on the first evaluation.
+        code, resp = api(ctx, "DELETE", f"/v1/projects/{pid}/monitors/{stale['id']}")
+        if code != 200:
+            fail("could not clean up the previous drill monitor; retry DELETE on the same ID", id=stale["id"], detail=error_text(resp))
     drills = [("query_failures", {"op": "GT", "threshold": 0, "window": "1m", "sustainSecs": 0}, "failed queries"),
               ("memory_working_set", {"op": "GT", "threshold": 1, "sustainSecs": 0}, "memory above 1% (always true)")]
     for template_id, spec, trigger in drills:
         body = {"name": DRILL, "templateId": template_id,
-                "description": "Temporary: proves alert delivery end to end. spice-launch deletes it after it fires.",
+                "description": "Temporary: tests signal evaluation and notification delivery. Recipients confirm arrival; spice-launch removes this monitor.",
                 "spec": {**spec, "severity": "warn"}, **({"targets": targets} if targets else {})}
         code, mon = api(ctx, "POST", f"/v1/projects/{pid}/monitors", body)
         if code == 201:
@@ -1726,32 +1805,50 @@ def cmd_fire_drill(a):
             fail(f"could not create the drill monitor (HTTP {code}: {error_text(mon)})")
     else:
         fail("no drill template is available to this organization", tried=[d[0] for d in drills])
-    drill_id, started, fired = mon["id"], time.time(), None
+    drill_id, started, fired, resolved = mon["id"], time.time(), None, None
+    recovery_requested, recovery_error = False, None
     status(f"Drill monitor created ({template_id}: {trigger}); waiting for it to fire (up to {a.timeout}s) ...")
     try:
         while time.time() - started < a.timeout:
-            # One failure per ~25 s round (about 0.04/s) trips the drill's `> 0` monitor but stays under the
-            # regular query-failure monitor's default 0.05/s, so only the drill fires.
-            if template_id == "query_failures":
+            if template_id == "query_failures" and not fired:
                 sql(endpoint, key, "SELECT * FROM spice_launch_fire_drill_missing_table", timeout=30)
             code, m = api(ctx, "GET", f"/v1/projects/{pid}/monitors/{drill_id}")
-            fired = (m or {}).get("last_fired_at") if isinstance(m, dict) else None
-            status(f"  t+{int(time.time() - started)}s last_fired_at={fired}")
-            if fired:
+            if code == 200 and isinstance(m, dict):
+                fired = m.get("last_fired_at") or fired
+                resolved = m.get("last_resolved_at")
+            if template_id == "memory_working_set" and fired and not recovery_requested:
+                code, response = api(ctx, "PATCH", f"/v1/projects/{pid}/monitors/{drill_id}",
+                                     {"spec": {**spec, "threshold": 1000, "severity": "warn"}})
+                if code != 200:
+                    recovery_error = f"could not reset the temporary memory condition (HTTP {code}: {error_text(response)})"
+                    break
+                recovery_requested, resolved = True, None
+            status(f"  t+{int(time.time() - started)}s last_fired_at={fired} last_resolved_at={resolved}")
+            if fired and resolved and resolved >= fired:
                 break
             time.sleep(20)
     finally:
         code, _ = api(ctx, "DELETE", f"/v1/projects/{pid}/monitors/{drill_id}")
         cleaned = code == 200
-    delivered_to = [t.get("type") for t in targets] or ["email to the credential's user (default target)"]
+    notification_targets = [t.get("type") for t in targets] or ["email to the credential's user (default target)"]
     result = {"project": ctx.ref, "fired": bool(fired), "fired_at": fired, "seconds": round(time.time() - started),
-              "template": template_id, "delivered_to": delivered_to, "drill_monitor_deleted": cleaned}
+              "template": template_id,
+              "resolved": bool(fired and resolved and resolved >= fired), "resolved_at": resolved,
+              "notification_targets": notification_targets, "delivery_confirmed": False, "drill_monitor_deleted": cleaned}
     ctx.save(fire_drill={**result, "at": now()})
+    if not cleaned:
+        fail("drill monitor cleanup failed; retry DELETE on the same ID", **result, id=drill_id)
+    if recovery_error:
+        fail(recovery_error, **result, id=drill_id,
+             hints=["The memory fallback update requires org admin; close any downstream test incident manually."])
     if not fired:
         fail("the drill monitor did not fire in time", **result,
              hints=["Evaluations run every 60s; retry with a longer --timeout.",
-                    "Monitors run only on managed projects with a live deployment."])
-    emit({**result, "status": "alert_delivered", "note": "Confirm the notification arrived where you expect it.",
+                     "Monitors run only on managed projects with a live deployment."])
+    if not result["resolved"]:
+        fail("drill fired but recovery was not recorded; downstream incidents may need manual closure", **result, id=drill_id,
+             hints=["Confirm recovery or close the test incident at each destination before handoff."])
+    emit({**result, "status": "alert_fired", "note": "Ask the recipient to confirm arrival at every destination; firing alone does not prove delivery.",
           "next": f"spice-launch.sh handoff {ctx.dir}"})
 
 
@@ -1836,7 +1933,7 @@ Spice.ai Cloud project `{ctx.ref}` ({st.get('profile', 'poc')} profile), created
 | Last deployment | {deploy.get('id')} ({deploy.get('status')}, {deploy.get('image_tag')}, {deploy.get('at')}) |
 | Last verification | {verify.get('at')}: {verify.get('passed')} passed, {verify.get('failed')} failed |
 | Latency at launch | p50 {latency.get('p50_ms')} ms, p99 {latency.get('p99_ms')} ms over {latency.get('samples')} uncached queries (client-observed) |
-| Alert fire drill | {('delivered in ' + str(drill.get('seconds')) + ' s on ' + str(drill.get('at'))) if drill.get('fired') else 'not run'} |
+| Alert fire drill | {('fired in ' + str(drill.get('seconds')) + ' s on ' + str(drill.get('at')) + '; recipient confirmation required') if drill.get('fired') else 'not run'} |
 
 The spicepod in this directory is the source of truth: keep it in version control. Spice Cloud
 deploys its stored copy, which `spice-launch.sh deploy` replaces on every deploy.
@@ -1853,8 +1950,10 @@ referenced as `${{ secrets:NAME }}`; no value is in this directory's committed f
 {md_table(['Alert', 'Template', 'Fires when', 'Window', 'Severity', 'Status', 'Meaning', 'First response'], alert_rows) if alert_rows else 'No monitors yet: run `spice-launch.sh monitors`.'}
 
 Thresholds use each template's unit: per-second rates for failures, milliseconds for latency,
-percent of the instance limit for memory and CPU. Change one by editing the flags and running
+refresh-error counts per dataset, and percent of the instance limit for memory and CPU. Change one by editing the flags and running
 `spice-launch.sh monitors` again (it updates monitors in place), or in the portal.
+Enabled configuration is not proof of current signal coverage. Check readiness and telemetry;
+missing telemetry is not recovery. Review disabled, unavailable, and outside-profile monitors.
 
 ## Operate
 
@@ -2084,9 +2183,13 @@ def main():
     p.add_argument("--webhook-token-env", help="variable holding the webhook's bearer token")
     p.add_argument("--latency-ms", type=int)
     p.add_argument("--query-failure-rate", type=float, default=0.05, help="failed queries per second (default 0.05 = 3/min)")
+    p.add_argument("--enable-disabled", action="store_true", help="re-enable selected launch monitors only with the user's approval")
     p.add_argument("--dry-run", action="store_true")
-    p = add("fire-drill", cmd_fire_drill, help_text="prove an alert reaches its target, then remove the drill")
+    p = add("fire-drill", cmd_fire_drill, help_text="record drill firing and recovery, then remove it; recipients confirm delivery")
     p.add_argument("--timeout", type=int, default=420)
+    group = p.add_mutually_exclusive_group()
+    group.add_argument("--webhook-token-env", help="variable holding the saved webhook's bearer token (not printed)")
+    group.add_argument("--webhook-no-token", action="store_true", help="confirm the saved webhook requires no bearer token")
     add("handoff", cmd_handoff, help_text="write RUNBOOK.md and AGENT-CONNECT.md")
     add("status", cmd_status, help_text="one-shot health: deployment, instances, datasets, alerts, problems")
     add("pause", cmd_pause, help_text="tear the runtime down, keeping the project; the next deploy resumes it")
