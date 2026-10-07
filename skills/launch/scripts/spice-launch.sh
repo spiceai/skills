@@ -212,6 +212,10 @@ TOKEN_HELP = [
     "environment or this directory's .env.local. `spice cloud login api` reads the same variables.",
     "Or run `spice cloud login` (the script reuses the credential the CLI stores), or set SPICE_API_TOKEN to a "
     "personal access token from https://spice.ai/account/tokens.",
+    "If `spice cloud login` reported success and this still fails, use a personal access token: create the file "
+    "with `touch .env.local && chmod 600 .env.local` in this directory, open it in an editor, add one line "
+    "`SPICE_API_TOKEN=<token>`, and save. Don't paste the token into a command: it lands in shell history, and a "
+    "silent `read -s` prompt took no input in an embedded terminal.",
 ]
 
 
@@ -746,7 +750,11 @@ def cmd_local(a):
             models = models.get("data", []) if isinstance(models, dict) else (models if isinstance(models, list) else [])
             pending = [d for d in (datasets or []) + models if d.get("status") in ("Initializing", "Refreshing", None)]
             settled = settled + 1 if datasets and not pending else 0
-            if ready or settled >= 3:
+            errored = any(d.get("status") == "Error" for d in (datasets or []) + models)
+            # Settled datasets are not readiness: views are not listed by the runtime and can still be
+            # initializing (a join over a 1.5M-row table took ~32 s), so wait for /v1/ready unless a
+            # component failed, where waiting longer only delays the diagnosis.
+            if ready or (settled >= 3 and errored):
                 break
             time.sleep(2)
         exited = proc.poll()

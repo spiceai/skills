@@ -85,7 +85,9 @@ success only when all of these hold:
 
 ### 1. Turn the scenario into a brief
 
-Pull these from what the user said, and ask only for what you cannot default:
+Pull these from what the user said, and ask only for what you cannot default. Ask for everything
+missing in **one** message, including the Cloud credential (step 3), since it is the first blocker
+and takes the user a few minutes. Don't spread the questions over several turns.
 
 | Item | Default when unstated |
 | --- | --- |
@@ -93,6 +95,7 @@ Pull these from what the user said, and ask only for what you cannot default:
 | Where each credential lives | Ask: their environment/`.env.local`, project secrets, or org secrets linked to a base project |
 | Consumers: agents over MCP, apps over SQL/HTTP, chat over the OpenAI API | Agents over MCP plus SQL |
 | Models: provider and role (agent with tools, text-to-SQL, embeddings for search) | One chat model with `tools: auto` |
+| "Users bring their own LLM key" | Ask which they mean. **Hosted**: Spice loads one model per provider whose key the owner supplies, and clients pick one by `name`. **Client-side**: no models deployed; each user's own LLM client connects over MCP with its own key. Spice has no per-request key, so a key a user types in later reaches the runtime only as a project secret plus a deploy. Hosted is the default |
 | Profile: `demo`, `poc`, or `production` | "Demo tomorrow" → demo; evaluation or customer trial → poc; "production", "greenfield", "operate", "on-call" → production |
 | Org, project name, region | Org from `preflight`; a 4–38 character name such as `acme-agent-data`; the region nearest the data (`us-east-1` or `us-west-2`) |
 | Alert recipients | The user's email |
@@ -103,6 +106,13 @@ When a named source has no credentials yet, say so and pick with the user:
   `references/scenarios.md`), swapped for the real source later.
 - **poc / production**: deploy the rest and list the source as pending, or wait. Never mark it done.
 
+When the user says to use stand-ins for everything, replace each source with a public dataset
+(`references/scenarios.md` maps the common three-warehouse case), keep each real connector in a
+comment beside it so the swap is one edit, and report every stand-in in the final report. A model
+whose key isn't stored yet stays out of the spicepod (commented, with its secret name): a model
+with a missing or bad key keeps the runtime from becoming ready, so one absent key would block the
+whole deploy. Enable it with `secrets` and a redeploy once the key exists.
+
 Sources must be reachable from Spice Cloud. A database on `localhost`, a private subnet, or behind
 a VPN cannot be read by a managed project, and neither can `file:` paths on the user's machine.
 `deploy` refuses both before it starts.
@@ -110,8 +120,12 @@ a VPN cannot be read by a managed project, and neither can `file:` paths on the 
 ### 2. Design the spicepod
 
 Read `references/scenarios.md` for each source and model, then write `DIR/spicepod.yaml`. Start
-from `examples/spicepod.agents.yaml` (Snowflake, Postgres, S3, and OpenAI for agents). The choices
-that matter most:
+from `examples/spicepod.agents.yaml` (Snowflake, Postgres, S3, and OpenAI for agents), or
+`examples/spicepod.unified-data.yaml` (Snowflake, Databricks, and Postgres as stand-ins, with a
+three-source view and commented Claude, OpenAI, and Grok models). Put `DIR` outside any Git
+checkout, such as `~/spice-projects/NAME`: it ends up holding `.env.local` with a Cloud token, and
+`create` adds the `.gitignore` entries only after that file may already exist. The choices that
+matter most:
 
 - **Name and describe every dataset.** Agents discover data through `list_datasets` and
   `table_schema`, so `description:` is their only map.
@@ -155,6 +169,15 @@ apps, deployments, secrets, monitors, and reactions read/write scopes, and sets
 variables. Also accepted: `SPICE_API_TOKEN` (a personal access token), or the credential
 `spice cloud login` stored, read from the environment, `.env`, or the macOS keychain (macOS may
 ask once to allow it).
+
+A `spice cloud login` that reported success has still left `preflight` on `management_token_missing`
+(the helper did not find the stored credential). The reliable fix is a personal access token: the user
+creates one at <https://spice.ai/account/tokens>, runs `touch DIR/.env.local && chmod 600
+DIR/.env.local`, opens that file in an editor (`open -e DIR/.env.local` on macOS), adds the line
+`SPICE_API_TOKEN=<token>`, and saves. Don't ask them to paste the token into a command or into this
+chat: a command puts it in shell history, and a silent `read -s` prompt took no input in an embedded
+terminal. Never look for the credential yourself in the keychain, shell profile, or other files; the
+helper reads the sources above, and a missing one is the user's to supply.
 
 `local` is worth running when the sources are reachable from this machine and the secrets are in
 `.env.local`. It catches configuration mistakes in seconds, while each Cloud deploy cycle takes
@@ -270,6 +293,17 @@ For a change later: edit `spicepod.yaml`, then `deploy` and `verify`; monitors p
 deploys. For demos and POCs, offer `teardown` when the user is done, and run it only on their
 confirmation.
 
+**Sharing the project with a teammate.** Access belongs to the organization, not the project:
+`POST /v1/members` (scope `members:write`; the `cloud` skill has the call) adds a person to the whole
+org, so on a personal org they see everything in it. Tell the user that before adding anyone, and
+offer a shared org instead when the project should stay separate. The call takes a Spice.ai
+**username**, not an email, and the account must already exist (`404` otherwise): find it from a
+repo, directory, or the person's public profile at `https://spice.ai/USERNAME`, check that the
+profile describes them, and never guess. Confirm the username and the role (`member` by default,
+`viewer` is read-only) with the user, then verify with `GET /v1/members`. Adding a member grants
+access, so an environment may block the agent from doing it: give the user the portal path
+(organization **Settings → Members**) or the exact command to run themselves.
+
 ## Profiles
 
 | | demo | poc | production |
@@ -302,6 +336,10 @@ rollbacks, channel and version pinning, and capacity.
   one replica for MCP clients: requests in one MCP session then reach different instances and fail
   with `404 Session not found` (41% of calls in testing). Scale `--cpu` and `--memory` instead.
 - **Install or upgrade Spice, or invent connection details.** Both are the user's to provide.
+- **Enable a model before its key is stored,** or add a person to the org by a guessed username.
+  A missing model key blocks readiness for the whole deploy; a wrong username adds a stranger.
+- **Hunt for a missing Cloud credential** in the keychain, shell profile, or other files. Ask the
+  user to supply one (step 3).
 
 ## Troubleshooting
 

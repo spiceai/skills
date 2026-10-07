@@ -187,6 +187,80 @@
         "The run never reads the user's mailbox, chat, or other accounts; it asks the user to confirm alert delivery",
         "The MCP session check passes with the project's replica count (one replica unless MCP is not used)"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "I want to combine data from Snowflake, Databricks, and Postgres, and let each user pick Claude, OpenAI, or Grok as the LLM by supplying their own API key. Use stand-ins for all of the data for now. Set it up in ./unified-data as project `unified-data` in our acme org on Spice Cloud, make it a demo, and test it works end to end. I don't have any LLM keys yet.",
+      "expected_output": "Asks any remaining questions in one message (including the Cloud credential and what bring-your-own-key means: hosted models with owner-supplied keys versus a client-side LLM over MCP), uses labeled public stand-ins for Snowflake, Databricks, and Postgres with the real connectors kept in comments, builds a cross-source view that joins all three, leaves the Claude, OpenAI, and Grok models commented out with their secret names because no keys exist, includes runtime.mcp.allowed_hosts, creates the project on the demo profile, deploys and confirms the endpoint serves the new spicepod, verifies rows from every dataset and view plus an MCP session, reports the models as pending, and writes RUNBOOK.md and AGENT-CONNECT.md.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "uses_launch_helper",
+          "type": "regex",
+          "value": "spice-launch\\.sh\\s+(preflight|create|deploy|verify|monitors)",
+          "description": "Drives the workflow with the bundled helper"
+        },
+        {
+          "name": "demo_profile",
+          "type": "regex",
+          "value": "--profile\\s+demo",
+          "description": "Uses the demo profile"
+        },
+        {
+          "name": "public_stand_ins",
+          "type": "regex",
+          "value": "s3://spiceai-demo-datasets/",
+          "description": "Uses the public stand-in datasets for the sources without credentials"
+        },
+        {
+          "name": "labels_stand_ins",
+          "type": "regex",
+          "value": "(?i)stand-in",
+          "description": "Labels the stand-ins in the spicepod and the report"
+        },
+        {
+          "name": "real_connectors_kept",
+          "type": "regex",
+          "value": "(?i)(snowflake:|databricks:|postgres:)",
+          "description": "Keeps each real connector in a comment so the swap is one edit"
+        },
+        {
+          "name": "cross_source_view",
+          "type": "regex",
+          "value": "(?is)views:.*\\bJOIN\\b",
+          "description": "Defines a view that joins across the sources"
+        },
+        {
+          "name": "models_pending_without_keys",
+          "type": "regex",
+          "value": "(?i)(#\\s*models:|commented out|pending)",
+          "description": "Does not deploy a model whose key does not exist"
+        },
+        {
+          "name": "mcp_allowed_hosts",
+          "type": "regex",
+          "value": "allowed_hosts:\\s*\\[\\s*\"\\*\"\\s*\\]",
+          "description": "Adds the Cloud MCP host allowance"
+        },
+        {
+          "name": "verifies_end_to_end",
+          "type": "regex",
+          "value": "spice-launch\\.sh\\s+verify",
+          "description": "Verifies rows and an MCP session after the deploy"
+        }
+      ],
+      "expectations": [
+        "The remaining questions are asked together in one message, not spread over several turns",
+        "The bring-your-own-key request is interpreted explicitly: hosted models with keys the owner supplies, or each user's own LLM client over MCP, and the user is told Spice has no per-request key",
+        "Every source is a labeled public stand-in, and each real connector is kept in a comment beside it",
+        "A view joins data across all three stand-in sources",
+        "No model is deployed while its key is missing; the Claude, OpenAI, and Grok blocks are prepared but not enabled, with their secret names",
+        "Anthropic and xAI are named as Alpha providers",
+        "The project is deployed, healthy, and serves every dataset as Ready",
+        "Rows are verified from every dataset and view, and an MCP client can run the sql tool several times in one session",
+        "The final report names every stand-in and lists the models as pending",
+        "A missing Cloud credential is handed back to the user to supply; the run does not search the keychain or other files for it"
+      ]
     }
   ]
 }

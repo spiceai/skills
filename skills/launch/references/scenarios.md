@@ -8,7 +8,7 @@ values in Cloud.
 Contents:
 
 1. [Design rules](#design-rules)
-2. [Sources](#sources): PostgreSQL, Snowflake, S3 and object stores, MySQL, others
+2. [Sources](#sources): PostgreSQL, Snowflake, Databricks, S3 and object stores, MySQL, others
 3. [Models and tools](#models-and-tools)
 4. [Search](#search)
 5. [Acceleration on Spice Cloud](#acceleration-on-spice-cloud)
@@ -155,11 +155,38 @@ datasets:
 Native binlog CDC (`refresh_mode: changes`, v2.2.0+) needs `binlog_format=ROW`, an accelerator
 with `primary_key` and an `on_conflict` upsert; see the connectors skill.
 
+### Databricks (`databricks:catalog.schema.table`) — Stable with `mode: delta_lake`
+
+```yaml
+datasets:
+  - from: databricks:main.supply.suppliers
+    name: dbx_suppliers
+    description: One row per supplier; s_nationkey joins the country lookup
+    params:
+      mode: delta_lake # Stable; the default, spark_connect, is Beta
+      databricks_endpoint: dbc-1234abcd-5678.cloud.databricks.com
+      databricks_token: ${ secrets:DATABRICKS_TOKEN }
+      databricks_aws_access_key_id: ${ secrets:DATABRICKS_AWS_ACCESS_KEY_ID } # storage the Delta table lives in
+      databricks_aws_secret_access_key: ${ secrets:DATABRICKS_AWS_SECRET_ACCESS_KEY }
+      databricks_aws_region: us-east-1
+```
+
+- `delta_lake` reads the Delta files from object storage, and the documented setup supplies storage
+  credentials next to the workspace token (`databricks_aws_*`, `databricks_azure_*`, or
+  `databricks_google_service_account`, per cloud). `databricks_credential_vending: enabled` fetches
+  short-lived storage credentials from Unity Catalog instead of static ones.
+- Modes are `delta_lake`, `spark_connect` (the default, Beta), and `sql_warehouse`
+  (`databricks_sql_warehouse_id`). OAuth parameters (`databricks_client_id`,
+  `databricks_client_secret`, `databricks_auth_mode`) also exist. The
+  [connector docs](https://spiceai.org/docs/components/data-connectors/databricks) list every
+  parameter for each mode; check them against the user's cloud and auth before writing the spicepod.
+- The storage and the workspace endpoint must be reachable from Spice Cloud (see
+  [Reachability](#reachability-from-spice-cloud)).
+
 ### Others
 
-Databricks (`databricks:catalog.schema.table`, Stable with `mode: delta_lake`), BigQuery through
-ADBC (`adbc:` with `adbc_driver: bigquery`), DynamoDB, MongoDB, MS SQL Server, Iceberg catalogs,
-Kafka, and GitHub are covered by the connectors and datasets skills and the
+BigQuery through ADBC (`adbc:` with `adbc_driver: bigquery`), DynamoDB, MongoDB, MS SQL Server,
+Iceberg catalogs, Kafka, and GitHub are covered by the connectors and datasets skills and the
 [connector docs](https://spiceai.org/docs/components/data-connectors). Check the connector's status
 (Stable, Release Candidate, Beta, Alpha) and say it in the brief: Alpha connectors are fine for a
 demo, and a risk to name in a production plan.
@@ -193,7 +220,13 @@ models:
 - Other providers keep the same shape with their own prefix: `anthropic:` (`anthropic_api_key`),
   `azure:` (`azure_api_key`, `endpoint`, `azure_deployment_name`), `bedrock:`, `xai:`, and `google:`
   (Vertex AI since v2.3.0). OpenAI-compatible providers use `openai:` with `endpoint:`. The models
-  skill lists their params.
+  skill lists their params. `anthropic:` and `xai:` are Alpha: name that in the brief.
+- **Letting users choose among providers**: declare one model per provider the owner has a key for
+  (`name: claude`, `openai`, `grok`), each with its own secret, and clients choose by passing the
+  `name` as `model`. Spice reads a model's key from a project secret when the deployment starts;
+  there is no per-request key. Declare only the providers whose keys are stored: a missing or wrong
+  key keeps the whole runtime from becoming ready. `examples/spicepod.unified-data.yaml` shows the
+  three-provider block, commented out until the keys exist.
 - Text-to-SQL for apps: `POST /v1/nsql` with `{"query": "..."}` uses the configured model.
 
 ## Search
@@ -291,6 +324,14 @@ until it does. Label it in the dataset `description` and in the report, and keep
 | Trip or event facts | `s3://spiceai-demo-datasets/taxi_trips/2024/` (Parquet) | 2.96M rows; ~400 MiB in memory |
 | Documents for search | `s3://spiceai-demo-datasets/nginx/docs/` (`file_format: md`) | 94 files |
 | Lookup table | `s3://spiceai-demo-datasets/taxi_zone_lookup/` (CSV) | 265 rows |
+
+**Snowflake, Databricks, and Postgres at once**: spread the TPC-H tables so every source has a role and
+the views still join. Orders stand in for Snowflake facts (1.5M rows, about 212 MiB in memory),
+customers and nations for Postgres (150,000 and 25 rows), and suppliers and parts for Databricks
+(10,000 and 200,000 rows). The columns are lowercase (`o_custkey`, `c_nationkey`, `s_nationkey`), and
+the nation key joins all three. Together they use about 285 MiB of the 4 GiB instance. The customer-to-orders
+join is the cross-source view; a country roll-up over all three takes about 30 s to initialize,
+which is why `local` waits for `/v1/ready`. `examples/spicepod.unified-data.yaml` is that layout, validated and verified on Spice.ai Cloud.
 
 ```yaml
   - from: s3://spiceai-demo-datasets/tpch/customer/ # stand-in for snowflake:ANALYTICS.PUBLIC.CUSTOMERS

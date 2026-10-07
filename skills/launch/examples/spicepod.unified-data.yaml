@@ -1,0 +1,179 @@
+# Unify Snowflake, Databricks, and Postgres on Spice.ai Cloud, with the user's choice of LLM.
+#
+# Every source below is a labeled STAND-IN backed by public TPC-H Parquet (no credentials), so the
+# whole project deploys and verifies before any real connection details exist. Each dataset keeps its
+# real connector in a comment: swap `from:` and `params:`, keep `name:`, and the views still work.
+# Deployed and verified on Spice.ai Cloud (v2.3.2): five datasets and two views returned rows, and an
+# MCP session ran `sql` calls.
+#
+#   Snowflake  stand-in -> sf_orders
+#   Postgres   stand-in -> pg_customers, pg_nations
+#   Databricks stand-in -> dbx_suppliers, dbx_parts
+#
+# Models are commented out. A model whose key is missing or wrong keeps the runtime from becoming
+# ready, so enable a provider only after its secret is stored (`spice-launch.sh secrets`).
+version: v2
+kind: Spicepod
+name: unified-data
+
+datasets:
+  # ---- Snowflake stand-in: warehouse facts -------------------------------------------------
+  # Real source: from: snowflake:ANALYTICS.PUBLIC.ORDERS with snowflake_* params. Snowflake returns
+  # UPPERCASE columns that must be double-quoted: rename them in a view when you swap.
+  - from: s3://spiceai-demo-datasets/tpch/orders/
+    name: sf_orders
+    description: >-
+      STAND-IN for the Snowflake warehouse (public TPC-H orders). One row per order.
+      o_orderkey is the order id, o_custkey joins pg_customers.c_custkey, o_totalprice is the
+      order value in USD, o_orderdate is the order date, o_orderstatus is F, O, or P.
+    params:
+      file_format: parquet
+      s3_auth: public
+      s3_region: us-east-1
+    acceleration:
+      enabled: true
+      refresh_check_interval: 1h
+
+  # ---- Postgres stand-in: operational data -------------------------------------------------
+  # Real source: from: postgres:public.customers (pg_host, pg_db, pg_user, pg_pass, pg_sslmode: verify-full)
+  - from: s3://spiceai-demo-datasets/tpch/customer/
+    name: pg_customers
+    description: >-
+      STAND-IN for the production Postgres database (public TPC-H customers). One row per
+      customer. c_custkey is the customer id, c_name the name, c_nationkey joins
+      pg_nations.n_nationkey, c_mktsegment is AUTOMOBILE, BUILDING, FURNITURE, HOUSEHOLD, or
+      MACHINERY, c_acctbal is the account balance in USD.
+    params:
+      file_format: parquet
+      s3_auth: public
+      s3_region: us-east-1
+    acceleration:
+      enabled: true
+      refresh_check_interval: 15m
+
+  # Real source: from: postgres:public.nations
+  - from: s3://spiceai-demo-datasets/tpch/nation/
+    name: pg_nations
+    description: >-
+      STAND-IN for a Postgres lookup table (public TPC-H nation). n_nationkey is the id,
+      n_name the country name, n_regionkey the region id.
+    params:
+      file_format: parquet
+      s3_auth: public
+      s3_region: us-east-1
+    acceleration:
+      enabled: true # loaded once at startup; fine for a lookup table that never changes
+
+  # ---- Databricks stand-in: lakehouse reference data ---------------------------------------
+  # Real source: from: databricks:CATALOG.SCHEMA.SUPPLIERS with mode: delta_lake, databricks_endpoint,
+  # databricks_token, and storage credentials for the Delta table (databricks_aws_access_key_id and
+  # databricks_aws_secret_access_key, or credential vending).
+  - from: s3://spiceai-demo-datasets/tpch/supplier/
+    name: dbx_suppliers
+    description: >-
+      STAND-IN for the Databricks lakehouse (public TPC-H suppliers). One row per supplier.
+      s_suppkey is the supplier id, s_name the name, s_nationkey joins pg_nations.n_nationkey,
+      s_acctbal is the account balance in USD.
+    params:
+      file_format: parquet
+      s3_auth: public
+      s3_region: us-east-1
+    acceleration:
+      enabled: true
+      refresh_check_interval: 1h
+
+  # Real source: from: databricks:CATALOG.SCHEMA.PARTS
+  - from: s3://spiceai-demo-datasets/tpch/part/
+    name: dbx_parts
+    description: >-
+      STAND-IN for the Databricks lakehouse (public TPC-H parts). One row per part.
+      p_partkey is the part id, p_name the name, p_brand the brand, p_type the type,
+      p_size the size, p_retailprice the retail price in USD.
+    params:
+      file_format: parquet
+      s3_auth: public
+      s3_region: us-east-1
+    acceleration:
+      enabled: true
+      refresh_check_interval: 1h
+
+views:
+  # Snowflake x Postgres: the question agents ask most, answered from one table.
+  - name: customer_orders
+    description: >-
+      Per-customer order totals. Joins sf_orders (Snowflake stand-in) to pg_customers and
+      pg_nations (Postgres stand-in). One row per customer: segment, country, order count,
+      total order value in USD.
+    sql: |
+      SELECT c.c_custkey AS customer_id,
+             c.c_name AS customer_name,
+             c.c_mktsegment AS segment,
+             n.n_name AS country,
+             COUNT(o.o_orderkey) AS order_count,
+             SUM(o.o_totalprice) AS total_order_value
+      FROM pg_customers c
+      JOIN pg_nations n ON n.n_nationkey = c.c_nationkey
+      LEFT JOIN sf_orders o ON o.o_custkey = c.c_custkey
+      GROUP BY c.c_custkey, c.c_name, c.c_mktsegment, n.n_name
+
+  # Snowflake x Postgres x Databricks in one row per country. Joins a 1.5M-row table, so the first
+  # initialization takes tens of seconds: wait for /v1/ready, not just for the datasets.
+  - name: country_overview
+    description: >-
+      One row per country combining all three sources: customers and order value (Postgres and
+      Snowflake stand-ins) and suppliers (Databricks stand-in). Use it for questions that
+      compare demand and supply by country.
+    sql: |
+      SELECT n.n_name AS country,
+             COALESCE(d.customers, 0) AS customers,
+             COALESCE(d.order_count, 0) AS orders,
+             COALESCE(d.total_order_value, 0) AS total_order_value,
+             COALESCE(s.suppliers, 0) AS suppliers
+      FROM pg_nations n
+      LEFT JOIN (
+        SELECT c.c_nationkey,
+               COUNT(DISTINCT c.c_custkey) AS customers,
+               COUNT(o.o_orderkey) AS order_count,
+               SUM(o.o_totalprice) AS total_order_value
+        FROM pg_customers c
+        LEFT JOIN sf_orders o ON o.o_custkey = c.c_custkey
+        GROUP BY c.c_nationkey
+      ) d ON d.c_nationkey = n.n_nationkey
+      LEFT JOIN (
+        SELECT s_nationkey, COUNT(*) AS suppliers
+        FROM dbx_suppliers
+        GROUP BY s_nationkey
+      ) s ON s.s_nationkey = n.n_nationkey
+
+# Bring-your-own-key models: one per provider whose key the owner supplies. Clients pick one by
+# passing its `name` as "model" on /v1/chat/completions. Anthropic and xAI are Alpha providers.
+# Confirm each model id in the models skill before enabling.
+#
+# models:
+#   - from: anthropic:claude-sonnet-4-6
+#     name: claude
+#     params:
+#       anthropic_api_key: ${ secrets:ANTHROPIC_API_KEY }
+#       tools: auto
+#       system_prompt: &prompt |
+#         You answer questions about customers, orders, suppliers, and parts across the
+#         Snowflake, Postgres, and Databricks datasets. Use the sql tool, say which dataset
+#         each answer came from, and prefer the customer_orders and country_overview views.
+#   - from: openai:gpt-4o-mini
+#     name: openai
+#     params:
+#       openai_api_key: ${ secrets:OPENAI_API_KEY }
+#       tools: auto
+#       system_prompt: *prompt
+#   - from: xai:grok-4.3
+#     name: grok
+#     params:
+#       xai_api_key: ${ secrets:XAI_API_KEY }
+#       tools: auto
+#       system_prompt: *prompt
+
+runtime:
+  mcp:
+    allowed_hosts: ["*"] # without it, /v1/mcp answers 403 "Host header is not allowed" on Spice Cloud
+  query:
+    timeout: 30s # (v2.2.0+) bound runaway agent queries
