@@ -187,6 +187,65 @@
         "The run never reads the user's mailbox, chat, or other accounts; it asks the user to confirm alert delivery",
         "The MCP session check passes with the project's replica count (one replica unless MCP is not used)"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "I'm new to Spice and don't have a Spice Cloud account yet. Put our MySQL and PostgreSQL behind one endpoint so our agents can query and join both: MySQL is mysql.example.com (database shop, tables orders and customers, user spice_reader, password in MYSQL_PASS in my environment) and Postgres is pg.example.com (database inventory, table public.stock, user spice_reader, password in PG_PASS in my environment). We don't have an OpenAI key. Use ./shop-federation.",
+      "expected_output": "Starts with spice-launch.sh login: relays the device URL and code, explains that the page signs the user up (Continue with GitHub) or in, and waits with login --wait instead of asking for credentials in chat. Designs a spicepod with described MySQL and Postgres datasets, a cross-source view joining them, an OpenAI model with tools keyed by ${ secrets:SCP_OPENAI_API_KEY } (the account's OpenAI credit), and the Cloud runtime block. Runs preflight and local, creates the project in the user's org, runs secrets (storing MYSQL_PASS and PG_PASS from the environment and linking SCP_OPENAI_API_KEY), deploys, verifies rows from both sources and the view, a tool-grounded answer, and MCP, then sets up monitors and the hand-off docs.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "login_first",
+          "type": "regex",
+          "value": "spice-launch\\.sh\\s+login",
+          "description": "Signs the user in (or up) with the helper's device-code login"
+        },
+        {
+          "name": "waits_for_approval",
+          "type": "regex",
+          "value": "login\\s+\\S+\\s+--wait",
+          "description": "Waits for the user to approve the code instead of asking for a token"
+        },
+        {
+          "name": "credit_key",
+          "type": "regex",
+          "value": "\\$\\{\\s*secrets:\\s*SCP_OPENAI_API_KEY\\s*\\}",
+          "description": "Keys the OpenAI model with the account's platform-managed OpenAI credit"
+        },
+        {
+          "name": "mysql_dataset",
+          "type": "regex",
+          "value": "mysql:shop\\.(orders|customers)",
+          "description": "Adds the MySQL tables"
+        },
+        {
+          "name": "postgres_dataset",
+          "type": "regex",
+          "value": "postgres:(public\\.)?stock",
+          "description": "Adds the Postgres table"
+        },
+        {
+          "name": "cross_source_view",
+          "type": "regex",
+          "value": "(?is)views:.{0,1500}\\bjoin\\b",
+          "description": "Defines a view that joins the two databases"
+        },
+        {
+          "name": "secret_references",
+          "type": "regex",
+          "value": "\\$\\{\\s*secrets:\\s*(MYSQL_PASS|PG_PASS)\\s*\\}",
+          "description": "References the database passwords as secrets"
+        }
+      ],
+      "expectations": [
+        "The run starts with spice-launch.sh login, gives the user the device URL and code, says the page creates a Spice.ai account for a new user, and never asks for a password, token, or key in the conversation",
+        "The OpenAI model references SCP_OPENAI_API_KEY, and secrets links it to the project rather than asking the user for an OpenAI key",
+        "MYSQL_PASS and PG_PASS are stored from the environment as project secrets; no value appears in files or output",
+        "A view joins the MySQL and Postgres tables, and verify returns rows from both datasets and the view",
+        "The model answers a cross-source question with the right number through the sql tool",
+        "The TLS settings for MySQL and Postgres are verified connections, or any weaker mode is named as a risk",
+        "The project is created in an organization the signed-in user can deploy to"
+      ]
     }
   ]
 }

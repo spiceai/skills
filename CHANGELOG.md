@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- launch: fixes from a live MySQL + PostgreSQL federation launch. `login` signs the user in to
+  Spice.ai Cloud, or up, with a device code, in two steps an agent can relay (the URL and code, then
+  `--wait`), so the Cloud path no longer starts with OAuth clients or tokens. OpenAI models default
+  to `SCP_OPENAI_API_KEY`, the $25 OpenAI credit a new account gets as a platform-managed org
+  secret. `secrets` links org secrets to the project through the Management API, including that
+  unlisted one, instead of reporting them unverified, and fails on a secret it finds nowhere
+  instead of letting the deploy fail on it. `local` always runs and
+  queries every dataset and view, reporting components whose secrets exist only in Cloud instead of
+  skipping. `deploy` stops when a federated dataset stays Initializing, deploys a paused project,
+  and accepts a deployment whose record stays `in_progress` once its instance serves the new
+  spicepod; `pause` stops a stuck instance from holding source connections. The lint covers
+  `mysql_sslmode`, words each TLS mode accurately, and merges repeated notes. The references cover
+  MySQL TLS modes, the MySQL 5.x/MariaDB metadata stall on servers with thousands of databases,
+  per-dataset connection pools on shared servers, and views that wait for every dataset.
 - Add project forks to cloud. `POST /v1/projects/{projectId}/forks` creates a project from another project's spicepod, connections, secrets, and runtime settings, in the same place or in another region or cluster, and `GET /v1/projects/{projectId}/forks` lists a project's forks. Project responses include `forked_from`. The skill documents the fields, the `shared_state` check before the first deployment of a fork, how a source connected to a GitHub repository is forked, and the error codes. It adds a workflow to copy or move a project to another region, `fork-project` and `list-forks` commands in `scripts/spice-cloud.sh`, and an eval.
 - Add the `launch` skill: from a plain-language scenario ("serve Snowflake, Postgres, and S3 data to
   agents with OpenAI") to a Spice.ai Cloud project that is designed, deployed, verified, monitored,

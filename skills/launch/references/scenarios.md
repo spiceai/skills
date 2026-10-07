@@ -70,7 +70,13 @@ datasets:
   `require` encrypts without verifying: acceptable for a throwaway demo database, not production.
 - A server without TLS fails under both `verify-full` and `require`; it needs `prefer` or
   `disable`, which is plaintext. Don't use that on the public internet.
-- Use a dedicated read-only role. `connection_pool_size` (no `pg_` prefix) defaults to 5.
+- Use a dedicated read-only role.
+- Each dataset keeps its own pool: `connection_pool_size` (no `pg_` prefix, default 5) and
+  `pg_connection_pool_min_idle` (default 1, held open for the dataset's lifetime). Eight datasets on
+  one server can hold 40 sessions. Behind PgBouncer or a small `max_connections`, set `"2"` and
+  `"0"`. An exhausted server shows up as `PostgreSQL connection failed. db error` or
+  `Timed out in bb8`; `psql` shows the real reason (`query_wait_timeout`, `too many connections`).
+- `jsonb` and `json` columns come back as JSON text; say so in the description.
 - Identifiers: `postgres:public."MixedCase"` for a case-sensitive table name.
 - `refresh_mode: changes` (CDC over logical replication) needs `wal_level=logical`, a role with
   `REPLICATION`, a primary key or `REPLICA IDENTITY FULL`, and a free replication slot. "All
@@ -145,15 +151,51 @@ datasets:
 datasets:
   - from: mysql:shop.orders
     name: mysql_orders
+    description: One row per order; total in USD; created_at is UTC
     params:
       mysql_host: mysql.example.com
+      mysql_tcp_port: "3306"
       mysql_db: shop
       mysql_user: spice_reader
       mysql_pass: ${ secrets:MYSQL_PASS }
+      mysql_sslmode: required # the default: TLS with a verified certificate and host name
 ```
+
+- `mysql_sslmode` defaults to `required`, which verifies the certificate and host name
+  (`mysql_sslrootcert` for a private CA). `preferred` encrypts without verifying and, unlike
+  Postgres `prefer`, does not fall back to plaintext: a server without TLS fails with
+  `Client asked for SSL but server does not have this capability` under both, and connects only
+  with `disabled` (plaintext, acceptable only for public data).
+- Use a dedicated read-only user granted only the databases the spicepod reads. Besides least
+  privilege, it keeps the runtime's metadata read short: for each dataset, the runtime reads table
+  and column comments from `information_schema`, and on MySQL 5.x or MariaDB 10.0 that read scans
+  every database the user can see. On a server with thousands of databases (public genome servers,
+  multi-tenant hosts) the dataset stays `Initializing` for many minutes, or the server fails with
+  `Disk full (/tmp/#sql...)`. MySQL 8.0 and later are not affected.
+- Each dataset keeps its own pool: `mysql_pool_max` (default 5) and `mysql_pool_min` (default 1).
+- `BLOB` and binary columns come back as hex strings, and `ENUM` as text; describe them, or hide
+  them behind a view.
 
 Native binlog CDC (`refresh_mode: changes`, v2.2.0+) needs `binlog_format=ROW`, an accelerator
 with `primary_key` and an `on_conflict` upsert; see the connectors skill.
+
+### Several tables from one database
+
+A YAML anchor keeps the connection in one place; `spice validate` and Spice Cloud resolve it:
+
+```yaml
+datasets:
+  - from: postgres:public.orders
+    name: orders
+    params: &app_db
+      pg_host: db.example.com
+      pg_db: app
+      pg_user: spice_reader
+      pg_pass: ${ secrets:PG_PASS }
+  - from: postgres:public.customers
+    name: customers
+    params: *app_db
+```
 
 ### Others
 
@@ -171,7 +213,7 @@ models:
   - from: openai:gpt-4o-mini # any OpenAI chat model id
     name: assistant # what clients pass as "model"
     params:
-      openai_api_key: ${ secrets:OPENAI_API_KEY }
+      openai_api_key: ${ secrets:SCP_OPENAI_API_KEY } # the account's OpenAI credit; or the user's own key
       tools: auto # unset = no tools at all
       system_prompt: |
         You answer questions about Acme's orders and customers. Use the sql tool;
@@ -185,6 +227,12 @@ models:
 | `nsql` | SQL and sampling tools (text-to-SQL) |
 | `memory, sql` | `load_memory`, `store_memory`, `sql` (needs a `memory:store` dataset with `access: read_write`) |
 
+- **The key.** A new Spice.ai Cloud account comes with $25 of OpenAI credit as the platform-managed
+  org secret `SCP_OPENAI_API_KEY`: never listed, and its name is reserved, but `secrets` links it to
+  the project. It is the default for demos and POCs when the user has no OpenAI key, for chat and
+  embedding models alike. Use the user's own key (`OPENAI_API_KEY` as an org secret or local value)
+  for production, when the credit runs out (`insufficient_quota`), and in organizations created
+  before the credit existed, where `secrets` reports it `missing`.
 - MCP clients always get the full built-in tool set, whatever a model's `tools` says.
 - Every runtime start makes a small billable health-check call to each model provider. A bad key
   keeps the runtime from becoming ready; `deploy` stops on it.
@@ -205,7 +253,7 @@ embeddings:
   - from: openai:text-embedding-3-small
     name: openai_embed
     params:
-      openai_api_key: ${ secrets:OPENAI_API_KEY }
+      openai_api_key: ${ secrets:SCP_OPENAI_API_KEY }
 
 datasets:
   - from: s3://acme-docs/handbook/
