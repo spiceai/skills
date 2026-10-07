@@ -195,7 +195,7 @@ The skills are version-aware. Each one names the release line it is written for,
 | Skill | Description |
 | --- | --- |
 | [setup](skills/setup/) | **Start here.** Take a directory to a running runtime that answers SQL with rows, using an existing installation; CLI, ports, and `/v1/sql` reference |
-| [launch](skills/launch/) | Take a scenario to a Spice.ai Cloud project that is deployed, verified (rows, model answers, MCP), monitored with alerts and a fire drill, and handed off with a runbook; for demos, POCs, and greenfield production |
+| [launch](skills/launch/) | Sign in (or up) to Spice.ai Cloud with a device code, then take a scenario to a Cloud project that is deployed, verified (rows, model answers, MCP), monitored with alerts and a fire drill, and handed off with a runbook; for demos, POCs, and greenfield production |
 | [cookbook](skills/cookbook/) | Find, set up, and run recipes from the Spice.ai cookbook, including from a pull request |
 | [spicepod](skills/spicepod/) | Create and configure spicepod.yaml manifests |
 | [datasets](skills/datasets/) | Connect to data sources and query across them with federated SQL |
@@ -223,7 +223,7 @@ related commands; configuration topics are not invented CLI subcommands.
 | `chat` / `models` | `spice chat`, `spice models`, OpenAI-compatible APIs and provider configuration |
 | `datasets` / `connectors` | Dataset and catalog configuration, `spice datasets`, `/v1/datasets` |
 | `cloud` | Available `spice cloud` commands and the Cloud Management API |
-| `launch` | `spice cloud project`/`deploy`/`status`/`logs`, Management API monitors and forks, `/v1/sql`, `/v1/chat/completions`, `/v1/mcp` |
+| `launch` | `spice cloud login`/`project`/`deploy`/`status`/`logs`, Management API monitors, forks, org-secret links, and pause, `/v1/sql`, `/v1/chat/completions`, `/v1/mcp` |
 | `sdk` | Client construction, endpoints, credentials, typed results, and language-specific methods |
 | `spicepod`, `acceleration`, `accelerators`, `cache`, `secrets` | Runtime configuration and related operations |
 | `terraform` / `cookbook` | Infrastructure as code and documented recipe workflows |

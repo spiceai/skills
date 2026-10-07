@@ -67,10 +67,12 @@ Which templates an org can create varies with release and early access. `monitor
 in turn, and a `404 monitor_template_unavailable` becomes `template_unavailable` in the output; it
 is not an error. One code covers every reason (not released for the org, unmanaged project, no
 CPU limit for `container_cpu`), and no route lists the available templates, so a create attempt
-is the test. In October 2026 a managed project on an Enterprise org accepted `query_failures`,
-`http_5xx`, `flight_failures`, `query_latency_p99`, `memory_working_set`, `container_cpu`, and
-`llm_failures`, and refused `instance_health`, `dataset_refresh_errors`, `dataset_status`, and
-`query_latency_p95`. The last is retired for new monitors: use `query_latency_p99`.
+is the test. Availability differs by organization. In October 2026 a managed project on an
+Enterprise org accepted `query_failures`, `http_5xx`, `flight_failures`, `query_latency_p99`,
+`memory_working_set`, `container_cpu`, and `llm_failures`, and refused `instance_health`,
+`dataset_refresh_errors`, `dataset_status`, and `query_latency_p95`; a project in a personal org the
+same week refused `query_failures` and `llm_failures` but accepted `dataset_refresh_errors`.
+`query_latency_p95` is retired for new monitors: use `query_latency_p99`.
 
 ## Notification targets
 
@@ -90,11 +92,14 @@ replaces the set on every `launch:` monitor. `--email` with notification details
 `fire-drill` proves the path from metric to inbox:
 
 1. It creates `launch: fire drill` (`query_failures > 0`, 1-minute window, no sustain, severity
-   `warn`), sending to the same email and Slack targets as `launch: query failures`. HTTP targets
-   are not copied, because their token cannot be read back.
-2. It sends one failing query (`SELECT * FROM spice_launch_fire_drill_missing_table`) every
-   ~25 s: about 0.04/s, under the regular query-failure monitor's default 0.05/s, so only the drill
-   fires. With `--query-failure-rate 0` the regular monitor fires too (a second alert).
+   `warn`), sending to the same email and Slack targets as the `launch:` monitors (`query failures`
+   first). HTTP targets are not copied, because their token cannot be read back. Where the org
+   cannot use `query_failures`, the drill is `memory_working_set > 1` (percent), which is always
+   true and fires on the first evaluation without failing any query; the result names the template.
+2. With `query_failures`, it sends one failing query (`SELECT * FROM
+   spice_launch_fire_drill_missing_table`) every ~25 s: about 0.04/s, under the regular
+   query-failure monitor's default 0.05/s, so only the drill fires. With `--query-failure-rate 0` the
+   regular monitor fires too (a second alert).
 3. It polls the monitor until `last_fired_at` is set (two to three minutes in testing).
 4. It deletes the drill monitor in all cases.
 
