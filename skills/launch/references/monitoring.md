@@ -99,6 +99,9 @@ catalog and previews, using session-authenticated routes; there is no equivalent
 catalog route. Historical pre-release refusal observations are no longer the availability contract.
 Automatic eight-monitor setup and create/fork `default_alerts` are pending in #6087; list actual
 monitors instead of assuming new projects already have defaults.
+Live availability can still differ by org and environment: an October 2026 personal-org launch
+refused `query_failures` and `llm_failures` but accepted `dataset_refresh_errors`. Report actual
+refusals as coverage gaps rather than assuming release documentation guarantees creation.
 
 ## Notification targets
 
@@ -125,15 +128,19 @@ creating a separate temporary drill monitor. Never print it or pass its value as
 completes the path to inbox, Slack, or webhook:
 
 1. It creates `launch: fire drill` (`query_failures > 0`, 1-minute window, no sustain, severity
-   `warn`), sending to the saved targets of the enabled `launch: query failures` monitor. For HTTP,
+   `warn`), sending to the saved targets of an enabled `launch:` monitor (query failures first). For HTTP,
    pass `--webhook-token-env VAR`, or `--webhook-no-token` if the destination is unauthenticated.
    It stops before creating anything if webhook credentials are unconfirmed.
-2. It sends one failing query (`SELECT * FROM spice_launch_fire_drill_missing_table`) every
+   If `query_failures` is unavailable, it uses `memory_working_set > 1%`, without failing queries.
+2. For `query_failures`, it sends one failing query (`SELECT * FROM spice_launch_fire_drill_missing_table`) every
    ~25 s: about 0.04/s, under the regular query-failure monitor's default 0.05/s, so only the drill
    fires. With `--query-failure-rate 0` the regular monitor fires too (a second alert).
 3. It polls the monitor until `last_fired_at` is set (two to three minutes in testing).
 4. It stops failed queries and waits for a recorded recovery before deletion. A timeout reports
    that downstream test incidents may need manual closure.
+   For the memory fallback, it raises only the temporary rule to 1000% after firing, then waits
+   for resolution. This tests the notification lifecycle, not recovery from actual memory pressure;
+   the rule update requires org admin.
 5. It attempts deletion in all cases and fails if cleanup fails; retry DELETE on the reported ID.
 
 Ask the user before running it: it sends real firing and recovery notifications to the targets. Then

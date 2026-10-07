@@ -1,6 +1,6 @@
 ---
 name: launch
-description: Launch a Spice.ai project end to end from a plain-language scenario. It designs the spicepod for the user's sources and models, deploys it to Spice.ai Cloud, and proves the deployment serves rows, model answers, and MCP tool calls. It then adds monitors and alerts, runs an alert fire drill, and hands off a runbook and agent connection snippets. Use it for demos, POCs, and greenfield production projects — "serve our Snowflake, Postgres, and S3 data to agents with OpenAI", "spin up a Spice demo on Cloud for tomorrow", "deploy this spicepod to Spice Cloud with alerting", "make our Spice POC production-ready" — and whenever a new Spice deployment must work and be operable, not just configured. Bundles scripts/spice-launch.sh. For a local-only first run use setup; for one-off Cloud API calls use cloud.
+description: Launch a Spice.ai project on Spice.ai Cloud end to end from a plain-language scenario. It signs the user in to Spice.ai Cloud with a device code (sign-up included), designs the spicepod for the user's sources and models, deploys it, and proves the deployment serves rows, model answers, and MCP tool calls. It then adds monitors and alerts, runs an alert fire drill, and hands off a runbook and agent connection snippets. Use it for demos, POCs, and greenfield production projects — "serve our Snowflake, Postgres, and S3 data to agents with OpenAI", "federate our MySQL and Postgres in one SQL endpoint", "spin up a Spice demo on Cloud for tomorrow", "deploy this spicepod to Spice Cloud with alerting", "make our Spice POC production-ready", "sign me up for Spice Cloud" — and whenever a new Spice deployment must work and be operable, not just configured. Bundles scripts/spice-launch.sh. For a local-only first run use setup; for one-off Cloud API calls use cloud.
 ---
 
 # Launch a Spice Project on Spice.ai Cloud
@@ -10,6 +10,10 @@ Spice.ai Cloud project that is designed, deployed, tested, monitored, and docume
 is something a team can demo, evaluate, or run in production, not a config file that merely
 validates.
 
+Spice.ai Cloud is the target: Spice runs the runtime, so the user needs only a Spice.ai account and
+sources reachable from the internet. `login` signs them in, or up, with a device code; nobody pastes
+a password or token into the conversation.
+
 You do the design work (turning the scenario into a spicepod). The bundled helper,
 `scripts/spice-launch.sh` in this skill's directory, does everything mechanical and checks its
 own results. Call it by its full path. Progress goes to stderr; each command prints one JSON result
@@ -17,20 +21,22 @@ and exits 1 with `error`, `hints`, and `next` when something is wrong.
 
 | Command | What it does |
 | --- | --- |
-| `preflight DIR [--project ORG/NAME]` | CLI and runtime versions, the Cloud credential and its role in the org, plan limits, regions, spicepod validity, and which secret references are available locally |
-| `local DIR` | Optional: runs the spicepod on a local runtime with local secrets for up to two minutes, reports each component, then stops that PID. Skips when some secrets exist only in Cloud |
-| `create DIR --project ORG/NAME [--region R] [--base ORG/BASE] [--profile P] [--replicas N]` | Creates a managed project (`--kind set`), or forks a base project to inherit its credentials, on the `stable` channel. Reuses an existing project |
-| `secrets DIR [--set NAME]` | Stores each `${ secrets:NAME }` the spicepod uses as a project secret, reading values from the environment, `.env.local`, or `.env` |
-| `deploy DIR [--timeout S]` | Uploads the spicepod, deploys, and watches the new instance. It stops early on an unresolved secret, a dataset stuck in Error, or a model that fails to load, then confirms the endpoint serves the new spicepod |
+| `login DIR [--wait] [--force]` | Signs in to Spice Cloud: returns at once when this machine has a working credential, else starts a device login and returns a `url` and `code` for the user to approve (sign-up included). `--wait` confirms the credential and lists the user's orgs |
+| `preflight DIR [--project ORG/NAME]` | CLI and runtime versions, the Cloud credential and its role in the org (or the orgs it can use), plan limits, regions, spicepod validity, and where each secret reference can come from (local value, org secret, project secret) |
+| `local DIR` | Optional: runs the spicepod on a local runtime, queries every dataset and view, then stops that PID. Components whose secrets exist only in Cloud are reported (`needs_cloud_secret`), not failed |
+| `create DIR --project ORG/NAME [--region R] [--base ORG/BASE] [--profile P] [--replicas N]` | Creates a managed project (`--kind set`), or forks a base project to inherit its project secrets, on the `stable` channel. Reuses an existing project |
+| `secrets DIR [--set NAME]` | Makes each `${ secrets:NAME }` the spicepod uses available to the project: links the org secret of that name, or stores the value from the environment, `.env.local`, or `.env` as a project secret. Fails on a secret it finds nowhere |
+| `deploy DIR [--timeout S] [--init-timeout S]` | Uploads the spicepod, deploys (resuming a paused project), and watches the new instance. It stops early on an unresolved secret, a dataset stuck in Error, a federated dataset stuck Initializing, or a model that fails to load, then confirms the endpoint serves the new spicepod |
 | `verify DIR [--sql Q]... [--ask Q --expect A] [--search T] [--nsql Q]` | Checks readiness, rows from every dataset and view, model answers (including a tool-grounded answer), embeddings, and an MCP session of several `sql` calls. Measures p50/p99 latency |
 | `monitors DIR --profile P [--email E]... [--slack C] [--webhook URL] [--enable-disabled]` | Creates or updates the profile's alerts in place and reads them back. Preserves disabled state unless explicitly approved; reports incomplete coverage |
-| `fire-drill DIR [--webhook-token-env VAR \| --webhook-no-token]` | Tests metric evaluation: a temporary monitor fires, records recovery, then is deleted. Sends real notifications; recipients must confirm delivery |
+| `fire-drill DIR [--webhook-token-env VAR \| --webhook-no-token]` | Tests metric evaluation using failed queries, or a temporary memory condition when that template is unavailable. Records recovery, then deletes the monitor. Sends real notifications; recipients must confirm delivery |
 | `handoff DIR` | Writes `RUNBOOK.md` and `AGENT-CONNECT.md` from the live project; a re-run replaces only the text between its markers |
 | `status DIR` | One-shot health: deployment, instances, unhealthy datasets, alerts and when they last fired, recent problems |
+| `pause DIR` | Tears the runtime down and keeps the project, secrets, keys, and monitors; the next `deploy` resumes it |
 | `teardown DIR --yes` | Deletes the `launch:` monitors, and the project only if this helper created it |
 
-State, without secrets, lives in `DIR/.spice-launch/state.json`. `create` adds `.env`, `.env.local`,
-`.spice-launch/`, and `.spice/` to `DIR/.gitignore`.
+State, without secrets, lives in `DIR/.spice-launch/state.json`. `create` (and `login` when it saves
+to `.env`) adds `.env`, `.env.local`, `.spice-launch/`, and `.spice/` to `DIR/.gitignore`.
 
 ## Version Compatibility
 
@@ -84,19 +90,55 @@ success only when all of these hold:
 
 ## Workflow
 
-### 1. Turn the scenario into a brief
+### 1. Sign in to Spice.ai Cloud
+
+Start here, so the user can approve the sign-in while you design:
+
+```bash
+spice-launch.sh login ./acme-agent-data
+```
+
+- `logged_in`: this machine already has a working credential; `orgs` lists where it can deploy.
+- `waiting_for_approval`: there is none. Tell the user that Spice.ai Cloud needs an account and give
+  them the `url` and `code`. On that page, **Continue with GitHub** signs in, or creates the account
+  for a new user (a GitHub account is required); then they approve the code, which must match the
+  one you gave. Continue with steps 2–3, then:
+
+  ```bash
+  spice-launch.sh login ./acme-agent-data --wait
+  ```
+
+  It returns once they approve and lists their orgs; choose the org with the user. The code expires
+  5 minutes after `login`; running `login` again starts a new one. The CLI stores the credential in
+  the macOS keychain, or elsewhere in `DIR/.env` (kept out of git).
+
+Never ask the user to paste a password, token, or key into the conversation. Unattended runs (CI,
+scheduled `verify` or `status`) need a credential that is not a person's: an OAuth client
+(organization **Settings → OAuth Clients**) with apps, deployments, secrets, monitors, and
+reactions read/write scopes, set as `SPICE_CLOUD_CLIENT_ID` and `SPICE_CLOUD_CLIENT_SECRET` in the
+environment or `.env.local`. The helper uses, in order: `SPICE_API_TOKEN` (a personal access token),
+an OAuth client, then the login.
+
+### 2. Turn the scenario into a brief
 
 Pull these from what the user said, and ask only for what you cannot default:
 
 | Item | Default when unstated |
 | --- | --- |
 | Sources: type, location, tables or prefixes, rough size, freshness | None — ask for connection details. Never invent hosts, accounts, or table names |
-| Where each credential lives | Ask: their environment/`.env.local`, project secrets, or org secrets linked to a base project |
+| Where each credential lives | Ask: their environment/`.env.local`, or an org secret (`preflight` lists which references match one) |
 | Consumers: agents over MCP, apps over SQL/HTTP, chat over the OpenAI API | Agents over MCP plus SQL |
-| Models: provider and role (agent with tools, text-to-SQL, embeddings for search) | One chat model with `tools: auto` |
+| Models: provider and role (agent with tools, text-to-SQL, embeddings for search) | One OpenAI chat model with `tools: auto`, keyed by `${ secrets:SCP_OPENAI_API_KEY }` (below) unless the user brings their own key |
 | Profile: `demo`, `poc`, or `production` | "Demo tomorrow" → demo; evaluation or customer trial → poc; "production", "greenfield", "operate", "on-call" → production |
-| Org, project name, region | Org from `preflight`; a 4–38 character name such as `acme-agent-data`; the region nearest the data (`us-east-1` or `us-west-2`) |
+| Org, project name, region | Org from `login` (one the user owns or administers); a 4–38 character name such as `acme-agent-data`; the region nearest the data (`us-east-1` or `us-west-2`) |
 | Alert recipients | The user's email |
+
+A new Spice.ai Cloud account comes with $25 of OpenAI credit as the org secret
+`SCP_OPENAI_API_KEY`, which Spice manages: it is never listed among the org's secrets, and `secrets`
+links it to the project like any org secret. Use it for OpenAI chat and embedding models in demos
+and POCs when the user has no OpenAI key of their own; for production, or when the credit runs out,
+reference the user's own key. Organizations created before the credit existed don't have it
+(`secrets` reports it `missing`).
 
 When a named source has no credentials yet, say so and pick with the user:
 
@@ -108,7 +150,7 @@ Sources must be reachable from Spice Cloud. A database on `localhost`, a private
 a VPN cannot be read by a managed project, and neither can `file:` paths on the user's machine.
 `deploy` refuses both before it starts.
 
-### 2. Design the spicepod
+### 3. Design the spicepod
 
 Read `references/scenarios.md` for each source and model, then write `DIR/spicepod.yaml`. Start
 from `examples/spicepod.agents.yaml` (Snowflake, Postgres, S3, and OpenAI for agents). The choices
@@ -142,48 +184,50 @@ that matter most:
 
 - **Prefer views for cross-source questions** (`views:` with a SQL join of a Postgres and an S3
   dataset): agents then query one well-described table instead of rediscovering the join.
+- **Size connection pools for shared databases.** Each Postgres or MySQL dataset keeps its own pool
+  (Postgres `connection_pool_size` 5 with `pg_connection_pool_min_idle` 1; MySQL `mysql_pool_max` 5
+  with `mysql_pool_min` 1), so eight datasets on one server can hold 40 sessions. Lower them for a
+  server behind PgBouncer or with a small `max_connections`.
 
-### 3. Preflight, and optionally run locally
+### 4. Preflight, and optionally run locally
 
 ```bash
 spice-launch.sh preflight ./acme-agent-data --project acme/acme-agent-data
 ```
 
-Stop on `blockers`. `management_token_missing` means no Management API credential was found. For
-production, the user creates an OAuth client (organization **Settings → OAuth Clients**) with
-apps, deployments, secrets, monitors, and reactions read/write scopes, and sets
-`SPICE_CLOUD_CLIENT_ID` and `SPICE_CLOUD_CLIENT_SECRET`. `spice cloud login api` reads the same
-variables. Also accepted: `SPICE_API_TOKEN` (a personal access token), or the credential
-`spice cloud login` stored, read from the environment, `.env`, or the macOS keychain (macOS may
-ask once to allow it).
+Stop on `blockers`; `management_token_missing` means step 1 has not finished. `secret_references`
+says where each `${ secrets:NAME }` can come from: `available_locally`, `org_secret`, or (for an
+existing project) `project_secret`. A warning names any that has none: get the value from the user,
+or have them create the org secret.
 
-`local` is worth running when the sources are reachable from this machine and the secrets are in
-`.env.local`. It catches configuration mistakes in seconds, while each Cloud deploy cycle takes
-minutes. It skips itself when some secrets exist only in Cloud, because components waiting on them
-stall a local runtime instead of failing.
+Run `local` whenever the sources are reachable from this machine. It loads every component, queries
+every dataset and view, and stops the runtime, catching configuration, type, and source problems in
+seconds, while each Cloud deploy cycle takes minutes. Components whose secrets exist only in Cloud
+come back `needs_cloud_secret` (status `checked`); `deploy` and `verify` check them.
 
-### 4. Create the project and store its secrets
+### 5. Create the project and connect its secrets
 
 ```bash
 spice-launch.sh create ./acme-agent-data --project acme/acme-agent-data --region us-east-1 --profile poc
 spice-launch.sh secrets ./acme-agent-data
 ```
 
-Where the credentials live decides the path:
+`secrets` resolves each reference in this order:
 
-- **The user has the values** (environment, `.env.local`): `secrets` pushes each referenced one as
-  a project secret through the Management API. Values never appear in output or on a command line.
-- **The org keeps them as org secrets** (organization **Settings → Secrets**): an org secret reaches
-  a project's runtime only after it is linked to that project (project **Settings → Secrets** in the
-  portal). The public API can't link one, but forking copies the links. If the org has a base
-  project with the secrets linked, `create --base ORG/BASE` forks it and then resets the channel to
-  `stable` (forks inherit the base's channel). Otherwise ask the user to link the secrets to the new
-  project in the portal.
+- **A project secret** of that name is kept.
+- **An org secret** (organization **Settings → Secrets**) reaches a project only through a link;
+  `secrets` creates it through the Management API, including for the platform-managed
+  `SCP_OPENAI_API_KEY`, which is never listed. It wins over a local value of the same name, so a
+  personal key never shadows the organization's; `--set NAME` stores the local value instead.
+- **A local value** (environment, `.env.local`, `.env`) is stored as a project secret. Values never
+  appear in output or on a command line.
+- **Nothing**: `missing`, and `secrets` fails before a deploy is wasted on it.
 
-`secrets` lists anything it cannot confirm as `unverified`. The runtime's startup check during
-`deploy` settles it.
+`create --base ORG/BASE` forks a project whose credentials are *project* secrets, which the API
+cannot read back: the fork copies them and its links, then resets the channel to `stable` (forks
+inherit the base's channel).
 
-### 5. Deploy
+### 6. Deploy
 
 ```bash
 spice-launch.sh deploy ./acme-agent-data
@@ -191,11 +235,17 @@ spice-launch.sh deploy ./acme-agent-data
 
 On failure, read `error`, `unresolved`, `datasets`, `problems`, and `hints`, fix the cause, and run
 `deploy` again (a new deployment supersedes the stuck one). Typical causes are in the
-troubleshooting table. The `lint` notes flag configurations worth fixing: `pg_sslmode` weaker than
-`verify-full` in production, S3 without `s3_auth`, accelerations that never refresh, and models
-without tools.
+troubleshooting table. The `lint` notes flag configurations worth fixing: `pg_sslmode` or
+`mysql_sslmode` weaker than a verified TLS connection in production, S3 without `s3_auth`,
+accelerations that never refresh, and models without tools.
 
-### 6. Verify end to end
+A stuck deployment's new instance keeps running, and holding its connections to the sources, until
+the next deploy. If you stop there, `pause` the project: on a shared or connection-limited source,
+a stuck instance can lock other clients out. If Spice Cloud never marks a deployment succeeded
+although its instance is ready (seen right after a pause), `deploy` confirms the endpoint serves the
+new spicepod, reports `deployment_record`, and carries on.
+
+### 7. Verify end to end
 
 Prove what the scenario promised, not just that tables exist. Pass a cross-source query, an agent
 question, and a search if the scenario has one:
@@ -216,7 +266,7 @@ doesn't block, but it describes something clients must work around: put it in th
 the Scenario notes. The latency baseline is client-observed (it includes the network round trip
 from this machine) over uncached queries; `monitors` derives its latency threshold from it.
 
-### 7. Monitor and alert
+### 8. Monitor and alert
 
 ```bash
 spice-launch.sh monitors ./acme-agent-data --profile production --email oncall@acme.com --slack C0123ABCD
@@ -248,7 +298,7 @@ Notes:
 - Confirming delivery is the user's job: ask whether the alert arrived. Never search their mailbox,
   chat, or other accounts for it, even when a connected tool could.
 
-### 8. Hand off
+### 9. Hand off
 
 ```bash
 spice-launch.sh handoff ./acme-agent-data
@@ -286,7 +336,7 @@ confirmation.
 | Stand-in data | Allowed, labeled | Only with agreement | No |
 | Alerts | Query failures, 5xx, memory, model failures (warn) | + latency, refresh errors | + CPU, Flight, dataset and instance health; failures and memory are critical |
 | Fire drill | Optional | Recommended | Required before calling it done (with the user's consent) |
-| TLS to sources | `pg_sslmode: require` acceptable on a demo DB | `verify-full` preferred | `verify-full` |
+| TLS to sources | `pg_sslmode: require` acceptable on a demo DB; plaintext only for public data | `verify-full` / `mysql_sslmode: required` preferred | `verify-full` / `required` |
 | Teardown | Offer when done | Offer at the end of the evaluation | Never without an explicit request |
 
 `references/production.md` has the production checklist: replicas, timeouts, key rotation,
@@ -298,7 +348,8 @@ rollbacks, channel and version pinning, and capacity.
   keeps the old version answering; only `deploy` and `verify` compare against the new spicepod.
 - **Put secret values in the spicepod, in output, or on a command line.** `spice cloud secrets set
   NAME VALUE` leaves the value in shell history; `secrets` reads it from the environment instead.
-  Never copy Spice Cloud tokens or API keys into project secrets.
+  Never copy Spice Cloud tokens or API keys into project secrets, and never ask the user to paste a
+  password, token, or key into the conversation: `login` uses a device code.
 - **Point a Cloud dataset at `localhost`, a private IP, or `file:`.** Upload files to object
   storage; give databases a reachable endpoint with a read-only user.
 - **Accelerate a table of unknown size in memory** on the default instance.
@@ -315,10 +366,17 @@ rollbacks, channel and version pinning, and capacity.
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| `deploy` stops with `unresolved` secrets, `not found in [env]` | The secret is neither a project secret nor an org secret linked to the project | `secrets` with the value in the environment, or link the org secret in the portal; deploy again |
-| Postgres `error performing TLS handshake` | `pg_sslmode` defaults to `verify-full`, and the server certificate is self-signed, expired, or for another host | Check with `openssl s_client -starttls postgres -connect HOST:5432`; fix the cert or set `pg_sslrootcert`; `require` only for a demo DB |
+| `deploy` stops with `unresolved` secrets, `not found in [env]` | The secret is neither a project secret nor an org secret linked to the project | `secrets` (links the org secret of that name, or stores the value from the environment); deploy again |
+| Postgres `error performing TLS handshake` | `pg_sslmode` defaults to `verify-full`, and the server certificate is self-signed, expired, or for another host, or the server offers no TLS at all | Check with `openssl s_client -starttls postgres -connect HOST:5432`; fix the cert or set `pg_sslrootcert`; `require` only for a demo DB. No TLS (`psql "host=HOST sslmode=require"` says `server does not support SSL`): `disable`, for public data only |
 | Postgres `Authentication failed` | Wrong user or password, or an empty secret | Fix the secret; deploy again |
+| Postgres `PostgreSQL connection failed. db error` (no detail); `psql` shows `query_wait_timeout` or `too many connections` | The server or its PgBouncer is out of connections; each dataset holds its own pool, and a stuck deployment's instance keeps its pools open | Lower `connection_pool_size` and `pg_connection_pool_min_idle`; `pause` a stuck project |
+| MySQL `Client asked for SSL but server does not have this capability` | `mysql_sslmode` defaults to `required`, and `preferred` does not fall back to plaintext | Enable TLS on the server, or `mysql_sslmode: disabled` for public data only |
+| A MySQL dataset stays `Initializing` with no error (`deploy` stops after `--init-timeout`), or fails with `Disk full (/tmp/#sql...)` | On MySQL 5.x or MariaDB 10.0, the runtime's `information_schema` metadata read scans every database the user can see; a server with thousands takes many minutes | Connect as a user granted only the databases the spicepod reads, or use MySQL 8.0+ |
+| Every view fails with `table ... not found` while datasets work | Views register only after every dataset loads, so one dataset in Error holds them all back | Fix that dataset; `local` reports `views_not_registered` |
+| `deploy` reports `deployment_record` `in_progress` | Spice Cloud did not mark the deployment succeeded though its instance is ready (seen right after a pause) | None needed: `deploy` confirmed the endpoint serves the new spicepod; the next deploy supersedes the record |
 | `Failed to load LLM ... Incorrect API key` or `You didn't provide an API key` | Bad or missing model key | Fix the secret. Until then the runtime never becomes ready |
+| `Failed to load LLM ... insufficient_quota` or `exceeded your current quota` | The key has no quota left; with `SCP_OPENAI_API_KEY`, the $25 credit is used up | Reference the user's own key, then `secrets` and `deploy` |
+| `secrets`: `SCP_OPENAI_API_KEY` `missing` | The organization predates the OpenAI credit | Reference the user's own key; the `SCP_` name is reserved and cannot be created |
 | `Memory usage at 90% ... while loading` in `problems` | An acceleration larger than the instance | Federate it or narrow it with `refresh_sql`; raise `--memory` only with private compute |
 | `deploy`: `could not start the deployment`, `400 Invalid spicepod configuration` | Cloud checks the published Spicepod schema, which is stricter than `spice validate` | Write search `row_id`s as lists; compare other fields with the [Spicepod reference](https://spiceai.org/docs/reference/spicepod) |
 | `Resource limits can only be updated when private compute is enabled` | The org has no private compute | Keep the default size; federate or narrow accelerations |
@@ -331,7 +389,7 @@ rollbacks, channel and version pinning, and capacity.
 | `monitors`: `update_failed` with 403 | Updating a monitor needs org admin | Use an admin's credential with `monitors:write`; retain the same alert ID |
 | `monitors`: disabled / `verification_failed` / `monitoring_incomplete` | Disabled alert, mismatched saved fields, or missing prerequisites | Inspect GET and repair the reported gap; approve re-enabling separately |
 | `fire-drill` never fires | No live deployment, or evaluation lag | Confirm `status` is healthy; retry with `--timeout 600` |
-| `management_token_missing` | No credential the helper can read | Step 3 |
+| `management_token_missing` | No credential the helper can read | Step 1: `login` (sign-in or sign-up with a device code) |
 | `org_not_accessible` | An OAuth client from another org | OAuth clients act only in their own org; use that org's client |
 
 ## Documentation

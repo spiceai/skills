@@ -301,6 +301,48 @@ class LaunchMonitorTests(unittest.TestCase):
         self.assertTrue(result.data["drill_monitor_deleted"])
         self.assertIn("manual closure", result.data["error"])
 
+    def test_memory_fallback_uses_saved_targets_and_resolves_before_delete(self):
+        monitor = self.existing()
+        monitor["name"] = "launch: memory"
+        monitor["template_id"] = "memory_working_set"
+        api = self.api
+
+        def memory_only(ctx, method, path, body=None):
+            if method == "POST" and body["templateId"] == "query_failures":
+                return 404, {"code": "monitor_template_unavailable"}
+            return api(ctx, method, path, body)
+
+        self.ns["api"] = memory_only
+        self.ns["time"] = SimpleNamespace(time=lambda: 0, sleep=lambda seconds: None)
+        result = self.run_command("cmd_fire_drill")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.data["template"], "memory_working_set")
+        self.assertTrue(result.data["resolved"])
+        self.assertTrue(result.data["drill_monitor_deleted"])
+        self.ns["sql"].assert_not_called()
+        post = next(call[2] for call in self.calls if call[0] == "POST")
+        self.assertEqual(post["targets"], monitor["targets"])
+        patch_body = next(call[2] for call in self.calls if call[0] == "PATCH")
+        self.assertEqual(patch_body["spec"]["threshold"], 1000)
+        self.assertIn("existing-id", self.monitors)
+
+    def test_memory_recovery_update_failure_still_cleans_up(self):
+        self.existing()
+        api = self.api
+
+        def failed_recovery(ctx, method, path, body=None):
+            if method == "POST" and body["templateId"] == "query_failures":
+                return 404, {"code": "monitor_template_unavailable"}
+            if method == "PATCH":
+                return 403, {"error": "Org admin required"}
+            return api(ctx, method, path, body)
+
+        self.ns["api"] = failed_recovery
+        result = self.run_command("cmd_fire_drill")
+        self.assertFalse(result.ok)
+        self.assertTrue(result.data["drill_monitor_deleted"])
+        self.assertIn("temporary memory condition", result.data["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

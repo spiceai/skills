@@ -8,12 +8,13 @@ set -e
 # status, and log operations, and the Cloud Management API for the rest.
 #
 # Usage:
+#   spice-launch.sh login     [DIR] [--wait] [--timeout SECS] [--force] [--store keychain|env]
 #   spice-launch.sh preflight [DIR] [--project ORG/NAME]
 #   spice-launch.sh local     [DIR] [--timeout SECS]
 #   spice-launch.sh create    [DIR] --project ORG/NAME [--region us-east-1|us-west-2] [--base ORG/BASE]
 #                             [--profile demo|poc|production] [--replicas N] [--channel stable]
 #   spice-launch.sh secrets   [DIR] [--set NAME]...
-#   spice-launch.sh deploy    [DIR] [--timeout SECS]
+#   spice-launch.sh deploy    [DIR] [--timeout SECS] [--init-timeout SECS]
 #   spice-launch.sh verify    [DIR] [--sql SQL]... [--ask QUESTION] [--search TEXT] [--nsql QUESTION]
 #                             [--samples N] [--no-model] [--no-mcp]
 #   spice-launch.sh monitors  [DIR] [--profile P] [--email ADDR]... [--slack CHANNEL_ID] [--webhook URL]
@@ -22,6 +23,7 @@ set -e
 #                             sends firing and recovery notifications; requires user approval
 #   spice-launch.sh handoff   [DIR]
 #   spice-launch.sh status    [DIR]
+#   spice-launch.sh pause     [DIR]
 #   spice-launch.sh teardown  [DIR] --yes [--keep-project]
 #
 # DIR defaults to the current directory and must hold spicepod.yaml. Progress
@@ -69,6 +71,8 @@ SECRET_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 PROJECT_NAME = re.compile(r"^[A-Za-z0-9-]{4,38}$")
 # Spice Cloud management credentials. They never become runtime secrets.
 CREDENTIAL_VAR = re.compile(r"^(SPICE_SPICEAI_(TOKEN|API_KEY)(_\w+)?|SPICE_CLOUD_CLIENT_(ID|SECRET)|SPICE_API_TOKEN)$")
+# Org secrets Spice.ai Cloud manages itself: linkable to a project, but never listed.
+PLATFORM_SECRETS = {"SCP_OPENAI_API_KEY": "the OpenAI credit ($25) Spice.ai Cloud gives a new account"}
 LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # the local runtime: never proxied
 REMOTE = urllib.request.build_opener()                               # Spice Cloud: honor HTTPS_PROXY
 
@@ -208,11 +212,13 @@ def resolve_token(d, org):
 
 
 TOKEN_HELP = [
-    "Production: create an OAuth client (organization Settings -> OAuth Clients) with apps, deployments, secrets, "
-    "monitors and reactions read/write scopes, and set SPICE_CLOUD_CLIENT_ID and SPICE_CLOUD_CLIENT_SECRET in the "
-    "environment or this directory's .env.local. `spice cloud login api` reads the same variables.",
-    "Or run `spice cloud login` (the script reuses the credential the CLI stores), or set SPICE_API_TOKEN to a "
-    "personal access token from https://spice.ai/account/tokens.",
+    "Ask whether the user has a Spice.ai account, then run `spice-launch.sh login DIR`: it starts a device login and "
+    "returns a URL and a one-time code for the user to open and approve. On that page, Continue with GitHub signs in, "
+    "and creates the account for a new user (a GitHub account is required). Then run `spice-launch.sh login DIR --wait`.",
+    "Unattended use (CI, scheduled checks): an OAuth client (organization Settings -> OAuth Clients) with apps, "
+    "deployments, secrets, monitors and reactions read/write scopes, as SPICE_CLOUD_CLIENT_ID and "
+    "SPICE_CLOUD_CLIENT_SECRET in the environment or .env.local. SPICE_API_TOKEN (a personal access token from "
+    "https://spice.ai/account/tokens) also works.",
 ]
 
 
@@ -295,7 +301,7 @@ def api(ctx, method, path, body=None, timeout=45, retries=2, org=True):
         break
     if code == 401:
         fail("the Management API rejected the credential (401)", token_source=ctx.token_source,
-             hints=["The token expired or was revoked: run `spice cloud login` again, or mint a new one."] + TOKEN_HELP)
+             hints=["The token expired or was revoked: `spice-launch.sh login DIR --force` signs in again."] + TOKEN_HELP)
     return code, as_json(text)
 
 
@@ -314,6 +320,33 @@ def get_project(ctx, pid):
     if code != 200 or not isinstance(data, dict):
         fail(f"could not read project {pid} (HTTP {code}: {error_text(data)})")
     return data
+
+
+def org_id(ctx):
+    """The numeric id of ctx.org, which the org-level routes need."""
+    code, data = api(ctx, "GET", "/v1/orgs", org=False)
+    rows = data.get("orgs", []) if isinstance(data, dict) else []
+    match = next((o for o in rows if str(o.get("name", "")).lower() == str(ctx.org or "").lower()), None)
+    return match.get("id") if match else None
+
+
+def org_secret_names(ctx, oid=None):
+    """Names of the organization's secrets, or None when this credential cannot list them."""
+    oid = oid or org_id(ctx)
+    if not oid:
+        return None
+    code, data = api(ctx, "GET", f"/v1/orgs/{oid}/secrets")
+    if code != 200 or not isinstance(data, dict):
+        return None
+    return {s.get("name") for s in data.get("secrets", []) if isinstance(s, dict)}
+
+
+def linked_org_secrets(ctx, pid):
+    """Names of the org secrets linked to the project, or None when they cannot be listed."""
+    code, data = api(ctx, "GET", f"/v1/projects/{pid}/org-secrets")
+    if code != 200 or not isinstance(data, dict):
+        return None
+    return {s.get("name") for s in data.get("org_secrets", []) if isinstance(s, dict)}
 
 
 # ---------------------------------------------------------------- the spice CLI
@@ -424,17 +457,48 @@ def problem_lines(lines):
     return keep
 
 
-def hints_for(lines, datasets=()):
-    text = "\n".join(lines) + "\n" + "\n".join(str(d.get("error_message") or "") for d in datasets)
+def hints_for(lines, datasets=(), local=False):
+    text = "\n".join(lines) + "\n" + "\n".join(str(d.get("error_message") or d.get("error") or "") for d in datasets)
     hints = []
     if "could not be resolved" in text or "not found in any configured secret store" in text:
-        hints.append("A secret is missing in Cloud. Set it as a project secret (`spice-launch.sh secrets DIR` pushes "
-                     "values from your environment or .env), or link the org secret to this project in the portal "
-                     "(project Settings -> Secrets), then deploy again.")
+        hints.append("A secret is not set locally. Put it in .env.local to run it here; components that use it are "
+                     "checked by the Cloud deploy instead." if local else
+                     "A secret is missing in Cloud. `spice-launch.sh secrets DIR` links the org secret of that name to "
+                     "the project, or stores the value from your environment or .env as a project secret; then deploy "
+                     "again.")
     if "TLS handshake" in text:
-        hints.append("TLS failed before authentication. pg_sslmode defaults to verify-full: the server certificate must "
-                     "be valid, unexpired, and match the host (check with `openssl s_client -starttls postgres -connect "
-                     "HOST:5432`), or provide pg_sslrootcert. Use pg_sslmode: require only for a demo database.")
+        hints.append("Postgres TLS failed before authentication. pg_sslmode defaults to verify-full: the server "
+                     "certificate must be valid, unexpired, and match the host (check with `openssl s_client -starttls "
+                     "postgres -connect HOST:5432`), or provide pg_sslrootcert. The same error means the server offers "
+                     "no TLS at all (`psql \"host=HOST sslmode=require\"` says 'server does not support SSL'): then only "
+                     "pg_sslmode: disable connects, in plaintext, which is acceptable only for public data. Use "
+                     "pg_sslmode: require only for a demo database.")
+    if "Client asked for SSL but server does not have this capability" in text:
+        hints.append("The MySQL server offers no TLS, and mysql_sslmode defaults to required (verified TLS); preferred "
+                     "does not fall back to plaintext either. Enable TLS on the server, or set mysql_sslmode: disabled "
+                     "(plaintext, acceptable only for public data).")
+    if "Access denied for user" in text:
+        hints.append("MySQL rejected the login: check mysql_user and mysql_pass, and that the user may connect from "
+                     "outside the server's network (its host part and any IP allowlist).")
+    if re.search(r"PostgreSQL connection failed\.\s*(db error|Timed out in bb8)", text) or "too many connections" in text \
+            or "remaining connection slots" in text or "query_wait_timeout" in text:
+        hints.append("Postgres refused the session. Reproduce it with psql to see the reason. `query_wait_timeout` "
+                     "(PgBouncer) and 'too many connections' mean the server is out of connections: each dataset keeps "
+                     "its own pool (connection_pool_size, default 5; pg_connection_pool_min_idle, default 1), so lower "
+                     "both for a shared server. An instance whose deployment stays in_progress keeps its connections "
+                     "until a new deployment supersedes it or the project is paused.")
+    if "Disk full (/tmp" in text:
+        hints.append("The MySQL server ran out of temporary space while answering the runtime's information_schema "
+                     "metadata query. The server's operator must free space; until then use another server.")
+    if any(str(d.get("status")) == "Initializing" for d in datasets):
+        hints.append("A federated dataset stays Initializing while the runtime waits on the source: a firewall dropping "
+                     "packets, or a slow metadata query. On a MySQL 5.x or MariaDB 10.0 server that hosts thousands of "
+                     "databases, the runtime's information_schema read scans every database and can take many minutes: "
+                     "connect as a user granted only the databases the spicepod uses, or use MySQL 8.0 or later.")
+    if "insufficient_quota" in text or "exceeded your current quota" in text:
+        hints.append("The OpenAI key has no quota left. With SCP_OPENAI_API_KEY, the $25 credit Spice.ai Cloud gives a "
+                     "new account is used up: reference the user's own key instead (an org secret, or a value in "
+                     ".env.local), then run secrets and deploy again.")
     if "Failed to load LLM" in text or "Failed to load embedding" in text:
         hints.append("A model failed to load (bad key, unknown model id, or quota). Fix it and deploy again; until then "
                      "the runtime never becomes ready and the deployment stays in_progress.")
@@ -497,6 +561,30 @@ def accelerated(ds):
     return isinstance(acc, dict) and acc.get("enabled", True) is not False
 
 
+# TLS modes that encrypt without verifying the server, or not at all, and what production should use instead.
+WEAK_TLS = {
+    "postgres": ("pg_sslmode", "verify-full", "verify-full (with pg_sslrootcert if the CA is private)", {
+        "disable": "sends credentials and data in plaintext",
+        "allow": "can connect in plaintext and never verifies the server certificate",
+        "prefer": "can connect in plaintext and never verifies the server certificate",
+        "require": "encrypts but does not verify the server certificate"}),
+    "mysql": ("mysql_sslmode", "required", "required, the default (with mysql_sslrootcert if the CA is private)", {
+        "disabled": "sends credentials and data in plaintext",
+        "preferred": "encrypts but does not verify the server certificate or host name"}),
+}
+
+
+def merge_notes(notes):
+    """One note per (level, code, message), listing every dataset it applies to."""
+    merged = {}
+    for note in notes:
+        key = (note["level"], note["code"], note["message"])
+        entry = merged.setdefault(key, {k: v for k, v in note.items() if k != "dataset"})
+        if note.get("dataset"):
+            entry.setdefault("datasets", []).append(note["dataset"])
+    return list(merged.values())
+
+
 def lint(spec, profile):
     notes = []
     runtime = spec.get("runtime") or {}
@@ -511,10 +599,13 @@ def lint(spec, profile):
             continue
         name, source = ds.get("name"), str(ds.get("from", ""))
         params, acc = ds.get("params") or {}, ds.get("acceleration") or {}
-        if source.startswith("postgres") and str(params.get("pg_sslmode", "verify-full")) in ("require", "prefer", "disable", "allow"):
-            notes.append({"level": "warn" if profile == "production" else "info", "code": "pg_sslmode", "dataset": name,
-                          "message": f"pg_sslmode {params.get('pg_sslmode')} does not verify the server certificate; "
-                                     "production should use verify-full (with pg_sslrootcert if the CA is private)."})
+        connector = source.split(":", 1)[0]
+        if connector in WEAK_TLS:
+            param, default, better, weak = WEAK_TLS[connector]
+            mode = str(params.get(param, default))
+            if mode in weak:
+                notes.append({"level": "warn" if profile == "production" else "info", "code": param, "dataset": name,
+                              "message": f"{param} {mode} {weak[mode]}; production should use {better}."})
         if source.startswith("s3://") and "s3_auth" not in params:
             notes.append({"level": "info", "code": "s3_auth", "dataset": name,
                           "message": "Set s3_auth explicitly (public for public buckets, key or iam_role otherwise); "
@@ -595,11 +686,12 @@ def data_plane(ctx):
     return endpoint, key, project
 
 
-def dp(endpoint, key, method, path, body=None, content_type=None, accept="application/json", timeout=60, extra=None):
-    headers = {"X-API-Key": key, "Accept": accept, **(extra or {})}
+def dp(endpoint, key, method, path, body=None, content_type=None, accept="application/json", timeout=60, extra=None,
+       opener=REMOTE):
+    headers = {**({"X-API-Key": key} if key else {}), "Accept": accept, **(extra or {})}
     if content_type:
         headers["Content-Type"] = content_type
-    return http(method, endpoint + path, body, headers, timeout)
+    return http(method, endpoint + path, body, headers, timeout, opener=opener)
 
 
 def served(endpoint, key):
@@ -612,9 +704,9 @@ def served(endpoint, key):
     return (datasets if isinstance(datasets, list) else []), (models if isinstance(models, list) else [])
 
 
-def sql(endpoint, key, query, timeout=60, nocache=False):
+def sql(endpoint, key, query, timeout=60, nocache=False, opener=REMOTE):
     extra = {"Cache-Control": "no-cache"} if nocache else None
-    code, text, _ = dp(endpoint, key, "POST", "/v1/sql", query, "text/plain", timeout=timeout, extra=extra)
+    code, text, _ = dp(endpoint, key, "POST", "/v1/sql", query, "text/plain", timeout=timeout, extra=extra, opener=opener)
     return code, as_json(text)
 
 
@@ -637,6 +729,7 @@ def cmd_preflight(a):
         version = parse_json_tail(ANSI.sub("", r.stdout)) or {}
         result["cli"] = {"path": ctx.cli, "version": version.get("cli"), "runtime": version.get("runtime")}
     token, source, problems = resolve_token(ctx.dir, ctx.org)
+    org_names, project_names, linked = None, None, None
     if not token:
         blockers.append({"blocker": "management_token_missing", "problems": problems, "hints": TOKEN_HELP})
     else:
@@ -645,6 +738,8 @@ def cmd_preflight(a):
         code, orgs = api(ctx, "GET", "/v1/orgs", org=False)
         rows = orgs.get("orgs", []) if isinstance(orgs, dict) else []
         result["orgs_visible"] = len(rows)
+        if not ctx.org:
+            result["orgs"] = [{"name": o.get("name"), "role": o.get("role")} for o in rows][:50]
         if ctx.org:
             match = next((o for o in rows if str(o.get("name", "")).lower() == ctx.org.lower()), None)
             if not match:
@@ -668,11 +763,16 @@ def cmd_preflight(a):
                 code, regions = api(ctx, "GET", "/v1/regions")
                 if code == 200:
                     result["regions"] = [r["region"] for r in regions.get("regions", []) if not r.get("disabled")]
+                org_names = org_secret_names(ctx, match.get("id"))
                 if ctx.name:
                     existing = find_project(ctx, ctx.name)
                     result["project_exists"] = bool(existing)
                     if existing:
                         result["project_id"] = existing["id"]
+                        linked = linked_org_secrets(ctx, existing["id"])
+                        code, data = api(ctx, "GET", f"/v1/projects/{existing['id']}/secrets")
+                        if code == 200 and isinstance(data, dict):
+                            project_names = {s.get("name") for s in data.get("secrets", []) if isinstance(s, dict)}
     pod = find_pod(ctx.dir)
     if not pod:
         warnings.append("No spicepod.yaml yet: design it, then run create.")
@@ -682,8 +782,23 @@ def cmd_preflight(a):
         if not ok:
             blockers.append({"blocker": "spicepod_invalid", "validate": text[-1500:]})
         env = local_env(ctx.dir)
-        result["secret_references"] = [{"name": k, "stores": sorted(v), "available_locally": bool(env.get(k) or env.get(k.upper()))}
-                                       for k, v in sorted(references(pod.read_text()).items())]
+        refs = []
+        for key, stores in sorted(references(pod.read_text()).items()):
+            name = key.upper()
+            ref = {"name": name, "stores": sorted(stores), "available_locally": bool(env.get(key) or env.get(name))}
+            for field, names in (("org_secret", org_names), ("project_secret", project_names), ("linked", linked)):
+                if names is not None:
+                    ref[field] = name in names
+            if name in PLATFORM_SECRETS:
+                ref["platform_secret"] = (f"{PLATFORM_SECRETS[name]}: never listed; `secrets` links it after create, "
+                                          "or reports it missing if this organization has none")
+            refs.append(ref)
+            if stores & {"secrets", "env"} and not CREDENTIAL_VAR.match(name) and not ref["available_locally"] and \
+                    org_names is not None and not ref["org_secret"] and not ref.get("project_secret") and \
+                    name not in PLATFORM_SECRETS:
+                warnings.append(f"{name} is not set locally, and {ctx.org} has no org secret of that name: get the value "
+                                "from the user (environment or .env.local) or have them create the org secret.")
+        result["secret_references"] = refs
     result["blockers"], result["warnings"] = blockers, warnings
     if blockers:
         result["next"] = "Resolve the blockers; installation and Cloud credentials are the user's to provide."
@@ -693,6 +808,95 @@ def cmd_preflight(a):
         result["next"] = f"spice-launch.sh create {ctx.dir} --project ORG/NAME" if not ctx.ref else \
             f"spice-launch.sh create {ctx.dir} --project {ctx.ref}"
     emit(result, ok=not blockers)
+
+
+DEVICE_CODE = re.compile(r"^\s*([A-Z0-9]{4}-[A-Z0-9]{4})\s*$", re.M)
+DEVICE_URL = re.compile(r"(https://\S+/auth/token\?code=[A-Za-z0-9]+)")
+
+
+def working_credential(ctx):
+    """(source, orgs) for a stored credential the Management API accepts, else (None, problems)."""
+    token, source, problems = resolve_token(ctx.dir, ctx.org)
+    if not token:
+        return None, problems
+    code, text, _ = http("GET", API + "/v1/orgs", None, {"Authorization": f"Bearer {token}", "Accept": "application/json"})
+    if code != 200:
+        return None, problems + [f"{source} was rejected (HTTP {code}: {error_text(as_json(text))})"]
+    rows = (as_json(text) or {}).get("orgs", [])
+    return source, [{"name": o.get("name"), "role": o.get("role")} for o in rows if isinstance(o, dict)]
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, TypeError):
+        return False
+
+
+def cmd_login(a):
+    """Sign in to Spice Cloud with the CLI's device flow, in two steps an agent can relay: start (URL and code), wait."""
+    ctx = Ctx(a, need_project=False)
+    log = ctx.dir / STATE_DIR / "login.log"
+    started = ctx.state.get("login") or {}
+    if a.wait:
+        if not started.get("pid") or started.get("completed_at"):
+            fail("no login is in progress", next=f"spice-launch.sh login {ctx.dir}")
+        status("Waiting for the user to approve the login ...")
+        deadline = time.time() + a.timeout
+        while alive(started["pid"]) and time.time() < deadline:
+            time.sleep(2)
+        if alive(started["pid"]):
+            fail("the login is still waiting for approval", url=started.get("url"),
+                 note="The user opens the URL, signs in or signs up, and approves the code; the code expires 5 "
+                      "minutes after login started.", next=f"spice-launch.sh login {ctx.dir} --wait")
+        text = ANSI.sub("", log.read_text(errors="replace")) if log.exists() else ""
+        # Judge this login by its own outcome, not by whatever credential was stored before it.
+        granted = "Successfully logged in" in text or "Login token saved" in text
+        source, found = working_credential(ctx) if granted else (None, [])
+        if source:
+            ctx.save(login={**started, "completed_at": now()})
+            emit({"status": "logged_in", "credential": source, "orgs": found,
+                  "next": f"spice-launch.sh preflight {ctx.dir} --project ORG/NAME (an org from `orgs`)"})
+        fail("the login ended without a working credential", log_tail=text.splitlines()[-8:], problems=found,
+             next=f"spice-launch.sh login {ctx.dir}  (starts a new code)")
+    if not a.force:
+        source, found = working_credential(ctx)
+        if source:
+            emit({"status": "logged_in", "credential": source, "orgs": found,
+                  "note": "Already signed in; `--force` signs in again, e.g. as another user.",
+                  "next": f"spice-launch.sh preflight {ctx.dir} --project ORG/NAME (an org from `orgs`)"})
+    if not ctx.cli:
+        fail("the Spice CLI is not installed or not on PATH", blocker="cli_missing", docs="https://spiceai.org/docs/installation")
+    # The CLI saves the credential to the macOS keychain, or to .env in this directory (kept out of git).
+    store = a.store or ("keychain" if sys.platform == "darwin" else "env")
+    if store == "env":
+        ensure_gitignore(ctx.dir)
+    log.parent.mkdir(parents=True, exist_ok=True)
+    env = {k: v for k, v in os.environ.items() if k != "SPICE_API_TOKEN"}
+    with open(log, "w") as handle:
+        proc = subprocess.Popen([ctx.cli, "cloud", "login", "-o", store, "subscription", "--device"], cwd=ctx.dir,
+                                stdin=subprocess.DEVNULL, stdout=handle, stderr=subprocess.STDOUT, env=env,
+                                start_new_session=True)  # keeps polling after this command returns
+    code = url = None
+    deadline = time.time() + 30
+    while time.time() < deadline and proc.poll() is None and not url:
+        text = ANSI.sub("", log.read_text(errors="replace"))
+        match_code, match_url = DEVICE_CODE.search(text), DEVICE_URL.search(text)
+        if match_code and match_url:
+            code, url = match_code.group(1), match_url.group(1)
+        else:
+            time.sleep(0.5)
+    if not url:
+        if proc.poll() is None:
+            proc.terminate()
+        fail("the device login did not start", log_tail=ANSI.sub("", log.read_text(errors="replace")).splitlines()[-8:])
+    ctx.save(login={"pid": proc.pid, "started_at": now(), "store": store, "url": url})
+    emit({"status": "waiting_for_approval", "url": url, "code": code, "expires_in_secs": 300, "store": store,
+          "note": "Give the user the URL and code, and wait for them. On the page, Continue with GitHub signs in, or "
+                  "creates a Spice.ai account for a new user (a GitHub account is required); then they approve the "
+                  "code, which must match.",
+          "next": f"spice-launch.sh login {ctx.dir} --wait"})
 
 
 def free_port():
@@ -716,14 +920,8 @@ def cmd_local(a):
     if not ok:
         fail("spice validate failed", validate=text[-2000:])
     env = local_env(ctx.dir)
-    missing = sorted(k for k, stores in references(pod.read_text()).items()
+    missing = sorted(k.upper() for k, stores in references(pod.read_text()).items()
                      if stores & {"secrets", "env"} and not (env.get(k) or env.get(k.upper())))
-    if missing and not a.anyway:
-        emit({"status": "skipped", "missing_local_secrets": missing,
-              "note": "These secrets are not in the environment, .env.local, or .env, and components that use them "
-                      "stall a local runtime rather than fail. Put them in .env.local to run locally (or pass "
-                      "--anyway); otherwise skip this step: the Cloud deploy and verify check them.",
-              "next": f"spice-launch.sh create {ctx.dir} --project ORG/NAME"})
     http_port, flight_port = free_port(), free_port()
     log = ctx.dir / STATE_DIR / "local-run.log"
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -733,7 +931,8 @@ def cmd_local(a):
         proc = subprocess.Popen(command, cwd=ctx.dir, stdin=subprocess.DEVNULL, stdout=handle,
                                 stderr=subprocess.STDOUT, start_new_session=True)
     base = f"http://127.0.0.1:{http_port}"
-    datasets, models, ready, settled = [], [], False, 0
+    log_lines = lambda: log.read_text(errors="replace").splitlines() if log.exists() else []
+    datasets, models, ready, settled, blocked, views, queries = [], [], False, 0, set(), [], []
     try:
         deadline = time.time() + a.timeout
         while time.time() < deadline and proc.poll() is None:
@@ -745,11 +944,36 @@ def cmd_local(a):
             code, body, _ = http("GET", base + "/v1/models?status=true", timeout=5, opener=LOCAL)
             models = as_json(body) if code == 200 else []
             models = models.get("data", []) if isinstance(models, dict) else (models if isinstance(models, list) else [])
-            pending = [d for d in (datasets or []) + models if d.get("status") in ("Initializing", "Refreshing", None)]
-            settled = settled + 1 if datasets and not pending else 0
+            # Components whose secret exists only in Cloud fail or wait here; the Cloud deploy checks them.
+            blocked = {m.group(1) for row in (secrets_preflight(log_lines()) or {}).get("unresolved", [])
+                       for m in [re.search(r"'([^']+)'", row.get("used_by", ""))] if m}
+            pending = [d for d in datasets + models if d.get("status") in ("Initializing", "Refreshing", None)
+                       and (d.get("name") or d.get("id")) not in blocked]
+            settled = settled + 1 if len(datasets) >= counts.get("datasets", 0) and not pending else 0
             if ready or settled >= 3:
                 break
             time.sleep(2)
+        # Views register after the datasets load (and not at all while a dataset is in Error), then answer queries.
+        names = {d.get("name") for d in datasets}
+        views_deadline = time.time() + (30 if not any(d.get("status") == "Error" for d in datasets) else 6)
+        while proc.poll() is None:
+            code, rows = sql(base, "", "SELECT table_schema, table_name FROM information_schema.tables WHERE "
+                                       "table_catalog = 'spice' AND table_schema NOT IN ('information_schema', 'runtime')",
+                             opener=LOCAL)
+            registered = {r.get("table_name") if r.get("table_schema") == "public" else
+                          f"{r.get('table_schema')}.{r.get('table_name')}" for r in rows if isinstance(r, dict)} \
+                if code == 200 and isinstance(rows, list) else set()
+            views = sorted(registered - names)
+            if len(views) >= counts.get("views", 0) or time.time() > views_deadline:
+                break
+            time.sleep(2)
+        for name in [d.get("name") for d in datasets if d.get("status") == "Ready"] + views:
+            t0 = time.perf_counter()
+            code, rows = sql(base, "", f"SELECT * FROM {quote_ident(name)} LIMIT 1", timeout=60, opener=LOCAL)
+            ok = code == 200 and isinstance(rows, list) and len(rows) > 0
+            queries.append({"name": name, "kind": "view" if name in views else "dataset", "ok": ok,
+                            "ms": round((time.perf_counter() - t0) * 1000), **({} if ok else {
+                                "error": "no rows" if code == 200 else f"HTTP {code}: {error_text(rows)}"})})
         exited = proc.poll()
     finally:
         if proc.poll() is None:
@@ -758,21 +982,35 @@ def cmd_local(a):
                 proc.wait(timeout=30)
             except subprocess.TimeoutExpired:
                 os.kill(proc.pid, signal.SIGKILL)
-    tail = log.read_text(errors="replace").splitlines()[-40:] if log.exists() else []
+    tail = log_lines()[-40:]
     rows = [{"name": d.get("name"), "status": d.get("status"), "error": d.get("error_message")}
-            for d in (datasets or []) if isinstance(d, dict)]
+            for d in datasets if isinstance(d, dict)]
     rows += [{"model": m.get("id") or m.get("name"), "status": m.get("status"), "error": m.get("error_message")}
              for m in models if isinstance(m, dict)]
-    errors = [r for r in rows if r.get("status") == "Error"]
-    result = {"ready": ready, "components": rows, "missing_local_secrets": missing, "log": str(log),
-              "stopped_pid": proc.pid, "runtime_exited_early": exited is not None and not ready}
-    if ready:
-        emit({**result, "status": "ready_locally", "next": f"spice-launch.sh create {ctx.dir} --project ORG/NAME"})
-    if errors and missing:
-        emit({**result, "status": "partial", "note": "Errors may come from secrets that exist only in Spice Cloud "
-              f"({', '.join(missing)}). Fix any error that is not about those, then deploy.",
-              "hints": hints_for(tail, errors)}, ok=True)
-    fail("the spicepod did not become ready locally", **result, log_tail=tail[-15:], hints=hints_for(tail, errors))
+    for row in rows:
+        if (row.get("name") or row.get("model")) in blocked:
+            row["needs_cloud_secret"] = True
+    problems = [r for r in rows if r.get("status") != "Ready" and not r.get("needs_cloud_secret")]
+    failed = [q for q in queries if not q["ok"]]
+    blocked_datasets = blocked & {d.get("name") for d in datasets}
+    unchecked_views = max(0, counts.get("views", 0) - len(views))
+    result = {"ready": ready, "components": rows, "queries": queries, "missing_local_secrets": missing,
+              "log": str(log), "stopped_pid": proc.pid, "runtime_exited_early": exited is not None and not ready}
+    if unchecked_views:
+        result["views_not_registered"] = unchecked_views
+    next_step = f"spice-launch.sh create {ctx.dir} --project ORG/NAME" if not ctx.ref else f"spice-launch.sh deploy {ctx.dir}"
+    if ready and not failed and not unchecked_views:
+        emit({**result, "status": "ready_locally", "next": next_step})
+    if not problems and not failed and (not unchecked_views or blocked_datasets):
+        emit({**result, "status": "checked", "note": "Everything that does not need a Cloud-only secret loads and answers "
+              "queries." + (f" Not checked here: {', '.join(sorted(blocked))} (secrets {', '.join(missing)} exist only in "
+              "Spice Cloud); deploy and verify check them." if blocked else "") + (
+              f" {unchecked_views} view(s) did not register while a dataset waits on a Cloud-only secret."
+              if unchecked_views else ""), "next": next_step})
+    fail("the spicepod does not fully work locally", **result, log_tail=tail[-15:],
+         hints=hints_for(tail, problems, local=True) + ([
+             f"{unchecked_views} view(s) never registered. Views wait until every dataset loads, so a dataset in Error "
+             "keeps all of them away; fix it first."] if unchecked_views else []))
 
 
 def ensure_gitignore(d):
@@ -863,8 +1101,16 @@ def cmd_secrets(a):
     if code != 200:
         fail(f"could not list project secrets (HTTP {code}: {error_text(data)})")
     names = {s.get("name") for s in data.get("secrets", [])} if isinstance(data, dict) else set()
+    linked = linked_org_secrets(ctx, pid)  # None: this credential cannot list them
+    org_names = org_secret_names(ctx)
     force = set(a.set or [])
     rows = []
+
+    def push(row, value):
+        code, resp = api(ctx, "POST", f"/v1/projects/{pid}/secrets", {"name": row["name"], "value": value})
+        rows.append({**row, "status": "pushed" if code in (200, 201) else "push_failed",
+                     **({} if code in (200, 201) else {"error": error_text(resp)})})
+
     for key, stores in sorted(refs.items()):
         name = key.upper()  # the env store upper-cases keys, and Cloud injects secrets as env
         row = {"name": name, "stores": sorted(stores)}
@@ -879,24 +1125,56 @@ def cmd_secrets(a):
             rows.append({**row, "status": "invalid_name"})
             continue
         value = env.get(key) or env.get(name)
-        if name in names and name not in force and key not in force:
+        if name in force or key in force:
+            if value:
+                push(row, value)
+            else:
+                rows.append({**row, "status": "push_failed", "error": "--set needs the value in the environment, "
+                                                                      ".env.local, or .env"})
+        elif name in names:
             rows.append({**row, "status": "project_secret"})
+        elif linked is not None and name in linked:
+            rows.append({**row, "status": "org_secret_linked"})
+        elif org_names is not None and name in org_names:
+            # An org secret reaches a project only through a link; a local value of the same name is not pushed,
+            # so a personal key never shadows the organization's.
+            code, resp = api(ctx, "PUT", f"/v1/projects/{pid}/org-secrets/{name}")
+            ok = code in (200, 201)
+            rows.append({**row, "status": "linked" if ok else "link_failed",
+                         **({"error": f"HTTP {code}: {error_text(resp)}"} if not ok else {}),
+                         **({"note": "The org secret is used, not the local value; `--set " + name + "` stores the "
+                                     "local value as a project secret, which takes precedence."} if ok and value else {})})
         elif value:
-            code, resp = api(ctx, "POST", f"/v1/projects/{pid}/secrets", {"name": name, "value": value})
-            rows.append({**row, "status": "pushed" if code in (200, 201) else "push_failed",
-                         **({} if code in (200, 201) else {"error": error_text(resp)})})
+            push(row, value)
         else:
-            rows.append({**row, "status": "unverified",
-                         "note": "Not a project secret and not set locally. It works only if it is an org secret "
-                                 "linked to this project (or inherited from the base it was forked from); the "
-                                 "runtime's startup check after deploy settles it."})
-    failed = [r for r in rows if r["status"] in ("push_failed", "invalid_name")]
+            # Platform-managed org secrets (SCP_OPENAI_API_KEY) are linkable but never listed: the link is the test.
+            code, resp = api(ctx, "PUT", f"/v1/projects/{pid}/org-secrets/{name}")
+            if code in (200, 201):
+                rows.append({**row, "status": "linked", **({"note": f"Platform-managed: {PLATFORM_SECRETS[name]}."}
+                                                           if name in PLATFORM_SECRETS else {})})
+            elif code == 404:
+                rows.append({**row, "status": "missing", "note": f"Not a project secret, not an org secret of "
+                             f"{ctx.org}, and not set locally." + (
+                                 f" {name} is {PLATFORM_SECRETS[name]}; this organization does not have it (accounts "
+                                 "created before the credit existed do not), so use the user's own key."
+                                 if name in PLATFORM_SECRETS else "")})
+            else:
+                rows.append({**row, "status": "unverified" if code == 403 else "link_failed",
+                             "error": f"HTTP {code}: {error_text(resp)}",
+                             "note": "Could not check whether an org secret of this name exists; the runtime's startup "
+                                     "check during deploy settles it."})
+    failed = [r for r in rows if r["status"] in ("push_failed", "link_failed", "invalid_name", "missing")]
     unverified = [r["name"] for r in rows if r["status"] == "unverified"]
     result = {"project": ctx.ref, "secrets": rows, "unverified": unverified,
-              "note": "Values come from the environment, .env.local, or .env and go only to the Management API.",
+              "note": "Values come from the environment, .env.local, or .env and go only to the Management API; org "
+                      "secrets are linked by name and their values never leave Spice Cloud.",
               "next": f"spice-launch.sh deploy {ctx.dir}"}
     if failed:
-        fail("some secrets could not be stored", **result)
+        fail("some secrets are not available to the project", **result, hints=[
+            "missing: put the value in the environment or .env.local and run secrets again, or create an org secret "
+            "of that name (organization Settings -> Secrets) and run secrets again to link it. A platform name such "
+            "as SCP_OPENAI_API_KEY is reserved and cannot be created: point the spicepod at the user's own key.",
+            "link_failed or push_failed with 403: the credential needs secrets:write and a role above viewer."])
     emit(result)
 
 
@@ -948,30 +1226,44 @@ def cmd_deploy(a):
                       "message": f"{replicas} replicas: MCP sessions are held by one instance, so agents get 404 "
                                  "'Session not found' when a request lands on another. Use 1 replica for MCP clients "
                                  "(SQL and chat over HTTP are stateless and fine with several)."})
+    notes = merge_notes(notes)
     if any(n["level"] == "error" for n in notes):
         fail("the spicepod has a configuration that fails on load", lint=notes)
+    federated = {d.get("name") for d in spec.get("datasets") or [] if isinstance(d, dict) and not accelerated(d)}
+    paused = get_project(ctx, pid).get("paused_at")
     before = {i["name"] for i in instances(ctx)}
     started = time.time()
-    dep, err = cli(ctx, "cloud", "deploy", "--project", ctx.ref, "-o", "json")
-    if err or not isinstance(dep, dict) or not dep.get("id"):
-        schema = "Invalid spicepod configuration" in str(err or dep)
-        fail("could not start the deployment", detail=err or dep, hints=[
-            "Spice Cloud checks the stored spicepod against the published Spicepod schema when a deployment starts, "
-            "which is stricter than `spice validate`. Known case: an embeddings or full_text_search row_id must be a "
-            "list (`row_id: [id]`), not a single value."] if schema else [])
+    if paused:
+        # Spice Cloud refuses deployments while a project is paused; resuming deploys the stored spicepod.
+        status(f"The project is paused (since {paused}); resuming it deploys the uploaded spicepod ...")
+        code, resumed = api(ctx, "POST", f"/v1/projects/{pid}/resume")
+        if code != 200 or not isinstance(resumed, dict) or not resumed.get("deployment_id"):
+            fail(f"could not resume the paused project (HTTP {code}: {error_text(resumed)})", paused_at=paused)
+        dep = {"id": resumed["deployment_id"]}
+    else:
+        dep, err = cli(ctx, "cloud", "deploy", "--project", ctx.ref, "-o", "json")
+        if err or not isinstance(dep, dict) or not dep.get("id"):
+            schema = "Invalid spicepod configuration" in str(err or dep)
+            fail("could not start the deployment", detail=err or dep, hints=[
+                "Spice Cloud checks the stored spicepod against the published Spicepod schema when a deployment "
+                "starts, which is stricter than `spice validate`. Known case: an embeddings or full_text_search "
+                "row_id must be a list (`row_id: [id]`), not a single value."] if schema else [])
     dep_id = dep["id"]
     status(f"Deployment {dep_id} started; watching it (up to {a.timeout}s) ...")
-    last, error_since, inst, lines, ds, captured = None, {}, None, [], [], {}
+    last, error_since, init_since, inst, lines, ds, captured = None, {}, {}, None, [], [], {}
 
     def stuck(reason, **extra):
         fail(reason, deployment=dep_id, instance=inst, **extra, problems=problem_lines(lines)[-12:],
              hints=hints_for(lines, ds), lint=notes,
              note="Spice Cloud keeps the deployment in_progress while the new instance is not ready, and the "
-                  "previous version (if any) keeps serving. Fix the cause and run deploy again: a new deployment "
-                  "supersedes this one.",
+                  "previous version (if any) keeps serving. The new instance keeps running, holding its source "
+                  "connections, until a new deployment supersedes it. Fix the cause and run deploy again. To stop "
+                  "instead, `spice-launch.sh pause DIR` tears the runtime down (the previous version too) until the "
+                  "next deploy.",
              next=f"spice-launch.sh deploy {ctx.dir}")
 
-    polls = 0
+    sources = {d["name"]: d.get("from") for d in spec.get("datasets") or [] if isinstance(d, dict) and d.get("name")}
+    polls, ready_checks, stale_record = 0, 0, None
     while True:
         code, d = api(ctx, "GET", f"/v1/projects/{pid}/deployments/{dep_id}")
         state = d.get("status") if isinstance(d, dict) else None
@@ -985,7 +1277,18 @@ def cmd_deploy(a):
             stuck(f"deployment failed: {d.get('error_code')}: {d.get('error_message')}", retriable=retriable)
         polls += 1
         if polls % 2 == 0:  # instance-level checks every ~20s
-            fresh = [i for i in instances(ctx) if i["name"] not in before]
+            current = instances(ctx)
+            fresh = [i for i in current if i["name"] not in before]
+            # The deployment record can stay in_progress after its instance is up (seen when deploying right after a
+            # pause). Every instance new and ready, three checks running, and the endpoint serving this spicepod
+            # is the rollout done.
+            if fresh and len(fresh) == len(current) and all((i.get("spicedStatus") or {}).get("ready") for i in current):
+                ready_checks += 1
+                if ready_checks >= 3 and confirm_serving(*data_plane(ctx)[:2], expected, sources, timeout=30)["ok"]:
+                    stale_record = state
+                    break
+            else:
+                ready_checks = 0
             if fresh:
                 inst = fresh[-1]["name"]
                 lines = instance_logs(ctx, inst)
@@ -1007,14 +1310,25 @@ def cmd_deploy(a):
                 if lasting:
                     stuck("datasets stay in Error on the new instance",
                           datasets=[{"name": r.get("name"), "error": r.get("error_message")} for r in lasting])
+                # A federated dataset only connects and reads its schema, so a long Initializing means it is waiting
+                # on the source. Accelerated ones may legitimately load for many minutes.
+                for row in ds:
+                    if row.get("status") == "Initializing" and row.get("name") in federated:
+                        init_since.setdefault(row.get("name"), time.time())
+                    else:
+                        init_since.pop(row.get("name"), None)
+                stalled = [n for n, t in init_since.items() if time.time() - t > a.init_timeout]
+                if stalled:
+                    stuck(f"federated datasets are still Initializing after {a.init_timeout}s on the new instance",
+                          datasets=[{"name": n, "status": "Initializing"} for n in stalled])
         if time.time() - started > a.timeout:
             stuck(f"the deployment did not finish within {a.timeout}s",
                   datasets=[{"name": r.get("name"), "status": r.get("status"), "error": r.get("error_message")} for r in ds])
         time.sleep(10)
 
     endpoint, key, project = data_plane(ctx)
-    status("Deployment succeeded; confirming the new spicepod is what the endpoint serves ...")
-    sources = {d["name"]: d.get("from") for d in spec.get("datasets") or [] if isinstance(d, dict) and d.get("name")}
+    status("Deployment succeeded; confirming the new spicepod is what the endpoint serves ..." if not stale_record else
+           f"Deployment {dep_id} still reads {stale_record}, but its instance is ready and serves this spicepod ...")
     serving = confirm_serving(endpoint, key, expected, sources)
     rows = instances(ctx)
     newest = rows[-1]["name"] if rows else None
@@ -1036,11 +1350,17 @@ def cmd_deploy(a):
                     "dataset and model is Ready, which a missing secret would usually prevent; verify settles it."}
     seconds = round(time.time() - started)
     ctx.save(endpoint=endpoint, expected=expected, spec_sha=hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:12],
-             last_deploy={"id": dep_id, "status": "succeeded", "seconds": seconds, "at": now(),
+             last_deploy={"id": dep_id, "status": f"serving (record still {stale_record})" if stale_record else "succeeded",
+                          "seconds": seconds, "at": now(),
                           "image_tag": (d or {}).get("image_tag"), "instance": newest})
     result = {"project": ctx.ref, "deployment": dep_id, "seconds": seconds, "endpoint": endpoint,
               "image_tag": (d or {}).get("image_tag"), "instance": newest, "serving": serving,
               "secrets": secrets_check, "lint": notes, "warnings": problem_lines(lines)[-10:]}
+    if stale_record:
+        result["deployment_record"] = {"status": stale_record, "note": (
+            "Spice Cloud never marked this deployment succeeded, although its only instance is ready and serves this "
+            "spicepod. Seen when deploying right after a pause; the next deployment supersedes it. Report it to "
+            "Spice.ai if it persists.")}
     if not serving["ok"]:
         fail("the deployment succeeded, but the endpoint does not serve every component as Ready", **result,
              hints=hints_for(lines, serving["not_ready"]))
@@ -1451,10 +1771,12 @@ def cmd_fire_drill(a):
     pid = ctx.project_id()
     endpoint, key, _ = data_plane(ctx)
     existing = list_alerts(ctx, pid)
-    template = existing.get((PREFIX + "query failures").lower())
-    if not template or template.get("status") != "active":
-        fail("fire drill requires an enabled launch: query failures monitor; run monitors first")
-    targets = alert_targets(template)
+    launch_monitors = sorted((m for m in existing.values()
+                              if m.get("name", "").startswith(PREFIX) and m["name"] != DRILL and m.get("status") == "active"),
+                             key=lambda m: m["name"].lower() != (PREFIX + "query failures").lower())
+    if not launch_monitors:
+        fail("fire drill requires an enabled launch monitor; run monitors first")
+    targets = next((alert_targets(m) for m in launch_monitors if alert_targets(m)), [])
     webhook = next((t for t in targets if t.get("type") == "http"), None)
     if webhook:
         if a.webhook_token_env:
@@ -1470,24 +1792,37 @@ def cmd_fire_drill(a):
         code, resp = api(ctx, "DELETE", f"/v1/projects/{pid}/monitors/{stale['id']}")
         if code != 200:
             fail("could not clean up the previous drill monitor; retry DELETE on the same ID", id=stale["id"], detail=error_text(resp))
-    body = {"name": DRILL, "templateId": "query_failures",
-            "description": "Temporary: tests signal evaluation and notification delivery. Recipients confirm arrival; spice-launch removes this monitor.",
-            "spec": {"op": "GT", "threshold": 0, "window": "1m", "sustainSecs": 0, "severity": "warn"},
-            **({"targets": targets} if targets else {})}
-    code, mon = api(ctx, "POST", f"/v1/projects/{pid}/monitors", body)
-    if code != 201:
-        fail(f"could not create the drill monitor (HTTP {code}: {error_text(mon)})")
+    drills = [("query_failures", {"op": "GT", "threshold": 0, "window": "1m", "sustainSecs": 0}, "failed queries"),
+              ("memory_working_set", {"op": "GT", "threshold": 1, "sustainSecs": 0}, "memory above 1% (always true)")]
+    for template_id, spec, trigger in drills:
+        body = {"name": DRILL, "templateId": template_id,
+                "description": "Temporary: tests signal evaluation and notification delivery. Recipients confirm arrival; spice-launch removes this monitor.",
+                "spec": {**spec, "severity": "warn"}, **({"targets": targets} if targets else {})}
+        code, mon = api(ctx, "POST", f"/v1/projects/{pid}/monitors", body)
+        if code == 201:
+            break
+        if not (code == 404 and "unavailable" in error_text(mon)):
+            fail(f"could not create the drill monitor (HTTP {code}: {error_text(mon)})")
+    else:
+        fail("no drill template is available to this organization", tried=[d[0] for d in drills])
     drill_id, started, fired, resolved = mon["id"], time.time(), None, None
-    status(f"Drill monitor created; sending failing queries until it fires (up to {a.timeout}s) ...")
+    recovery_requested, recovery_error = False, None
+    status(f"Drill monitor created ({template_id}: {trigger}); waiting for it to fire (up to {a.timeout}s) ...")
     try:
         while time.time() - started < a.timeout:
-            if not fired:
-                # Stop generating failures after firing so the window can expire and recovery can be recorded.
+            if template_id == "query_failures" and not fired:
                 sql(endpoint, key, "SELECT * FROM spice_launch_fire_drill_missing_table", timeout=30)
             code, m = api(ctx, "GET", f"/v1/projects/{pid}/monitors/{drill_id}")
             if code == 200 and isinstance(m, dict):
                 fired = m.get("last_fired_at") or fired
                 resolved = m.get("last_resolved_at")
+            if template_id == "memory_working_set" and fired and not recovery_requested:
+                code, response = api(ctx, "PATCH", f"/v1/projects/{pid}/monitors/{drill_id}",
+                                     {"spec": {**spec, "threshold": 1000, "severity": "warn"}})
+                if code != 200:
+                    recovery_error = f"could not reset the temporary memory condition (HTTP {code}: {error_text(response)})"
+                    break
+                recovery_requested, resolved = True, None
             status(f"  t+{int(time.time() - started)}s last_fired_at={fired} last_resolved_at={resolved}")
             if fired and resolved and resolved >= fired:
                 break
@@ -1497,11 +1832,15 @@ def cmd_fire_drill(a):
         cleaned = code == 200
     notification_targets = [t.get("type") for t in targets] or ["email to the credential's user (default target)"]
     result = {"project": ctx.ref, "fired": bool(fired), "fired_at": fired, "seconds": round(time.time() - started),
+              "template": template_id,
               "resolved": bool(fired and resolved and resolved >= fired), "resolved_at": resolved,
               "notification_targets": notification_targets, "delivery_confirmed": False, "drill_monitor_deleted": cleaned}
     ctx.save(fire_drill={**result, "at": now()})
     if not cleaned:
         fail("drill monitor cleanup failed; retry DELETE on the same ID", **result, id=drill_id)
+    if recovery_error:
+        fail(recovery_error, **result, id=drill_id,
+             hints=["The memory fallback update requires org admin; close any downstream test incident manually."])
     if not fired:
         fail("the drill monitor did not fire in time", **result,
              hints=["Evaluations run every 60s; retry with a longer --timeout.",
@@ -1732,9 +2071,28 @@ The body is raw SQL. A JSON body needs `"parameters"` (`[]` when unused) and exa
                   "or pending sources, questions that work, what the user still owns) outside the markers."})
 
 
+def cmd_pause(a):
+    ctx = Ctx(a)
+    pid = ctx.project_id()
+    code, data = api(ctx, "POST", f"/v1/projects/{pid}/pause")
+    if code == 409:
+        emit({"status": "paused", "project": ctx.ref, "paused_at": (data or {}).get("paused_at"), "note": "Already paused."})
+    if code != 200:
+        fail(f"could not pause {ctx.ref} (HTTP {code}: {error_text(data)})")
+    ctx.save(paused_at=data.get("paused_at"))
+    emit({"status": "paused", "project": ctx.ref, "paused_at": data.get("paused_at"),
+          "note": "The runtime is torn down and stops using its sources; configuration, secrets, keys, and monitors are "
+                  "kept. Queries fail until the next deploy, which resumes the project.",
+          "next": f"spice-launch.sh deploy {ctx.dir}"})
+
+
 def cmd_status(a):
     ctx = Ctx(a)
     pid = ctx.project_id()
+    paused = get_project(ctx, pid).get("paused_at")
+    if paused:
+        emit({"project": ctx.ref, "healthy": False, "paused_at": paused,
+              "note": "The project is paused: no runtime is running.", "next": f"spice-launch.sh deploy {ctx.dir}"})
     st = cloud_status(ctx)
     latest = st.get("latest_deployment") or {}
     rows = instances(ctx)
@@ -1785,10 +2143,16 @@ def main():
         p.set_defaults(func=func)
         return p
 
+    p = add("login", cmd_login, help_text="sign in to Spice Cloud with a device code (sign-up included)")
+    p.add_argument("--wait", action="store_true", help="wait for the user to approve the code from a previous login")
+    p.add_argument("--timeout", type=int, default=300)
+    p.add_argument("--force", action="store_true", help="sign in again even if a working credential exists")
+    p.add_argument("--store", choices=["keychain", "env"], help="where the CLI saves the credential "
+                   "(default: keychain on macOS, else .env in DIR)")
     add("preflight", cmd_preflight, help_text="check the CLI, Cloud credential, org, limits, and spicepod")
     p = add("local", cmd_local, help_text="smoke-run the spicepod on a local runtime, then stop it")
     p.add_argument("--timeout", type=int, default=120)
-    p.add_argument("--anyway", action="store_true", help="run even when some secrets exist only in Cloud")
+    p.add_argument("--anyway", action="store_true", help=argparse.SUPPRESS)  # older instructions; local always runs
     p = add("create", cmd_create, project=True, help_text="create or fork the managed project")
     p.add_argument("--region", default="us-east-1", choices=sorted(REGION_ENDPOINTS))
     p.add_argument("--base", help="ORG/BASE project to fork, inheriting its secrets and linked org secrets")
@@ -1800,6 +2164,8 @@ def main():
     p.add_argument("--set", action="append", help="push NAME from the local environment even if it exists")
     p = add("deploy", cmd_deploy, help_text="upload the spicepod, deploy, and confirm the new version serves")
     p.add_argument("--timeout", type=int, default=600)
+    p.add_argument("--init-timeout", type=int, default=180,
+                   help="seconds a federated dataset may stay Initializing on the new instance")
     p = add("verify", cmd_verify, help_text="prove datasets, models, MCP, and latency end to end")
     p.add_argument("--sql", action="append")
     p.add_argument("--ask")
@@ -1826,6 +2192,7 @@ def main():
     group.add_argument("--webhook-no-token", action="store_true", help="confirm the saved webhook requires no bearer token")
     add("handoff", cmd_handoff, help_text="write RUNBOOK.md and AGENT-CONNECT.md")
     add("status", cmd_status, help_text="one-shot health: deployment, instances, datasets, alerts, problems")
+    add("pause", cmd_pause, help_text="tear the runtime down, keeping the project; the next deploy resumes it")
     p = add("teardown", cmd_teardown, help_text="delete the launch monitors and the project launch created")
     p.add_argument("--yes", action="store_true")
     p.add_argument("--keep-project", action="store_true")

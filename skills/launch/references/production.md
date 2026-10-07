@@ -7,7 +7,7 @@ Cloud managed projects running Spice v2.3.x (checked against v2.3.2).
 
 | Area | Done when |
 | --- | --- |
-| Credentials | Source credentials are project secrets, or org secrets linked to the project; none in the spicepod or the repo. Automation uses an OAuth client (`SPICE_CLOUD_CLIENT_ID`/`SECRET`), not a person's token |
+| Credentials | Source credentials are org secrets linked to the project, or project secrets; none in the spicepod or the repo. People sign in with `spice-launch.sh login` (device code); automation uses an OAuth client (`SPICE_CLOUD_CLIENT_ID`/`SECRET`), not a person's token |
 | Source access | Each source uses a dedicated read-only user; Postgres uses `pg_sslmode: verify-full`; network allowlists cover Spice Cloud |
 | Freshness | Every accelerated dataset has a `refresh_check_interval` (or CDC) that matches what the user said "fresh" means |
 | Capacity | The accelerated total fits well under half the memory limit; `spice cloud metrics` shows headroom after `verify` |
@@ -28,6 +28,13 @@ Cloud managed projects running Spice v2.3.x (checked against v2.3.2).
   terminal state, while the previous instance keeps serving. `spice cloud deploy --wait` times out
   in that case; `spice-launch.sh deploy` reads the new instance's logs and dataset status and stops
   with the cause within about a minute.
+- That stuck instance keeps running, and keeps its source connections, until a later deployment
+  supersedes it. Against a shared database this matters: in testing, a stuck instance with four
+  datasets on a public Postgres behind PgBouncer (about six sessions for all users) locked every
+  other client out until the project was paused. Fix and deploy again promptly, or
+  `spice-launch.sh pause DIR`.
+- The reverse also happens: right after a pause, a deployment's record stayed `in_progress` for good
+  while its instance served. `deploy` checks the instances and the endpoint, not only the record.
 - Deploying again supersedes a stuck deployment, so the fix is always: correct the spicepod or
   secret, deploy, verify.
 - **Rollback** = deploy the previous `spicepod.yaml` from version control. Monitors, secrets, API keys,
@@ -39,6 +46,9 @@ Cloud managed projects running Spice v2.3.x (checked against v2.3.2).
 - Rotate a source credential: update the value where it lives (the environment or `.env.local`
   for `spice-launch.sh secrets DIR --set NAME`; the org secret in the portal), then deploy. The
   runtime reads secrets at startup only.
+- Org secrets reach a project through links (`GET`/`PUT`/`DELETE /v1/projects/{id}/org-secrets/{name}`
+  in the Management API); `spice-launch.sh secrets` creates them by name. A project secret of the
+  same name shadows the org secret.
 - Project API keys come in pairs for zero-downtime rotation:
   `spice cloud api-keys --project ORG/NAME --regenerate 2`, move clients to key 2, then
   `--regenerate 1`. Keys look like `<project-id>|<hex>`: the `|` breaks unquoted shell and `.env`
@@ -93,8 +103,10 @@ Cloud managed projects running Spice v2.3.x (checked against v2.3.2).
 
 ## Pause, resume, delete
 
-- Pause a demo between sessions without losing configuration: `POST /v1/projects/{id}/pause` and
-  `POST /v1/projects/{id}/resume` (Management API). Deployments are refused while it is paused.
+- Pause a demo between sessions without losing configuration: `spice-launch.sh pause DIR` (the
+  Management API's `POST /v1/projects/{id}/pause`); the next `spice-launch.sh deploy` brings it back.
+  The CLI has no pause command, and `spice cloud deploy` on a paused project is refused with
+  `spicepod_paused` unless the spicepod is uploaded first, which clears the pause.
 - `spice-launch.sh teardown DIR --yes` deletes the `launch:` monitors and, only if the helper created
   it, the project. Deleting a project removes its endpoint, keys, secrets, and monitors for good.
 

@@ -63,7 +63,9 @@ models:
   - from: openai:gpt-4o-mini
     name: assistant
     params:
-      openai_api_key: ${ secrets:OPENAI_API_KEY }
+      # The $25 OpenAI credit a new Spice.ai Cloud account gets (`secrets` links it); for production,
+      # the user's own key instead, e.g. ${ secrets:OPENAI_API_KEY }.
+      openai_api_key: ${ secrets:SCP_OPENAI_API_KEY }
       tools: auto # sql, table_schema, list_datasets, search, ...; unset means no tools
       system_prompt: |
         You answer questions about orders, customers, and support tickets. Use the sql tool,
