@@ -1,6 +1,6 @@
 ---
 name: cloud
-description: Manage Spice.ai Cloud resources through spice cloud and the Management API — projects, project forks, deployments, monitors, data reactions, secrets, API keys, and organization members. Use for Cloud project lifecycle (including fork, copy, or move to another region or cluster), deployments, organization context, regions, and infrastructure automation. Use sql, search, chat, or sdk for runtime data and inference APIs, and terraform for infrastructure as code.
+description: Manage Spice.ai Cloud resources through spice cloud and the Management API — projects, project forks, deployments, monitors, data reactions, secrets, API keys, and organization members. Use for Cloud project lifecycle (including fork, copy, or move to another region or cluster), deployments, creating or updating alerts, notification destinations, disabling monitors, alert troubleshooting, organization context, regions, and infrastructure automation. Use sql, search, chat, or sdk for runtime data and inference APIs, and terraform for infrastructure as code.
 ---
 
 # Spice.ai Cloud Management
@@ -11,7 +11,7 @@ Manage Spice.ai Cloud resources through the Management API (control plane) at `h
 
 ## Version Compatibility
 
-Written against the Spice.ai Cloud Management API as documented in September 2026, for projects running **Spice v2.3.x** (checked against v2.3.2). Two versions matter:
+Written against the Spice.ai Cloud Management API checked on October 6, 2026, for projects running **Spice v2.3.x** (checked against v2.3.2). Two versions matter:
 
 - **The project's runtime**: each deployment resolves the runtime from the project's `update_channel` (`stable`, `preview`, `nightly`) and `version` range unless `image_tag` pins it. Stable can trail the latest OSS release, so check `GET /v1/projects/{projectId}` and the [changelog](https://docs.spice.ai/changelog) before recommending a runtime feature. Cloud APIs have runtime minimums — the MCP API needs v2.0.0+ and `/v1/nsql` needs v2.1.0+.
 - **The API surface**: Cloud API changes are dated by the changelog month, not by a runtime release.
@@ -214,44 +214,51 @@ Returns `202` with the `queued` deployment; poll `GET .../deployments/{deploymen
 
 Monitors evaluate runtime metrics or dataset status; data reactions fire on matching Drasi queries. List both when asked for project alerts. Use the Management API Bearer token and a project ID from `GET /v1/projects`, not a project API key.
 
-| Resource | Base path | Read scope | Create/delete scope |
-| --- | --- | --- | --- |
-| Monitor | `/v1/projects/{projectId}/monitors` | `monitors:read` | `monitors:write` |
-| Data reaction | `/v1/projects/{projectId}/reactions` | `reactions:read` | `reactions:write` |
+For template selection, condition units, multi-destination notifications, pause/resume behavior, event history, test notifications, or troubleshooting, read `references/monitoring.md` before acting.
+Project monitor templates are released for managed projects; availability depends on project capabilities, not early access. LLM failures need models, refresh errors need acceleration, and CPU needs a finite CPU limit. New p95 monitors remain unavailable; use p99.
 
-On either base path, `GET` lists, `POST` creates, `GET /{alertId}` gets one, and `DELETE /{alertId}` deletes one. `{alertId}` is a UUID. There is no update operation for a project monitor or a data reaction. To change one, delete it and create it again with the new `spec`. The new item gets a new `id`. Only cluster monitors have `PATCH` (see below). Lists return `{"monitors":[...]}` or `{"reactions":[...]}` with non-deleted items; each has `id`, `name`, `status`, `template_id`, `spec`, and `last_fired_at`. A project outside the token's organization returns `404`. The helper script has no commands for these routes.
+| Resource | Base path | Read scope | Write scope / update role |
+| --- | --- | --- | --- |
+| Monitor | `/v1/projects/{projectId}/monitors` | `monitors:read` | `monitors:write`; PATCH requires org admin |
+| Data reaction | `/v1/projects/{projectId}/reactions` | `reactions:read` | `reactions:write`; PATCH requires org membership |
+
+On either base path, `GET` lists, `POST` creates, and `GET`, `PATCH`, or `DELETE /{alertId}` operates
+on one UUID. **Update existing alerts in place with PATCH**, preserving their IDs and history.
+Lists return `{"monitors":[...]}` or `{"reactions":[...]}`. A project outside the credential's org
+returns `404`. The cloud helper script has no commands for these routes; use HTTP directly.
 
 ```bash
 PROJECT_ID=123
 curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
   "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors"
-curl -X POST "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors" \
+ALERT_ID="<uuid-from-list>"
+# A spec supplied to PATCH replaces the spec; send the complete desired condition.
+curl -X PATCH "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors/$ALERT_ID" \
   -H "Authorization: Bearer $SPICE_API_TOKEN" -H "Content-Type: application/json" \
-  -d '{"name":"SQL failures","templateId":"query_failures","spec":{"op":"GT","threshold":0}}'
-ALERT_ID="<id-from-201-response>"
+  -d '{"spec":{"op":"GT","threshold":0.05,"window":"5m","sustainSecs":300,"severity":"critical"}}'
 curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
-  "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors/$ALERT_ID"
-curl -X DELETE -H "Authorization: Bearer $SPICE_API_TOKEN" \
   "https://api.spice.ai/v1/projects/$PROJECT_ID/monitors/$ALERT_ID"
 ```
 
-For a reaction, replace `monitors` with `reactions` and use a data template. Creation needs `name`, `templateId`, and `spec` containing `op` (`GT`, `GEQ`, `LT`, `LEQ`, `EQ`, or `NEQ`) and numeric `threshold`.
+PATCH accepts `name`, nullable `description`, `status` (`active`/`disabled`), `templateId`, complete `spec`, `targets` (or legacy singular `target`), and `recipientUserIds`. Omitted fields are preserved. A different template requires its spec and approval to change the signal.
+After every mutation, GET the same ID and verify the requested fields and destinations. `active`
+means enabled configuration, not proof of healthy signal evaluation or notification delivery.
 
-- Monitor templates that the Management API accepts: `query_failures`, `http_5xx`, and `flight_failures` (event rates); `query_latency_p99` (milliseconds); `memory_working_set` (bytes); `container_cpu` (percent of the CPU limit of the project, and available only on a managed project that has a CPU limit).
-- The specification also has `dataset_refresh_errors`, `llm_failures`, `dataset_status` (0 initializing, 1 ready, 2 disabled, 3 error, 4 refreshing, 5 shutting down; optional `spec.dataset`), and `query_latency_p95`. A `POST` to the Management API refuses all four. See the paragraph below.
-- `spec.window` defaults to `5m` (`1m`, `5m`, `15m`, `30m`, `1h`) but does not affect `memory_working_set` or `dataset_status`. `spec.sustainSecs` defaults to 300 seconds (0–86400); `spec.severity` defaults to `critical` (`warn` or `critical`).
-
-Four templates are in the specification but you cannot create them through the Management API. A `POST` with `dataset_refresh_errors`, `llm_failures`, `dataset_status`, or `query_latency_p95` gives `404` with the code `monitor_template_unavailable`. Tests in two organizations and three managed projects, one of which had a successful deployment, gave this result each time, while a control `POST` with `query_failures` created correctly. The web portal shows some of these templates, so they are not necessarily removed. For `query_latency_p95` the specification gives the reason: the template stays available to the monitors that already use it, but it is closed to new monitors. Use `query_latency_p99`. For the other three the reason is not known.
-
-The same code `monitor_template_unavailable` also occurs when the project is not managed. One code covers all these conditions and does not tell you which applies, and no route lists the available templates. To find out if a template works, send a `POST` and read the code.
-
-Reaction templates are `task_history_error`, `task_history_timeout`, `task_history_slow` (threshold in milliseconds), `dataset_row_match`, and `dataset_query`. For example, POST to `/reactions` with `{"name":"Slow tasks","templateId":"task_history_slow","spec":{"op":"GT","threshold":5000}}`.
+Create either kind with `name`, `templateId`, and `spec` containing `op` (`GT`, `GEQ`, `LT`, `LEQ`, `EQ`, `NEQ`) and numeric `threshold`. Disable via PATCH `{"status":"disabled"}` and verify with GET.
+Reaction templates are `task_history_error`, `task_history_timeout`, `task_history_slow` (milliseconds), `dataset_row_match`, and `dataset_query`.
 
 `dataset_row_match` needs `spec.dataset`, `column`, and `value`, or nonempty `conditions` with dataset, column, and comparison per condition. `dataset_query` needs `spec.query` and `dataset` or `datasets`; `queryLanguage` defaults to `gql` (`cypher` also works). Dataset reactions conventionally use `{"op":"EQ","threshold":0}`. Creating any reaction requires a ready Drasi data source. Optional `spec.model` transforms results with a spicepod model; monitors reject it.
 
-By default, notifications email the credential's user (the organization owner for machine credentials). Set `target` to `{"type":"email","emails":["team@example.com"]}`, `{"type":"http","url":"https://example.com/alerts"}`, or `{"type":"slack","channelId":"C12345678"}`; Slack must be connected. HTTP target tokens are write-only. Avoid `spec.includeDetails: true` if matching data is sensitive. Creation provisions a live monitor or query and may notify recipients. Names must be unique across both kinds in the project (`409`); the shared limit is 20 active alerts.
+`targets` supports one email, one Slack, and one HTTPS destination together (three maximum).
+On PATCH it replaces the destination set; omit it to preserve destinations. A singular `target`
+replaces the set with that one destination. HTTP tokens are write-only; read the reference before
+changing a webhook. Without explicit recipients, manual API creation emails the credential's user
+(org owner for machine credentials). Creation provisions a live alert and may notify recipients.
+Keep `includeDetails` off for sensitive data. Names are unique across both kinds (`409`); the shared
+limit is 20 non-deleted alerts, including disabled ones.
 
-Create returns `201` with an `id`; delete returns `200` with `{"ok":true}`. If delete returns `502`, the item is hidden but backend cleanup failed; retry with the same ID.
+Create returns `201`, PATCH returns `200`, and delete returns `200 {"ok":true}`. A paused project refuses creation with `409`. On PATCH `409 monitor_changed`, GET and reconcile concurrent edits.
+On PATCH `502`, saved configuration may have changed while backend update failed: GET and retry the update. On delete `502`, the item is hidden but backend cleanup failed: retry the same ID.
 
 ### Cluster monitors
 
