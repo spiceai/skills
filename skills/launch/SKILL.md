@@ -1,6 +1,6 @@
 ---
 name: launch
-description: Launch a Spice.ai project on Spice.ai Cloud end to end from a plain-language scenario. It signs the user in to Spice.ai Cloud with a device code (sign-up included), designs the spicepod for the user's sources and models, deploys it, and proves the deployment serves rows, model answers, and MCP tool calls. It then adds monitors and alerts, runs an alert fire drill, and hands off a runbook and agent connection snippets. Use it for demos, POCs, and greenfield production projects — "serve our Snowflake, Postgres, and S3 data to agents with OpenAI", "federate our MySQL and Postgres in one SQL endpoint", "spin up a Spice demo on Cloud for tomorrow", "deploy this spicepod to Spice Cloud with alerting", "make our Spice POC production-ready", "sign me up for Spice Cloud" — and whenever a new Spice deployment must work and be operable, not just configured. Bundles scripts/spice-launch.sh. For a local-only first run use setup; for one-off Cloud API calls use cloud.
+description: Launch a Spice.ai project on Spice.ai Cloud end to end from a plain-language scenario. It signs the user in to Spice.ai Cloud with a device code (sign-up included), designs the spicepod for the user's sources and models, deploys it (with its helper, or through the Spice Cloud management MCP server from a GitHub repository), and proves the deployment serves rows, model answers, and MCP tool calls. It then adds monitors and alerts, runs an alert fire drill, and hands off a runbook and agent connection snippets. Use it for demos, POCs, and greenfield production projects — "serve our Snowflake, Postgres, and S3 data to agents with OpenAI", "federate our MySQL and Postgres in one SQL endpoint", "spin up a Spice demo on Cloud for tomorrow", "deploy this spicepod to Spice Cloud with alerting", "make our Spice POC production-ready", "sign me up for Spice Cloud" — and whenever a new Spice deployment must work and be operable, not just configured. Bundles scripts/spice-launch.sh. For a local-only first run use setup; for one-off Cloud API calls use cloud.
 ---
 
 # Launch a Spice Project on Spice.ai Cloud
@@ -244,6 +244,33 @@ the next deploy. If you stop there, `pause` the project: on a shared or connecti
 a stuck instance can lock other clients out. If Spice Cloud never marks a deployment succeeded
 although its instance is ready (seen right after a pause), `deploy` confirms the endpoint serves the
 new spicepod, reports `deployment_record`, and carries on.
+
+#### Or deploy through the management MCP server
+
+When the agent has the Spice Cloud management MCP server (`https://api.spice.ai/mcp`) connected,
+steps 5 and 6 can be MCP tool calls instead of `create` and `deploy`. This is also how a project
+deploys a spicepod from a GitHub repository of the org's GitHub account. Pass `org` on each call:
+
+1. `create_project` with `name` and `region`.
+2. `connect_project_repository` with `repository` and the `root_directory` that holds `spicepod.yaml`
+   (or `update_project` with `spicepod` for a project without a repository).
+3. `link_project_org_secret` for each org secret the spicepod references. For values on this
+   machine, run `secrets DIR --project ORG/NAME`: `create_project_secret` would put the value in
+   the conversation.
+4. `create_project_deployment`, then `get_project_deployment` until `succeeded` or `failed`.
+5. `list_project_instances` and `get_project_instance_logs` show why an instance is not ready.
+
+Then continue at step 7 with `verify`, `monitors`, and `handoff`, passing `--project ORG/NAME` to the
+first of them. `verify` checks the spicepod the project deployed, including one read from the
+repository. The MCP client has its own credential (a management token header or OAuth sign-in);
+the helper still uses the `login` credential. The `cloud` skill's `references/management-mcp.md`
+lists the arguments and error codes.
+
+A project connected to a repository deploys `spicepod.yaml` from its production branch, so the
+helper's `deploy`, which uploads the local file, is refused with `github_connected`: push the change
+and call `create_project_deployment` again. Add `.env`, `.env.local`, `.spice-launch/`, and `.spice/`
+to the repository's `.gitignore`, as `create` does. `teardown` does not delete a project the helper
+did not create; use `delete_project` after the user confirms.
 
 ### 7. Verify end to end
 

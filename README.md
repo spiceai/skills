@@ -208,7 +208,7 @@ The skills are version-aware. Each one names the release line it is written for,
 | [sql](skills/sql/) | Author and run SQL through the CLI, runtime API, or SDK; build text-to-SQL workflows |
 | [cache](skills/cache/) | Cache query and search results with TTL and stale-while-revalidate |
 | [secrets](skills/secrets/) | Manage credentials with secret stores |
-| [cloud](skills/cloud/) | Manage Spice.ai Cloud resources via the Management API |
+| [cloud](skills/cloud/) | Manage Spice.ai Cloud resources via the Management API and its MCP server |
 | [terraform](skills/terraform/) | Manage Spice.ai Cloud infrastructure as code with Terraform |
 | [sdk](skills/sdk/) | Integrate Python, JavaScript/TypeScript, Go, Rust, Java, and .NET applications |
 
@@ -222,7 +222,7 @@ related commands; configuration topics are not invented CLI subcommands.
 | `search` | `spice search`, `/v1/search`, SDK search methods |
 | `chat` / `models` | `spice chat`, `spice models`, OpenAI-compatible APIs and provider configuration |
 | `datasets` / `connectors` | Dataset and catalog configuration, `spice datasets`, `/v1/datasets` |
-| `cloud` | Available `spice cloud` commands and the Cloud Management API |
+| `cloud` | Available `spice cloud` commands, the Cloud Management API, and the management MCP server (`https://api.spice.ai/mcp`) |
 | `launch` | `spice cloud login`/`project`/`deploy`/`status`/`logs`, Management API monitors, forks, org-secret links, and pause, `/v1/sql`, `/v1/chat/completions`, `/v1/mcp` |
 | `sdk` | Client construction, endpoints, credentials, typed results, and language-specific methods |
 | `spicepod`, `acceleration`, `accelerators`, `cache`, `secrets` | Runtime configuration and related operations |

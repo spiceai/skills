@@ -1,6 +1,6 @@
 ---
 name: cloud
-description: Manage Spice.ai Cloud resources through spice cloud and the Management API — projects, project forks, deployments, monitors, data reactions, secrets, API keys, and organization members. Use for Cloud project lifecycle (including fork, copy, or move to another region or cluster), deployments, creating or updating alerts, notification destinations, disabling monitors, alert troubleshooting, organization context, regions, and infrastructure automation. Use sql, search, chat, or sdk for runtime data and inference APIs, and terraform for infrastructure as code.
+description: Manage Spice.ai Cloud resources through spice cloud, the Management API, and the management MCP server (https://api.spice.ai/mcp) — projects, project forks, deployments, monitors, data reactions, secrets, API keys, and organization members. Use for Cloud project lifecycle (including fork, copy, or move to another region or cluster), deployments (including from a GitHub repository), instance logs, connecting an agent to Spice Cloud over MCP, creating or updating alerts, notification destinations, disabling monitors, alert troubleshooting, organization context, regions, and infrastructure automation. Use sql, search, chat, or sdk for runtime data and inference APIs, and terraform for infrastructure as code.
 ---
 
 # Spice.ai Cloud Management
@@ -27,8 +27,8 @@ Written against the Spice.ai Cloud Management API checked on October 6, 2026, fo
 
 ## CLI and API interfaces
 
-Use `spice cloud` when the user wants the installed CLI, and the Management API below for HTTP
-automation. Inspect `spice cloud --help` and subcommand help before selecting commands: CLI releases
+Use `spice cloud` when the user wants the installed CLI, the Management API below for HTTP
+automation, and the [management MCP server](#management-mcp-server) when an agent works through MCP tool calls. Inspect `spice cloud --help` and subcommand help before selecting commands: CLI releases
 and the continuously updated Cloud API do not necessarily expose the same operations.
 
 Keep project, deployment, region, monitor, secret, API-key, and member identifiers consistent across
@@ -55,6 +55,14 @@ Required scopes are listed per endpoint below. A write scope includes its read s
 ### Organization Context
 
 A request acts on the organization the credential was minted against. Send `X-Org-Name: <org-handle>` to act on another: personal access tokens can name any organization the user belongs to, while OAuth clients are pinned to their own (`403 org_assertion_mismatch`). `GET /v1/orgs` (Aug 2026, scope `apps:read`) lists the caller's organizations with its role in each.
+
+## Management MCP server
+
+The management MCP server at `https://api.spice.ai/mcp` (Streamable HTTP) exposes the Management API as tools such as `create_project`, `connect_project_repository`, `create_project_deployment`, `get_project_deployment`, `list_project_instances`, and `get_project_instance_logs`. It takes the same management token and scopes as the API, in `Authorization: Bearer`, or a browser OAuth sign-in. Pass each tool's `org` (a handle from `list_orgs`); without it a call uses the token's organization. Read `tools/list` for the current tools and arguments.
+
+It is not a project's runtime MCP endpoint (`<project endpoint>/v1/mcp` with the project API key), which queries data. Never send a project API key to `api.spice.ai`, or a management token to a project endpoint.
+
+Before connecting a client or deploying through it, read [references/management-mcp.md](references/management-mcp.md): client configuration, scopes per tool, the create → connect a GitHub repository → deploy → status → instance logs workflow, pause and resume, and error codes.
 
 ## Health Check
 
@@ -91,6 +99,9 @@ Manage Spice.ai Cloud projects.
 | Delete project | `DELETE` | `/v1/projects/{projectId}`       | `apps:delete` |
 | Fork project   | `POST`   | `/v1/projects/{projectId}/forks` | `apps:write`  |
 | List forks     | `GET`    | `/v1/projects/{projectId}/forks` | `apps:read`   |
+| Connect GitHub repository (Oct 2026) | `PUT` | `/v1/projects/{projectId}/repository` | `apps:write` |
+| List instances (Oct 2026) | `GET` | `/v1/projects/{projectId}/instances` | `apps:read` |
+| Instance logs (Oct 2026) | `GET` | `/v1/projects/{projectId}/instances/{instanceName}/logs?tail=N` | `apps:read` |
 
 ### Create Project
 
@@ -208,7 +219,7 @@ curl -X POST https://api.spice.ai/v1/projects/{projectId}/deployments \
 | `commit_message` | string  | No       | Deployment description                                   |
 | `debug`          | boolean | No       | Enable debug mode                                        |
 
-Returns `202` with the `queued` deployment; poll `GET .../deployments/{deploymentId}` for status. Returns `409` if a deployment is already in progress, and `400` if the project has no spicepod or is paused (resume with `POST /v1/projects/{projectId}/resume`).
+Returns `202` with the `queued` deployment; poll `GET .../deployments/{deploymentId}` for status. A project connected to a GitHub repository deploys `spicepod.yaml` from the head of its production branch, read when the deployment is created. Returns `409` if a deployment is already in progress, and `400` if the project has no spicepod or is paused (resume with `POST /v1/projects/{projectId}/resume`).
 
 ## Monitors and data reactions
 
@@ -435,24 +446,7 @@ Fork into the target region, fix any `shared_state`, deploy the fork, then point
 
 ### Rotate API Keys (Zero Downtime)
 
-```bash
-# 1. Get current keys
-curl -H "Authorization: Bearer $SPICE_API_TOKEN" \
-  https://api.spice.ai/v1/projects/123/api-keys
-
-# 2. Regenerate secondary key
-curl -X POST https://api.spice.ai/v1/projects/123/api-keys \
-  -H "Authorization: Bearer $SPICE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"key_number": 2}'
-
-# 3. Update clients to use new secondary key
-# 4. Regenerate primary key
-curl -X POST https://api.spice.ai/v1/projects/123/api-keys \
-  -H "Authorization: Bearer $SPICE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"key_number": 1}'
-```
+Read the current keys (`GET /v1/projects/123/api-keys`), regenerate the secondary key (`POST` with `{"key_number": 2}`), move clients to it, then regenerate the primary (`{"key_number": 1}`). Clients never hold a revoked key.
 
 ## Using the Helper Script
 
@@ -486,6 +480,7 @@ When presenting management API results: show project IDs/names in a table; for a
 | `409 Conflict` on create project    | Project name already exists (names compare case-insensitively)                              |
 | Fork errors (`fork_*`, `scheduler_state_location_*`) | See [references/project-forks.md](references/project-forks.md#fork-error-codes) |
 | `409` on deployment                 | A deployment is already in progress; wait for it to complete                                |
+| `409 github_connected` on update    | The project deploys `spicepod.yaml` from its GitHub repository; change it there, then deploy |
 | `400` on deployment                 | Project has no spicepod, is paused (`POST .../resume`), or `image_tag` isn't a published version for the channel |
 | `400` on create secret              | Secret name must start with letter/underscore; letters, numbers, underscores only           |
 | Deployment `failed`                 | Check `error_code`: `insufficient_*` codes are retriable; the others are terminal           |

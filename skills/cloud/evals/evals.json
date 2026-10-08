@@ -151,6 +151,88 @@
         "Does not invent public /v1 test, events, observation-state, or catalog endpoints",
         "Requests consent before real test notifications and asks recipients to confirm arrival"
       ]
+    },
+    {
+      "id": 6,
+      "prompt": "Using the Spice Cloud management MCP server, deploy our spicepod from the GitHub repository acme/analytics (it is in the sales-bi directory on main) as a new Spice Cloud project named sales-bi in our acme org, in us-east-1. Then show me the deployment status and the runtime's recent logs. What credential do I configure in my MCP client, and which tool calls do I make, in order, with their arguments?",
+      "expected_output": "Connect an MCP client to https://api.spice.ai/mcp with a management token (personal access token or OAuth) in Authorization: Bearer. Then call create_project (org acme, name sales-bi, region us-east-1), connect_project_repository (repository acme/analytics, root_directory sales-bi, production_branch main), link or create each secret, create_project_deployment, get_project_deployment until succeeded or failed, list_project_instances, and get_project_instance_logs with the instance name. Passes org on each call and proves the runtime serves rows before calling it done.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "management_mcp_url",
+          "type": "regex",
+          "value": "https://api\\.spice\\.ai/mcp",
+          "description": "Connects to the management MCP server, not a project's /v1/mcp"
+        },
+        {
+          "name": "connects_repository",
+          "type": "regex",
+          "value": "connect_project_repository",
+          "description": "Connects the project to the GitHub repository"
+        },
+        {
+          "name": "root_directory",
+          "type": "regex",
+          "value": "root_directory[\"'\\s:=]+[\"']?sales-bi",
+          "description": "Points the connection at the directory that holds spicepod.yaml"
+        },
+        {
+          "name": "creates_deployment",
+          "type": "regex",
+          "value": "create_project_deployment",
+          "description": "Deploys through the MCP tool"
+        },
+        {
+          "name": "reads_status",
+          "type": "regex",
+          "value": "get_project_deployment",
+          "description": "Reads the deployment status until it settles"
+        },
+        {
+          "name": "reads_logs",
+          "type": "regex",
+          "value": "list_project_instances[\\s\\S]*get_project_instance_logs",
+          "description": "Lists instances, then reads one instance's logs"
+        }
+      ],
+      "expectations": [
+        "Configures a management token (personal access token or OAuth) in Authorization: Bearer, not a project API key",
+        "Passes org acme on the tool calls",
+        "Creates the project before connecting the repository, and deploys after connecting it",
+        "Waits for succeeded or failed instead of reporting a queued or in-progress deployment as done",
+        "Does not put a secret value in the repository or the prompt"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I connected Claude to https://us-east-1-prod-aws-data.spiceai.io/v1/mcp with our Spice Cloud project's API key, and it can run SQL. Can I use the same connection to redeploy the project and read its logs? If not, what should I connect instead, and with which credential?",
+      "expected_output": "No. The project's /v1/mcp endpoint is the runtime MCP server: it queries data with the project API key and cannot manage the project. Connect the management MCP server at https://api.spice.ai/mcp with a management token (personal access token or OAuth client-credentials token, or OAuth sign-in) in Authorization: Bearer, then use create_project_deployment, get_project_deployment, list_project_instances, and get_project_instance_logs. Never send the project API key to api.spice.ai.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "management_mcp_url",
+          "type": "regex",
+          "value": "api\\.spice\\.ai/mcp",
+          "description": "Names the management MCP server"
+        },
+        {
+          "name": "management_credential",
+          "type": "regex",
+          "value": "(?i)(personal access token|management (api )?token|client.credentials|oauth)",
+          "description": "Uses a management credential, not the project API key"
+        },
+        {
+          "name": "log_tool",
+          "type": "regex",
+          "value": "get_project_instance_logs",
+          "description": "Names the tool that reads instance logs"
+        }
+      ],
+      "expectations": [
+        "States that the runtime /v1/mcp endpoint queries data and cannot deploy or read instance logs",
+        "States that the project API key does not authenticate the management MCP server",
+        "Keeps the existing runtime MCP connection for SQL instead of replacing it"
+      ]
     }
   ]
 }

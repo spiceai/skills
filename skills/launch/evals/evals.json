@@ -246,6 +246,50 @@
         "The TLS settings for MySQL and Postgres are verified connections, or any weaker mode is named as a risk",
         "The project is created in an organization the signed-in user can deploy to"
       ]
+    },
+    {
+      "id": 5,
+      "prompt": "Our spicepod.yaml is in our GitHub repository acme/agent-data, in the spice/ directory on main, and it is checked out in ./agent-data. My coding agent has the Spice Cloud management MCP server connected, and spice-launch.sh login has already succeeded. Plan the launch of acme/agent-data on Spice Cloud for a POC, deployed through the MCP tools, proven to serve data, with alerts to oncall@acme.com. List the MCP tool calls with their arguments and the spice-launch.sh commands, in order. Do not run anything yet.",
+      "expected_output": "Creates the project and connects the repository with root_directory spice through MCP tools, links or creates the secrets, deploys with create_project_deployment and follows get_project_deployment to succeeded (reading instance logs if it stalls), then runs spice-launch.sh verify and monitors with --project acme/agent-data and the email target. Does not run the helper's deploy, which uploads the local spicepod and is refused for a repository-connected project.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "connects_repository",
+          "type": "regex",
+          "value": "connect_project_repository",
+          "description": "Connects the project to the repository through MCP"
+        },
+        {
+          "name": "root_directory",
+          "type": "regex",
+          "value": "root_directory[\"'\\s:=]+[\"']?spice\\b",
+          "description": "Points the connection at the spice/ directory"
+        },
+        {
+          "name": "mcp_deploy",
+          "type": "regex",
+          "value": "create_project_deployment[\\s\\S]*get_project_deployment",
+          "description": "Deploys and follows the deployment through MCP"
+        },
+        {
+          "name": "helper_verify",
+          "type": "regex",
+          "value": "spice-launch\\.sh\\s+verify",
+          "description": "Proves the deployment with the helper's verify"
+        },
+        {
+          "name": "monitors_with_target",
+          "type": "regex",
+          "value": "(?i)monitors[\\s\\S]{0,200}oncall@acme\\.com",
+          "description": "Creates monitors that notify the requested address"
+        }
+      ],
+      "expectations": [
+        "Does not run spice-launch.sh deploy or upload the local spicepod to the repository-connected project",
+        "Passes --project acme/agent-data to the first helper command",
+        "Does not report success from a succeeded deployment alone",
+        "Passes org acme on the MCP tool calls"
+      ]
     }
   ]
 }
