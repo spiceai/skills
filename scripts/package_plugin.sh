@@ -71,6 +71,11 @@ fi
 # Portable Agent Plugins root manifest
 [ -f "$ROOT/plugin.json" ] && cp "$ROOT/plugin.json" "$STAGE_DIR/"
 
+# MCP servers: .mcp.json for Claude Code, mcp.json for Agent Plugins clients (Codex, Cursor)
+for mcp in .mcp.json mcp.json; do
+  [ -f "$ROOT/$mcp" ] && cp "$ROOT/$mcp" "$STAGE_DIR/"
+done
+
 # Listing icons referenced by the OpenAI manifests.
 [ -d "$ROOT/assets" ] && cp -r "$ROOT/assets" "$STAGE_DIR/"
 
