@@ -33,8 +33,10 @@ itself by following the [installation docs](https://spiceai.org/docs/installatio
 | Cursor, Grok Bot, OpenCode, Pi, others | `npx skills add spiceai/skills -a <agent>` (`cursor`, `opencode`, `pi`, ...) |
 
 Plugin installs invoke skills as `/spiceai:setup` (Claude Code) or `$spiceai:setup` (Codex);
-`npx skills add` installs them without the namespace (`$setup`). The sections below cover
-global installs, project auto-discovery, and maintainer publishing.
+`npx skills add` installs them without the namespace (`$setup`). Plugin installs also add the
+Spice.ai Cloud management MCP server as `spice-cloud` (`https://api.spice.ai/mcp`); sign in from
+the agent's MCP menu (`/mcp` in Claude Code). The sections below cover global installs, project
+auto-discovery, and maintainer publishing.
 
 <details>
 <summary>Per-agent installation details and maintainer publishing notes</summary>

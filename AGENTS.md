@@ -7,6 +7,7 @@ This repo is the **Spice.ai Marketplace** — Agent Skills / plugins for AI codi
 ```
 .claude-plugin/
   plugin.json           # Plugin metadata (required)
+.mcp.json, mcp.json     # spice-cloud MCP server (Claude Code; Agent Plugins clients)
 skills/
   {skill-name}/         # kebab-case directory name
     SKILL.md            # Skill definition (required)

@@ -58,7 +58,7 @@ A request acts on the organization the credential was minted against. Send `X-Or
 
 ## Management MCP server
 
-The management MCP server at `https://api.spice.ai/mcp` (Streamable HTTP) exposes the Management API as tools such as `create_project`, `connect_project_repository`, `create_project_deployment`, `get_project_deployment`, `list_project_instances`, and `get_project_instance_logs`. It takes the same management token and scopes as the API, in `Authorization: Bearer`, or a browser OAuth sign-in. Pass each tool's `org` (a handle from `list_orgs`); without it a call uses the token's organization. Read `tools/list` for the current tools and arguments.
+The management MCP server at `https://api.spice.ai/mcp` (Streamable HTTP) exposes the Management API as tools such as `create_project`, `connect_project_repository`, `create_project_deployment`, `get_project_deployment`, `list_project_instances`, and `get_project_instance_logs`. The `spiceai` plugin includes it as `spice-cloud`. Sign in once from the client's MCP menu (browser OAuth, no client ID needed), or send a management token with the API's scopes in `Authorization: Bearer`. Pass each tool's `org` (a handle from `list_orgs`); without it a call uses the token's organization. Read `tools/list` for the current tools and arguments.
 
 It is not a project's runtime MCP endpoint (`<project endpoint>/v1/mcp` with the project API key), which queries data. Never send a project API key to `api.spice.ai`, or a management token to a project endpoint.
 

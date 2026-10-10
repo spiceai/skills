@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "spice-cloud": {
+      "type": "http",
+      "url": "https://api.spice.ai/mcp"
+    }
+  }
+}

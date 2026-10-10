@@ -248,7 +248,8 @@ new spicepod, reports `deployment_record`, and carries on.
 #### Or deploy through the management MCP server
 
 When the agent has the Spice Cloud management MCP server (`https://api.spice.ai/mcp`) connected,
-steps 5 and 6 can be MCP tool calls instead of `create` and `deploy`. This is also how a project
+steps 5 and 6 can be MCP tool calls instead of `create` and `deploy`. The `spiceai` plugin includes it
+as `spice-cloud`; sign in once from the client's MCP menu. This is also how a project
 deploys a spicepod from a GitHub repository of the org's GitHub account. Pass `org` on each call:
 
 1. `create_project` with `name` and `region`.

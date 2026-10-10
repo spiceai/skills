@@ -19,9 +19,19 @@ project endpoint.
 
 ## Connect
 
-The server uses Streamable HTTP. Authenticate in one of two ways:
+The `spiceai` plugin includes the server as `spice-cloud`: `.mcp.json` for Claude Code, and `mcp.json`
+for Agent Plugins clients such as Codex and Cursor. Claude Code lists it as `plugin:spiceai:spice-cloud`.
+Without the plugin, add it by URL, for example
+`claude mcp add --transport http spice-cloud https://api.spice.ai/mcp`.
 
-- **A management token in a header** (agents, CI, scripts): a personal access token from
+The server uses Streamable HTTP. Sign in in one of two ways:
+
+- **Browser sign-in (OAuth)** (Oct 2026): select `spice-cloud` in the client's MCP menu (`/mcp` in
+  Claude Code) and authenticate. The client registers itself with `https://spice.ai` (RFC 7591 dynamic
+  client registration), so no client ID is needed. In the browser, choose a default org and approve. The
+  client then appears under **Account → User OAuth**, where it can be revoked. A registered client gets
+  `*`, so consent shows one scope.
+- **A management token in a header** (CI, scripts, headless agents): a personal access token from
   [spice.ai/account/tokens](https://spice.ai/account/tokens), or an OAuth client-credentials access token
   (see Authentication in `SKILL.md`). Keep the token in an environment variable and reference it from
   the client configuration, so it never appears in a prompt or a committed file. For Claude Code
@@ -38,12 +48,6 @@ The server uses Streamable HTTP. Authenticate in one of two ways:
     }
   }
   ```
-
-- **Browser sign-in (OAuth)**: the server advertises OAuth 2.0 authorization code with PKCE, with
-  `https://spice.ai` as the authorization server. It has no dynamic client registration, so the MCP
-  client needs the ID of an OAuth client the user creates in the portal (**Account → User OAuth**) with
-  the client's redirect URI. The project's endpoints page has install commands for common agents with
-  the client ID filled in.
 
 A request without a valid token returns `401` with a `WWW-Authenticate` header that names
 `/.well-known/oauth-protected-resource`.
