@@ -66,7 +66,7 @@ both the catalog validator and the index freshness check before opening the PR.
 
 For OpenAI, retain `spiceai` for subsequent uploads. A draft using an older package name requires
 a new draft. If privacy-policy assessment is incomplete, the current policy is
-[Spice AI Privacy Policy](https://docs.spice.ai/legal/privacy); use the additional-review path
+[Spice AI Privacy Policy](https://spice.ai/privacy-policy); use the additional-review path
 offered by the portal. Our validator checks packaging conventions and known installer regressions;
 it does not reproduce or bypass marketplace safety scans.
 
