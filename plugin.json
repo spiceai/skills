@@ -34,8 +34,8 @@
         ],
         "websiteURL": "https://spiceai.org",
         "supportURL": "https://github.com/spiceai/skills/issues",
-        "privacyPolicyURL": "https://docs.spice.ai/legal/privacy",
-        "termsOfServiceURL": "https://docs.spice.ai/legal/terms-of-service",
+        "privacyPolicyURL": "https://spice.ai/privacy-policy",
+        "termsOfServiceURL": "https://spice.ai/docs/legal/terms",
         "composerIcon": "./assets/spiceai-logo.svg",
         "logo": "./assets/spiceai-logo.svg",
         "defaultPrompt": [
