@@ -11,15 +11,18 @@ Unlike traditional caches that store query results, Spice accelerates entire dat
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0-rc.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| `acceleration` without `engine` (Arrow) | Breaking in v2.4.0-rc.1 (now Cayenne; Windows keeps Arrow) | `engine: arrow` to keep Arrow |
+| `on_conflict` | Deprecated in v2.4.0-rc.1 (removal planned for v3.0); Cayenne keeps one row per `primary_key` without it | `primary_key` (+ `time_column` for newest-wins) on Cayenne |
+| `on_conflict` to keep writes in the acceleration | Breaking in v2.4.0-rc.1 (no longer routes writes) | `write_mode: acceleration` (not with `refresh_mode: changes`) |
 | `acceleration.ready_state` | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
 | `write_mode: write_back` with `mode: memory`, retention, a composite key, or a non-PostgreSQL source | Breaking in v2.3.0 (rejected at load) | See Durable Write-Back |
 | `retention_check_enabled` without `retention_check_interval` | Changed in v2.3.0 (never ran; now logs an error) | Set `retention_check_interval` |
@@ -36,7 +39,7 @@ datasets:
     name: my_table
     acceleration:
       enabled: true
-      engine: duckdb # arrow (default), duckdb, sqlite, cayenne, postgres, turso
+      engine: duckdb # cayenne (default, v2.4.0-rc.1+; arrow before, and on Windows), arrow, duckdb, sqlite, postgres, turso
       mode: memory # memory (default) or file
       refresh_check_interval: 1h
 ```
@@ -156,7 +159,8 @@ change events to `/v1/datasets/{name}/cdc`. Kafka topics themselves use `refresh
 Pair CDC with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of
 re-fetching. Every engine except append-only `arrow` needs `primary_key` plus an `on_conflict` upsert on
 that key (a map, as in the example above) — updates apply as upserts and deletes route by that key; see
-connectors.
+connectors. **Changed in v2.4.0-rc.1**: `cayenne` needs only `primary_key` — it keeps one row per key
+(newest `time_column` wins, else last arrival) — and `on_conflict` is deprecated.
 
 ## Common Configurations
 

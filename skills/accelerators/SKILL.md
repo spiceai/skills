@@ -9,19 +9,21 @@ Accelerators materialize data locally from connected sources for faster queries 
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0-rc.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
 | `partition_by` with `engine: duckdb` (and the DuckDB partition params) | Removed in v2.2.0 | `engine: cayenne` or `arrow` |
 | DuckDB `partitioned_write_flush_threshold` | Renamed in v2.0.0 (`…_rows`); removed in v2.2.0 | Cayenne or Arrow partitioning |
 | `acceleration.params.cayenne_segment_cache_mb` | Deprecated in v2.2.0 (ignored) | `runtime.params.cayenne_segment_cache_mb` |
-| Unset `cayenne_tuning` | Breaking in v2.2.0 (now resolves to `auto`) | `cayenne_tuning: adaptive` for the closed-loop controller |
+| `acceleration` without `engine` (Arrow) | Breaking in v2.4.0-rc.1 (now Cayenne; Windows keeps Arrow) | `engine: arrow` to keep Arrow |
+| `on_conflict` on Cayenne | Deprecated in v2.4.0-rc.1 (removal planned for v3.0) | `primary_key` alone (+ `time_column` for newest-wins) |
+| `cayenne_tuning` (`adaptive`/`auto`), `cayenne_goal_*` | Breaking in v2.4.0-rc.2 (ignored with a warning) | `runtime.adaptive_tuning: enabled`/`disabled`, `runtime.params.target_*` |
 | DuckDB v1.5 SQL and functions | Changed in v2.2.1 (bundled DuckDB is v1.4.4) | DuckDB 1.4-compatible SQL |
 | `hash_index: enabled` (Arrow) | Ignored since v2.0.0 | `primary_key` |
 | `turso_mvcc` | Removed in v2.0.0 (MVCC always on) | Delete it |
@@ -37,7 +39,7 @@ datasets:
     name: my_table
     acceleration:
       enabled: true
-      engine: duckdb # arrow (default), duckdb, sqlite, cayenne, postgres, turso
+      engine: duckdb # cayenne (default, v2.4.0-rc.1+; arrow before, and on Windows), arrow, duckdb, sqlite, postgres, turso
       mode: memory # memory (default) or file
       refresh_check_interval: 1h
 ```
@@ -79,7 +81,8 @@ covered in acceleration. Engine constraints to keep in mind:
 
 - **`changes` (CDC)**: pair with a persistent accelerator (`mode: file`, or `postgres`) so a restart
   resumes instead of re-fetching. Every engine except append-only `arrow` requires `primary_key` plus an
-  `on_conflict` upsert on that key (example below).
+  `on_conflict` upsert on that key (example below). **Changed in v2.4.0-rc.1**: `cayenne` needs only
+  `primary_key` and dedupes by it (newest `time_column` wins, else last arrival).
 - **`caching`**: survives restarts only with `mode: file` on `duckdb`, `sqlite`, or `cayenne`.
 - **`snapshot`** (Spice.ai Enterprise): needs a file-mode `duckdb`, `sqlite`, `cayenne`, or `turso` engine.
 
@@ -193,8 +196,12 @@ queries read fewer files; it cannot be combined with `sort_columns` (the dataset
 Engine-global Cayenne settings go under `runtime.params`; setting one under `acceleration.params` has no
 effect. **Deprecated in v2.2.0**: table-level `cayenne_segment_cache_mb` — Cayenne tables share one
 process-wide Vortex segment cache sized by `runtime.params.cayenne_segment_cache_mb` (default 1/64 of the
-memory entitlement, clamped to 256 MiB–2 GiB). **Breaking in v2.2.0**: an unset `cayenne_tuning` resolves
-to `auto`; the closed-loop controller needs an explicit `cayenne_tuning: adaptive`.
+memory entitlement, clamped to 256 MiB–2 GiB). **Breaking in v2.4.0-rc.2**: adaptive tuning is
+runtime-wide — `runtime.adaptive_tuning: enabled` (default `disabled`; other values fail the load) with
+targets under `runtime.params` (`target_replication_lag`, `target_freshness`, `target_query_latency`,
+`target_convergence_window`, `target_qph`). The dataset parameters `cayenne_tuning` and `cayenne_goal_*`
+only log a warning. On v2.2.0–v2.3.x, an unset `cayenne_tuning` resolves to `auto`; the closed-loop
+controller needs an explicit `cayenne_tuning: adaptive`.
 
 The compaction memory pool is reserved only for file-mode accelerations on a small-write refresh profile,
 so `refresh_mode: full` keeps the full memory limit for queries, and budgets derive from the process's
