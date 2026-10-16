@@ -146,6 +146,14 @@ if args[0] == 'api':
         path.write_text(json.dumps(catalog))
         self.assertIn("unpinned remote", self.script("validate_plugin", ok=False).stderr)
 
+    def test_only_stable_or_rc_versions_are_accepted(self):
+        path = self.repo / "plugin.json"
+        manifest = json.loads(path.read_text())
+        for version in ("2.4.0-beta.1", "2.4.0-rc", "2.4.0-rc.1-models", "2.4"):
+            manifest["version"] = version
+            path.write_text(json.dumps(manifest))
+            self.assertIn("runtime-aligned release version", self.script("validate_plugin", ok=False).stderr)
+
     def test_tag_version_and_checkout_must_match(self):
         self.assertIn("must match manifest", self.script("prepare_release", "--tag", "v0.0.0", ok=False).stderr)
         self.run_cmd("git", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "different commit")

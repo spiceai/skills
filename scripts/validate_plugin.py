@@ -41,7 +41,8 @@ def validate_source(root=ROOT):
     canonical = manifests["plugin.json"]
     name, version = canonical["name"], canonical["version"]
     require(name == "spiceai", "Public plugin name must remain spiceai")
-    require(re.fullmatch(r"\d+\.\d+\.\d+", version), "Expected a runtime-aligned release version")
+    # Matches Spice runtime release tags: stable X.Y.Z or a release candidate X.Y.Z-rc.N.
+    require(re.fullmatch(r"\d+\.\d+\.\d+(-rc\.\d+)?", version), "Expected a runtime-aligned release version")
     for path, manifest in manifests.items():
         require((manifest.get("name"), manifest.get("version")) == (name, version), f"{path}: name/version mismatch")
     for path in CATALOGS:
