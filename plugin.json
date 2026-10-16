@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "spiceai",
-  "version": "2.3.2",
+  "version": "2.4.0-rc.2",
   "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
   "author": {
     "name": "Spice AI",
@@ -26,7 +26,7 @@
       "interface": {
         "displayName": "spiceai",
         "shortDescription": "Spice.ai data and AI workflows",
-        "longDescription": "Build and manage Spice.ai applications through the CLI, Cloud APIs, and official SDKs. Skills cover runtime setup, Spicepod configuration, data connectors, federated SQL, data acceleration, vector and full-text search, AI models, caching, secrets, cloud management, and Terraform. Includes cookbook guidance and Python, JavaScript/TypeScript, Go, Rust, Java, and .NET client integration. Runtime guidance targets Spice v2.3.x, checked against v2.3.2, and directs the agent to check your installed version before recommending configuration. Runtime setup uses an existing Spice installation; installation and upgrades are user-managed. Running commands requires a compatible environment with shell access. Cloud and data-source workflows require your own accounts and locally configured credentials. This package contains skills and helper scripts; it does not include a hosted MCP server.",
+        "longDescription": "Build and manage Spice.ai applications through the CLI, Cloud APIs, and official SDKs. Skills cover runtime setup, Spicepod configuration, data connectors, federated SQL, data acceleration, vector and full-text search, AI models, caching, secrets, cloud management, and Terraform. Includes cookbook guidance and Python, JavaScript/TypeScript, Go, Rust, Java, and .NET client integration. Runtime guidance targets Spice v2.4.x, checked against v2.4.0-rc.2, and directs the agent to check your installed version before recommending configuration. Runtime setup uses an existing Spice installation; installation and upgrades are user-managed. Running commands requires a compatible environment with shell access. Cloud and data-source workflows require your own accounts and locally configured credentials. This package contains skills and helper scripts; it does not include a hosted MCP server.",
         "developerName": "Spice AI",
         "category": "Developer Tools",
         "capabilities": [

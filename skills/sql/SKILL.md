@@ -11,13 +11,14 @@ Text-to-SQL can use the runtime's configured model or an application-owned LLM.
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.2). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
+Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
 
 | Spice | DataFusion | Dialect changes |
 | --- | --- | --- |
 | v2.0.x | 52.5 | Baseline for this skill |
 | v2.1.x | 54 | Adds `LATERAL` joins and `ANY` / `ALL` subqueries |
 | v2.2.x–v2.3.x | 54.1 | — |
+| v2.4.x | 55.2 | `EXPLAIN` takes PostgreSQL-style options and `FORMAT pgjson`; element-wise array math functions |
 
 - **Find it**: `spice version` or `spiced --version` for Spice; `SELECT version()` returns the DataFusion version, not the Spice version.
 - **Markers**: unmarked content applies to v2.0.0 and later; later additions are marked `(vX.Y.Z+)`. On an older runtime, read that release line's SQL reference (e.g. `https://spiceai.org/docs/v2.1/reference/sql`); on a newer one, check the [release notes](https://spiceai.org/releases).
@@ -105,7 +106,8 @@ datasets:
         full_text_search:
           enabled: true # enables text_search on this column
     acceleration:
-      enabled: true # default arrow engine: full JSON function support
+      enabled: true
+      engine: arrow # full JSON function support; the default is cayenne from v2.4.0-rc.1
 ```
 
 ## Step 1 — Introspect Schema
@@ -478,7 +480,7 @@ for attempt in range(3):
 | `This feature is not implemented` (LATERAL) | Pre-v2.1.0, or `RIGHT`/`FULL` lateral | Use `CROSS`/`LEFT JOIN LATERAL`, a CTE, or a correlated subquery       |
 | `Table not found`                           | Wrong name or schema                  | Check with `SHOW TABLES`. Use fully qualified `schema.table` if needed |
 | `Arrow error: Cast error`                   | Type mismatch in operation            | Check types with `arrow_typeof()`, add explicit CAST                   |
-| JSON function unsupported or slow           | Federated or non-Arrow source         | Accelerate with the default `arrow` engine                             |
+| JSON function unsupported or slow           | Federated or non-Arrow source         | Accelerate with `engine: arrow` (the default before v2.4.0-rc.1)       |
 | `ai() function not found`                   | No model configured                   | Add `models:` section to spicepod.yaml                                 |
 | `vector_search: no embedding column`        | No embeddings on column               | Add `embeddings:` to the column in spicepod.yaml                       |
 | `text_search: column not indexed`           | Full-text search not enabled          | Add `full_text_search: enabled: true` to column config                 |

@@ -7,14 +7,15 @@ committed or included in an archive. Git history and old releases are not rewrit
 ## Release automation
 
 1. Update every manifest/catalog version and each skill's runtime compatibility section.
-   The plugin version follows the supported Spice runtime release, currently `2.3.2`.
+   The plugin version follows the supported Spice runtime release, currently `2.4.0-rc.2`.
 2. Run `make check test-distribution release-preview`. The preview is in `dist/preview/`;
    its catalog entries contain placeholder SHAs because local changes may not exist at the
    recorded base commit. Pull requests and `trunk` pushes run these same checks
    and retain the preview as an Actions artifact.
 3. Merge the changes, then create and push a new `v<version>` tag at that clean commit.
    The **Release Plugin** workflow validates the tag, builds the release, and creates a **draft
-   GitHub release** with all artifacts and marketplace instructions. Review and publish that draft.
+   GitHub release** with all artifacts and marketplace instructions. A release-candidate version
+   (`X.Y.Z-rc.N`) gets a draft marked as a pre-release. Review and publish that draft.
    If you create a release in GitHub's UI, its `published` event also runs the workflow.
 4. To retry an existing tag, dispatch **Release Plugin** with its exact tag. Locally, the equivalent
    build is `make release-assets TAG=v<version>` from a clean checkout at the tag. The workflow

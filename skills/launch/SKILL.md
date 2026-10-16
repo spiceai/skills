@@ -40,7 +40,7 @@ to `.env`) adds `.env`, `.env.local`, `.spice-launch/`, and `.spice/` to `DIR/.g
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.2) and the Spice.ai Cloud Management API as
+Written for **Spice v2.4.x** (checked against v2.4.0-rc.2) and the Spice.ai Cloud Management API as
 tested in October 2026. What to check:
 
 - **The local CLI**: `spice version` (also `spice version -o json`). The helper needs `spice cloud`

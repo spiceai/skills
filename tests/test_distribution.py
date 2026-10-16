@@ -13,7 +13,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from publish_release import merge_notes  # noqa: E402
+from publish_release import draft_flags, merge_notes  # noqa: E402
 
 
 class DistributionTests(unittest.TestCase):
@@ -146,6 +146,14 @@ if args[0] == 'api':
         path.write_text(json.dumps(catalog))
         self.assertIn("unpinned remote", self.script("validate_plugin", ok=False).stderr)
 
+    def test_only_stable_or_rc_versions_are_accepted(self):
+        path = self.repo / "plugin.json"
+        manifest = json.loads(path.read_text())
+        for version in ("2.4.0-beta.1", "2.4.0-rc", "2.4.0-rc.1-models", "2.4"):
+            manifest["version"] = version
+            path.write_text(json.dumps(manifest))
+            self.assertIn("runtime-aligned release version", self.script("validate_plugin", ok=False).stderr)
+
     def test_tag_version_and_checkout_must_match(self):
         self.assertIn("must match manifest", self.script("prepare_release", "--tag", "v0.0.0", ok=False).stderr)
         self.run_cmd("git", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "different commit")
@@ -170,10 +178,15 @@ if args[0] == 'api':
         self.script("publish_release")
         create = next(c for c in self.calls() if c["args"][:2] == ["release", "create"])
         self.assertIn("--draft", create["args"])
+        self.assertEqual("--prerelease" in create["args"], "-rc." in self.version)
         self.assertIn("--verify-tag", create["args"])
         self.assertTrue(any(a.endswith(".tar.gz") for a in create["args"]))
         self.assertTrue(any(a.endswith("SHA256SUMS.txt") for a in create["args"]))
         self.assertIn(self.commit, create["body"])
+
+    def test_only_release_candidate_drafts_are_prereleases(self):
+        self.assertEqual(draft_flags("2.4.0"), ["--draft"])
+        self.assertEqual(draft_flags("2.4.0-rc.2"), ["--draft", "--prerelease"])
 
     def test_existing_release_preserves_notes_and_reruns_idempotently(self):
         self.build()

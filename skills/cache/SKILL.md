@@ -13,19 +13,21 @@ Spice caches results from SQL queries (`/v1/sql`), search (`/v1/search`), and em
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.3.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0-rc.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
 | `runtime.results_cache` (`cache_max_size`) | Deprecated in v1.4.0 (auto-migrates) | `runtime.caching.sql_results` (`max_size`) |
-| `engine: pingora` on an OSS build | Breaking in v2.2.0 (Enterprise only; falls back to Moka) | `engine: moka` (default) |
+| `engine: moka` / `engine: pingora` | Breaking in v2.4.0-rc.1 (accepted but ignored; one sharded backend) | Delete `engine`; pick behavior with `eviction_policy` |
+| `engine: pingora` on an OSS build (v2.2.0–v2.3.x) | Breaking in v2.2.0 (Enterprise only; falls back to Moka) | `engine: moka` (default) |
 | Caching-accelerator storage created before v2.0.0 | Breaking in v2.0.0 (errors at startup) | Delete the accelerator file before upgrading |
 | Refresh or DML write evicting cached results | Changed in v2.3.0 when `stale_while_revalidate_ttl` is set (served `STALE`) | Leave the TTL unset or `0s` to keep eviction |
+| Refresh, CDC, or retention invalidating SQL results | Breaking in v2.4.0-rc.2 (entries now age out on `item_ttl` only) | Lower `item_ttl`, or send `cache-control: no-cache` |
 | Unlabeled `*_cache_evictions` | Changed in v2.1.5 (`reason` label) | Aggregate by `reason` |
 
 ## Configuration
@@ -68,8 +70,10 @@ runtime:
 | `eviction_policy`   | `lru`    | `lru` (Least Recently Used) or `tiny_lfu` (higher hit rate for skewed access)         |
 | `item_ttl`          | `1s`     | Cache entry TTL (Time to Live)                                                        |
 | `hashing_algorithm` | `xxh3`   | Hash for cache keys: `xxh3`, `ahash`, `siphash`, `blake3`, `xxh32`, `xxh64`, `xxh128` |
-| `engine`            | `moka`   | Cache backend: `moka`, or `pingora` on a Spice.ai Enterprise build (**Breaking in v2.2.0**) |
+| `engine`            | `moka`   | Before v2.4.0-rc.1: `moka`, or `pingora` on a Spice.ai Enterprise build (**Breaking in v2.2.0**). Ignored from v2.4.0-rc.1 |
 
+**Breaking in v2.4.0-rc.1**: all three caches use one sharded backend; `engine` still parses but selects
+nothing, and the startup line (`Initialized sql results cache; …`) no longer names an engine. On v2.2.0–v2.3.x,
 `engine: pingora` is **not** rejected on an open-source build — it parses, logs a fallback line, and
 runs on Moka. Read the engine off the cache's own startup line (`Initialized sql results cache; … engine: Moka`)
 rather than trusting the configured value. Pingora has no `tiny_lfu`; asking for both warns and uses LRU.
@@ -127,7 +131,12 @@ runtime:
 
 > **Conflict warning**: When using `refresh_mode: caching` on a dataset, do not configure both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset. Choose one approach.
 
-### Stale across acceleration refresh (v2.3.0+)
+### Stale across acceleration refresh (v2.3.0–v2.3.x)
+
+**Breaking in v2.4.0-rc.2**: an acceleration refresh, CDC batch, or retention pass no longer touches
+SQL results-cache entries; they expire on `item_ttl` (then `stale_while_revalidate_ttl`), so a query can
+return pre-refresh data until then. Client DML writes, dataset reload, and unload still evict. Lower
+`item_ttl` when results must follow refreshes closely. The rest of this section describes v2.3.x.
 
 With a non-zero `stale_while_revalidate_ttl`, an acceleration refresh or DML write **marks** dependent
 SQL results-cache entries stale instead of evicting them. Inside the window — measured from the change,
@@ -248,12 +257,13 @@ Cache metrics are available at the Prometheus-compatible metrics endpoint. Prefi
 | `*_cache_hit_ratio`      | Gauge   | Hit ratio (hits / total)  |
 
 The `reason` label is `size` (over `max_size`), `expired` (past `item_ttl`), or `invalidated` (a
-refresh or DML write dropped entries that read a table); alert on `size` and `expired` for real cache
+refresh or DML write dropped entries that read a table; from v2.4.0-rc.2, only a client write, dataset
+reload, or unload); alert on `size` and `expired` for real cache
 pressure. `results_cache_stale_rejections` (v2.1.5+) counts lookups that refused an entry because a
 table it read had changed; they are also counted in `results_cache_misses`. With a non-zero
 `stale_while_revalidate_ttl`, refreshes mark entries stale instead of evicting them, so watch
 `results_cache_table_invalidations{mode="evict"|"mark_stale"}` and
-`results_cache_swr_revalidations{outcome}` (v2.3.0+). Counters export as zero from startup (v2.1.5+).
+`results_cache_swr_revalidations{outcome}` (v2.3.0+; from v2.4.0-rc.2 `mode` is always `evict`). Counters export as zero from startup (v2.1.5+).
 
 ## Common Recipes
 
@@ -298,9 +308,9 @@ runtime:
 
 | Issue                                                | Solution                                                                                                                                                  |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings); a refresh or DML write on a queried table evicts entries (`reason="invalidated"`) unless `stale_while_revalidate_ttl` is set (v2.3.0+) |
+| Always getting `MISS`                                | Check `item_ttl` is long enough; verify `cache_key_type` (`plan` matches equivalent queries, `sql` requires exact strings); a refresh or DML write on a queried table evicts entries (`reason="invalidated"`) unless `stale_while_revalidate_ttl` is set (v2.3.x; from v2.4.0-rc.2 a refresh does not evict) |
 | Cache filling up quickly                             | Increase `max_size`, enable `zstd` encoding, or reduce `item_ttl`. **Changed in v2.3.0**: `max_size` counts more of each entry's retained memory          |
-| Stale data being served                              | With `stale_while_revalidate_ttl` set, entries are served `STALE` for that window after `item_ttl` expires or (v2.3.0+) after a refresh or DML write — reduce `item_ttl` / the SWR TTL, or send `cache-control: no-cache` |
+| Stale data being served                              | With `stale_while_revalidate_ttl` set, entries are served `STALE` for that window after `item_ttl` expires or (v2.3.x) after a refresh or DML write. From v2.4.0-rc.2 a refresh does not invalidate results at all, so pre-refresh rows are served `HIT` until `item_ttl` — reduce `item_ttl` / the SWR TTL, or send `cache-control: no-cache` |
 | Dynamic functions (`NOW()`) returning cached results | Switch to `cache_key_type: plan` or use `cache-control: no-cache`                                                                                         |
 | SWR conflict error                                   | Don't set both `runtime.caching.sql_results.stale_while_revalidate_ttl` and `acceleration.params.caching_stale_while_revalidate_ttl` for the same dataset |
 

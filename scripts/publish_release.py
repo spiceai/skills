@@ -25,6 +25,11 @@ def merge_notes(existing, generated):
     return existing.rstrip() + ("\n\n" if existing.strip() else "") + generated.strip() + "\n"
 
 
+def draft_flags(version):
+    """GitHub does not infer pre-release status from the tag, so mark release candidates explicitly."""
+    return ["--draft"] + (["--prerelease"] if "-rc." in version else [])
+
+
 def publish(directory):
     manifest, _ = validate_source()
     name, version = manifest["name"], manifest["version"]
@@ -59,7 +64,7 @@ def publish(directory):
         if release.returncode:
             require("HTTP 404" in release.stderr, f"Cannot read GitHub release: {release.stderr.strip()}")
             notes.write_text(generated)
-            subprocess.run(command + ["create", tag, "--repo", repository, "--verify-tag", "--draft",
+            subprocess.run(command + ["create", tag, "--repo", repository, "--verify-tag", *draft_flags(version),
                                       "--title", f"{name} {tag}", "--notes-file", str(notes),
                                       *[str(directory / a) for a in assets]], check=True)
             status = "draft_created"
