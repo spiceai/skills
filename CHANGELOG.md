@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 2.3.3
+
+- Align plugin metadata with Spice.ai OSS runtime `v2.3.3`. The v2.3.3 runtime only updates trusted certificates, so no skill guidance changes for it.
+- Check the skills against v2.3.2 and v2.3.3. Version Compatibility sections now say `checked against v2.3.3`.
+- Fix spice-accelerators and spice-acceleration, which said that Cayenne ignores `indexes`. From v2.3.2, Cayenne builds a secondary index for each entry and uses it for exact-key lookups only.
+- Add the v2.3.2 breaking changes to spice-accelerators: `cayenne_datalake_clustering_columns` is replaced by `cayenne_cluster_by`, and Cayenne datasets with different `cayenne_file_path` values must share one `cayenne_metadata_dir`.
+
+## 2.3.2
 
 - Add the `spice-cookbook` skill, which sets up and runs recipes from the [Spice.ai cookbook](https://github.com/spiceai/cookbook). It picks a recipe by name or goal, fetches the cookbook (or a pull request or branch), and checks the runtime version, Docker, secrets, tools, and ports with `scripts/cookbook.sh` before running the README steps. The script reports whether each secret is set without printing its value.
 - Fix spice-setup and spicepod-config, which set bind addresses with `spice run -- --http ...`. That fails on every v2 CLI (`argument '--http' cannot be used multiple times`) because `spice run` already passes `--http`. Use `spice run --http-endpoint`, `--flight-endpoint`, and `--metrics-endpoint` instead.
