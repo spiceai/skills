@@ -28,7 +28,7 @@ candidates when a name is ambiguous.
 
 ## Version Compatibility
 
-Written for **Spice v2.3.x** (checked against v2.3.1). Check the user's runtime version before running a recipe:
+Written for **Spice v2.3.x** (checked against v2.3.3). Check the user's runtime version before running a recipe:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag. Not the runtime version: `version: v1` in a recipe's `spicepod.yaml` (manifest schema; v2 still loads `v1`) or SQL `version()`. `inspect` reports it under `spice`.
 - **The cookbook has no release tags**: `trunk` tracks the latest Spice release. Each README states a minimum (`Works with v1.8+`), which `inspect` compares with the installed runtime. A README that says `Deprecated in v2.0+` needs a v1.x runtime.
