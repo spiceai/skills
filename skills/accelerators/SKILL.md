@@ -9,12 +9,12 @@ Accelerators materialize data locally from connected sources for faster queries 
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.0). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0-rc.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
@@ -22,6 +22,7 @@ Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's run
 | DuckDB `partitioned_write_flush_threshold` | Renamed in v2.0.0 (`…_rows`); removed in v2.2.0 | Cayenne or Arrow partitioning |
 | `acceleration.params.cayenne_segment_cache_mb` | Deprecated in v2.2.0 (ignored) | `runtime.params.cayenne_segment_cache_mb` |
 | `acceleration` without `engine` (Arrow) | Breaking in v2.4.0-rc.1 (now Cayenne; Windows keeps Arrow) | `engine: arrow` to keep Arrow |
+| `engine: arrow`, `duckdb`, `sqlite`, `turso`, `postgres` | Deprecated in v2.4.0 (startup warning; removal planned for v2.5) | `engine: cayenne` ([migration guide](https://spiceai.org/docs/components/data-accelerators/cayenne/migration)); on native Windows, run Spice in Docker or WSL |
 | `on_conflict` on Cayenne | Deprecated in v2.4.0-rc.1 (removal planned for v3.0) | `primary_key` alone (+ `time_column` for newest-wins) |
 | `cayenne_tuning` (`adaptive`/`auto`), `cayenne_goal_*` | Breaking in v2.4.0-rc.2 (ignored with a warning) | `runtime.adaptive_tuning: enabled`/`disabled`, `runtime.params.target_*` |
 | DuckDB v1.5 SQL and functions | Changed in v2.2.1 (bundled DuckDB is v1.4.4) | DuckDB 1.4-compatible SQL |
@@ -39,12 +40,16 @@ datasets:
     name: my_table
     acceleration:
       enabled: true
-      engine: duckdb # cayenne (default, v2.4.0-rc.1+; arrow before, and on Windows), arrow, duckdb, sqlite, postgres, turso
+      engine: cayenne # default (v2.4.0-rc.1+; arrow before, and on Windows); arrow, duckdb, sqlite, postgres, turso are deprecated (v2.4.0)
       mode: memory # memory (default) or file
       refresh_check_interval: 1h
 ```
 
 ## Choosing an Accelerator
+
+**Deprecated in v2.4.0**: every engine except `cayenne` logs a startup warning and is planned for removal in v2.5.
+On v2.4.0+, use `cayenne` for new datasets. The table below compares engines for runtimes before v2.4.0 and for
+planning a migration; don't delete acceleration-only data to change engines.
 
 | Use Case                               | Engine     | Why                                                                        |
 | -------------------------------------- | ---------- | -------------------------------------------------------------------------- |
