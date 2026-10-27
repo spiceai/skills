@@ -7,7 +7,7 @@ committed or included in an archive. Git history and old releases are not rewrit
 ## Release automation
 
 1. Update every manifest/catalog version and each skill's runtime compatibility section.
-   The plugin version follows the supported Spice runtime release, currently `2.4.0-rc.2`.
+   The plugin version follows the supported Spice runtime release, currently `2.4.0`.
 2. Run `make check test-distribution release-preview`. The preview is in `dist/preview/`;
    its catalog entries contain placeholder SHAs because local changes may not exist at the
    recorded base commit. Pull requests and `trunk` pushes run these same checks

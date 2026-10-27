@@ -11,7 +11,7 @@ the runtime data plane; project creation and deployments belong to the `cloud` s
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check `spice version`, `spiced --version`,
+Written for **Spice v2.4.x** (checked against v2.4.0). Check `spice version`, `spiced --version`,
 or the deployed image tag for the runtime. SDK versions are independent: inspect the application's
 dependency manifest and lockfile before choosing methods or options. The Spicepod `version: v2`
 field and SQL `version()` do not identify either version.

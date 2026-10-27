@@ -13,15 +13,16 @@ tier first, falling back to the durable store.
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.0). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0-rc.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| `vectors.engine: duckdb` | Deprecated in v2.4.0 (removal planned for v2.5) | `engine: cayenne` with no `vectors` block (Cayenne indexes embedding columns for `vector_search`); [migration guide](https://spiceai.org/docs/components/data-accelerators/cayenne/migration#migrating-the-duckdb-vector-engine) |
 | `google_api_key` on `from: google` embeddings | Breaking in v2.3.0 | Vertex AI settings (see models) |
 | `col =>` in `vector_search` / `text_search` | Renamed in v2.0.0 | `column =>` |
 | `fused_score` column from `rrf()` | Renamed in v2.0.0 | `_fused_score` |
@@ -301,8 +302,8 @@ FROM rrf(
 ## Vector Engines
 
 Store and index embeddings at scale with a vector engine (`vectors.engine`): `s3_vectors`, `duckdb`
-(HNSW via DuckDB VSS; requires `acceleration.engine: duckdb`), or `elasticsearch` (Spice.ai
-Enterprise). S3 Vectors example:
+(HNSW via DuckDB VSS; requires `acceleration.engine: duckdb`; **deprecated in v2.4.0**, removal planned for
+v2.5), or `elasticsearch` (Spice.ai Enterprise). S3 Vectors example:
 
 ```yaml
 datasets:

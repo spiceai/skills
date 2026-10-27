@@ -11,16 +11,18 @@ Unlike traditional caches that store query results, Spice accelerates entire dat
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0-rc.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.0). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0-rc.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
 | `acceleration` without `engine` (Arrow) | Breaking in v2.4.0-rc.1 (now Cayenne; Windows keeps Arrow) | `engine: arrow` to keep Arrow |
+| `engine: arrow`, `duckdb`, `sqlite`, `turso`, `postgres` | Deprecated in v2.4.0 (removal planned for v2.5) | `engine: cayenne` (see accelerators) |
+| Top-level `snapshots` section, `runtime.scheduler.state_location` | Deprecated in v2.4.0 (still works and takes priority) | `runtime.state`, or per-dataset `acceleration.snapshots_location` |
 | `on_conflict` | Deprecated in v2.4.0-rc.1 (removal planned for v3.0); Cayenne keeps one row per `primary_key` without it | `primary_key` (+ `time_column` for newest-wins) on Cayenne |
 | `on_conflict` to keep writes in the acceleration | Breaking in v2.4.0-rc.1 (no longer routes writes) | `write_mode: acceleration` (not with `refresh_mode: changes`) |
 | `acceleration.ready_state` | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
@@ -102,7 +104,7 @@ acceleration:
   refresh_check_interval: 30s # snapshot poll interval; defaults to 1m
 ```
 
-`refresh_mode: snapshot` (Spice.ai Enterprise) also needs the top-level `snapshots` block (see Snapshots
+`refresh_mode: snapshot` (Spice.ai Enterprise) also needs a snapshot location (see Snapshots
 below) and a snapshot-capable file engine (DuckDB, SQLite, Cayenne, or Turso). The runtime polls the
 snapshot store at `refresh_check_interval`, validates each newer snapshot's schema, and swaps the file
 atomically, so queries keep serving from the previous snapshot until the swap lands. `INSERT`, `UPDATE`,
@@ -277,14 +279,23 @@ Snapshots (Spice.ai Enterprise) bootstrap file-mode accelerations (`duckdb`, `sq
 on startup from object storage (S3, ADLS Gen2, GCS) or a local `file://` folder, dramatically reducing
 cold-start latency in distributed deployments. Each snapshotted dataset must write to its own file.
 
+On v2.4.0+, snapshots are stored in the `snapshots/` folder of `runtime.state.location`:
+
 ```yaml
-snapshots:
-  enabled: true
-  location: s3://my_bucket/snapshots/ # a URI; use file:///path for a local folder
-  bootstrap_on_failure_behavior: warn # warn (default) | retry | fallback
-  params:
-    s3_auth: iam_role
+runtime:
+  state:
+    location: s3://my_bucket/spice/ # a URI; use file:///path for a local folder
+    params:
+      s3_auth: iam_role
 ```
+
+A dataset can override this with `acceleration.snapshots_location`, `snapshots_params`, and
+`snapshots_bootstrap_on_failure_behavior` (`warn` (default) | `retry` | `fallback`). Snapshots expire after
+28 days, except each dataset's current and newest snapshot (v2.4.0+).
+
+**Deprecated in v2.4.0**: the top-level `snapshots` section (`enabled`, `location`, `params`,
+`bootstrap_on_failure_behavior`). It still works and takes priority over `runtime.state`; before v2.4.0 it
+is the only way to set the snapshot location.
 
 Per-dataset opt-in — `acceleration.snapshots` is a string: `enabled`, `bootstrap_only`, `create_only`,
 or `disabled` (default):

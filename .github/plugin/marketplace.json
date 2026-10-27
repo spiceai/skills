@@ -11,7 +11,7 @@
     {
       "name": "spiceai",
       "source": "./",
-      "version": "2.4.0-rc.2",
+      "version": "2.4.0",
       "description": "Spice.ai CLI, Cloud API, and SDK workflows for SQL, search, AI, and data acceleration",
       "homepage": "https://spiceai.org",
       "repository": "https://github.com/spiceai/skills",
