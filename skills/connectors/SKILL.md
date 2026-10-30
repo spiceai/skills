@@ -9,15 +9,23 @@ Data Connectors enable federated SQL queries across databases, data warehouses, 
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.1.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| `mysql_connection_string` with no pool settings | Breaking in v2.4.1 (1–5 connections, was 10–100; a non-integer or conflicting pool setting fails the dataset) | `mysql_pool_min` / `mysql_pool_max` (now applied with a connection string) |
+| MySQL connections held open indefinitely | Changed in v2.4.1 (replaced after `mysql_connection_max_lifetime`, default `5m`) | `mysql_connection_max_lifetime: 0s` to keep them open |
+| Iceberg REST catalog that vends a private or loopback storage endpoint (e.g. local Nessie + MinIO) | Breaking in v2.4.1 (refused) | `iceberg_s3_endpoint` and `iceberg_s3_region` in the Spicepod |
+| Glue table location `s3a://`, `http://`, `https://` | Breaking in v2.4.1 (rejected) | An `s3://` location |
+| URL table fragment with `endpoint`, `allow_http`, access keys, or proxy settings | Breaking in v2.4.1 (rejected) | A dataset with those params; `SPICE_URL_TABLE_ALLOW_PRIVATE_HOSTS=true` for a private proxy |
+| HTTP response that decodes past 64 MiB at more than 100:1 | Breaking in v2.4.1 (refused) | `Accept-Encoding: identity` in `http_headers` |
+| XLSX with cells out of document order; PDF with `LZWDecode` or an indirect `/Filter` | Breaking in v2.4.1 (fails to load) | Re-save or convert the file |
+| Parquet, ORC, or document files past the size and nesting limits | Breaking in v2.4.1 (fail to load) | See the [v2.4.1 release notes](https://spiceai.org/releases) |
 | `schema_inference` dataset field | Removed in v2.2.0 (fails to load) | Delete it — inference is always on |
 | Metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` (document tables keep `location`, `content`) |
 | ScyllaDB in the default build | Breaking in v2.3.0 | `--features scylladb` build, or Spice.ai Enterprise |
