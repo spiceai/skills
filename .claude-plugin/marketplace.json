@@ -11,7 +11,7 @@
       "name": "spiceai",
       "source": "./",
       "description": "Skills for working with the Spice.ai runtime \u2014 data federation, acceleration, search, AI/LLM, and cloud management",
-      "version": "2.4.0",
+      "version": "2.4.1",
       "homepage": "https://spiceai.org",
       "repository": "https://github.com/spiceai/skills",
       "license": "MIT",

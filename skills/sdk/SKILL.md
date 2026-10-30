@@ -11,7 +11,7 @@ the runtime data plane; project creation and deployments belong to the `cloud` s
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0). Check `spice version`, `spiced --version`,
+Written for **Spice v2.4.x** (checked against v2.4.1). Check `spice version`, `spiced --version`,
 or the deployed image tag for the runtime. SDK versions are independent: inspect the application's
 dependency manifest and lockfile before choosing methods or options. The Spicepod `version: v2`
 field and SQL `version()` do not identify either version.
@@ -26,6 +26,7 @@ and source. Check runtime release notes before using a feature introduced after 
 | A Cloud Management API token authenticates runtime queries | Management and runtime use different credentials | Use the project's runtime API key; management tokens belong to `cloud` |
 | An HTTP URL can be used as an Arrow Flight address | The transports have separate endpoints | Configure the HTTP and Flight endpoints for the same runtime or project |
 | A method in the SDK default branch is available locally | It may be newer than the installed release | Use the matching published release and lockfile |
+| A Flight SQL prepared statement handle stays valid across runtime restarts and replicas | Breaking in v2.4.1 (valid only on the runtime process that issued it) | Prepare the statement again after a restart, or use session affinity across replicas |
 
 ## Choose the existing language and client
 

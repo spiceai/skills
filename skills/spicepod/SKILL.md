@@ -11,12 +11,12 @@ Spice is an open-source SQL query, search, and LLM-inference engine — not a re
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.0). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.0.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.1.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
@@ -27,6 +27,9 @@ Written for **Spice v2.4.x** (checked against v2.4.0). Check the user's runtime 
 | Metrics `accelerated_refresh*` | Renamed in v2.0.0 | `acceleration_refresh*` |
 | Full-node CPU sizing for a pod with a CPU request and no limit | Breaking in v2.2.0 | `runtime.cpu.cores: all` |
 | Browser `Origin` on `/v1/mcp` | Breaking in v2.3.1 (checked, else `403`) | List origins in `runtime.cors.allowed_origins` |
+| Metric labels `user_agent`, `client_version`, `client_system`, `baggage` | Removed in v2.4.1 | The `client` label (`spice`, `repl`, `spicepy`, `spice-rs`, `gospice`, `spice.js`, `spice-java`, `spice-dotnet`, `other`) |
+| TLS certificate that does not match its private key | Breaking in v2.4.1 (runtime does not start; a mismatched reload keeps the old certificate) | A matching certificate and key |
+| `spice` CLI with a missing or invalid `--tls-root-certificate-file` | Breaking in v2.4.1 (command fails) | A valid CA file path |
 
 ## Basic Structure
 
