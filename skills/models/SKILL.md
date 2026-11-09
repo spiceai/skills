@@ -60,6 +60,7 @@ models:
 | Spice.ai (v2.2.0+)     | `spice.ai:openai/gpt-4o`                 | Release Candidate |
 | HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct`      | Release Candidate |
 | Local file             | `file:./models/llama.gguf`               | Release Candidate |
+| TypeSafe (v2.4.0+)     | `typesafe:jev` (decisions only)          | —                 |
 
 Prefix aliases: `huggingface:` = `hf:`; `spiceai:` = `spice.ai:` (model ids are `<provider>/<model>`).
 The `perplexity` provider is **Removed in v2.0.0**; ONNX/traditional ML models and `/v1/predict` are
@@ -183,6 +184,20 @@ curl -XPOST "http://localhost:8090/v1/nsql" \
   -H "Content-Type: application/json" \
   -d '{"query": "What was the highest tip any passenger gave?"}'
 ```
+
+### Decisions (v2.4.0+)
+
+Typed yes/no, label, and score answers with probabilities, in SQL (`ai_if`, `ai_probability`,
+`ai_classify`, `ai_score`, `ai_decide`, each taking `model => '<name>'`) or over the OpenAI-compatible
+`POST /v1/decisions`. Any chat model can answer (uncalibrated probabilities); a `typesafe:` model
+(`typesafe_api_key`) returns calibrated ones but serves only decisions — `/v1/chat/completions` returns `400`.
+
+```sql
+SELECT id, ai_classify(body, ['billing', 'technical'], model => 'jev') AS team FROM tickets;
+```
+
+See [Decisions](https://spiceai.org/docs/features/large-language-models/decisions) and
+[TypeSafe](https://spiceai.org/docs/components/models/typesafe).
 
 ### CLI
 

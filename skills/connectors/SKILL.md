@@ -23,6 +23,7 @@ Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime 
 | Iceberg REST catalog that vends a private or loopback storage endpoint (e.g. local Nessie + MinIO) | Breaking in v2.4.1 (refused) | `iceberg_s3_endpoint` and `iceberg_s3_region` in the Spicepod |
 | Glue table location `s3a://`, `http://`, `https://` | Breaking in v2.4.1 (rejected) | An `s3://` location |
 | URL table fragment with `endpoint`, `allow_http`, access keys, or proxy settings | Breaking in v2.4.1 (rejected) | A dataset with those params; `SPICE_URL_TABLE_ALLOW_PRIVATE_HOSTS=true` for a private proxy |
+| HTTP `rate_control_acquire_timeout` unset waits without a limit | Breaking in v2.4.0 (waits up to `client_timeout`); datasets sharing an HTTP origin must use identical rate-control params or fail to load | `rate_control_acquire_timeout: 0` for unbounded, or a duration such as `30s` |
 | HTTP response that decodes past 64 MiB at more than 100:1 | Breaking in v2.4.1 (refused) | `Accept-Encoding: identity` in `http_headers` |
 | XLSX with cells out of document order; PDF with `LZWDecode` or an indirect `/Filter` | Breaking in v2.4.1 (fails to load) | Re-save or convert the file |
 | Parquet, ORC, or document files past the size and nesting limits | Breaking in v2.4.1 (fail to load) | See the [v2.4.1 release notes](https://spiceai.org/releases) |
@@ -87,7 +88,7 @@ datasets:
 | S3           | `s3://bucket/path/`          | Stable            |
 | Delta Lake   | `delta_lake:/path/to/delta/` | Stable            |
 | File (local) | `file:./path/to/data`        | Stable            |
-| Iceberg      | `iceberg:https://<catalog>/v1/namespaces/<ns>/tables/<table>` | Release Candidate (read+write) |
+| Iceberg      | `iceberg:https://<catalog>/v1/namespaces/<ns>/tables/<table>`, or a table root `iceberg:s3://bucket/db/table` (v2.4.0+, no catalog) | Release Candidate (read+write) |
 | DuckLake     | `ducklake:table`             | Beta              |
 | Azure BlobFS | `abfs://container/path/`     | Alpha             |
 | Google Cloud Storage | `gs://bucket/path/`  | Alpha             |
@@ -108,6 +109,7 @@ datasets:
 | SharePoint   | `sharepoint:drive:<name>/path:/<folder>` | Beta           |
 | FTP/SFTP     | `sftp://host/path/`                   | Alpha             |
 | HTTP/HTTPS   | `https://url/path/data.csv`           | Alpha             |
+| Hugging Face (v2.4.0+) | `hf://datasets/<owner>/<repo>/<path>/` | Alpha      |
 | Kafka        | `kafka:topic`                         | Alpha             |
 | Debezium CDC | `debezium:topic` (Kafka), `cdc:name` (HTTP push, v2.2.0+) | Alpha |
 | Elasticsearch | `elasticsearch:index`                | Alpha (Spice.ai Enterprise) |
@@ -151,12 +153,10 @@ datasets:
       mysql_pass: ${ secrets:mysql_pass }
     acceleration:
       enabled: true
-      engine: duckdb
+      engine: cayenne
       mode: file
       refresh_mode: changes
-      primary_key: id
-      on_conflict:
-        id: upsert
+      primary_key: id # before v2.4.0 (or on a non-Cayenne engine), also `on_conflict: {id: upsert}`
 ```
 
 `primary_key` and an `on_conflict` upsert on that key (the map above) are required on every upsert-capable engine (`duckdb`,
@@ -176,8 +176,13 @@ datasets:
       s3_region: us-east-1
     acceleration:
       enabled: true
-      engine: duckdb
+      engine: cayenne
 ```
+
+With `refresh_mode: changes` and `s3_changes_queue_url` (v2.4.0+), an accelerated S3 prefix loads new
+objects as SQS delivers S3 event notifications; the queue must serve only that dataset, and a periodic
+listing (`s3_changes_backfill_interval`, default `1h`) catches missed events. See
+[event-driven refresh](https://spiceai.org/docs/components/data-connectors/s3#event-driven-refresh-with-sqs).
 
 ### GitHub Issues, Reviews, Releases (v2.3.0+)
 
@@ -264,6 +269,7 @@ File-based connectors (S3, ABFS, GCS, HTTP/S, FTP/SFTP, SMB, NFS, local `file:`)
 | Apache Parquet | `parquet`     | Stable | Structured |
 | CSV            | `csv`         | Stable | Structured |
 | JSON           | `json`        | Stable | Structured |
+| Apache ORC (v2.4.0+) | `orc`   | —      | Structured |
 | Markdown       | `md`          | Stable | Document   |
 | Text           | `txt`         | Stable | Document   |
 | PDF            | `pdf`         | Beta   | Document   |

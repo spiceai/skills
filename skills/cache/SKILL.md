@@ -85,6 +85,7 @@ rather than trusting the configured value. Pingora has no `tiny_lfu`; asking for
 | `cache_key_type`             | `plan`  | `plan` = logical plan (matches semantically equivalent queries); `sql` = raw SQL string (faster, exact match only) |
 | `encoding`                   | `none`  | `none` or `zstd` (compresses cached results, 50-90% reduction)                                                     |
 | `stale_while_revalidate_ttl` | `0s`    | Serve stale entries while refreshing in background. `0s` = disabled                                                |
+| `warmup` (v2.4.0+)           | `disabled` | `on_first_refresh` records query shapes and replays them after a restart, before datasets report ready; needs `cache_key_type: plan` ([warmup](https://spiceai.org/docs/features/caching#warming-the-cache-after-a-restart)) |
 
 ## Choosing Parameters
 

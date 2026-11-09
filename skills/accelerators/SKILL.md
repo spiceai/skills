@@ -51,6 +51,12 @@ datasets:
 On v2.4.0+, use `cayenne` for new datasets. The table below compares engines for runtimes before v2.4.0 and for
 planning a migration; don't delete acceleration-only data to change engines.
 
+**Breaking in v2.4.0**: these loaded on the old Arrow default and now fail to load on Cayenne unless the
+dataset sets `engine: arrow` — `partition_by` in memory mode (or no `mode`); an Interval, Duration,
+FixedSizeBinary, Union, or RunEndEncoded column (e.g. a PostgreSQL `interval`); a Debezium or `cdc:`
+source with no key; a numeric `time_column` with `retention_period`; and `maintained_aggregates` with
+`MIN`/`MAX` and no primary key ([v2.4.0 notes](https://spiceai.org/releases/v2.4.0#accelerator-selection-and-primary-key-policies)).
+
 | Use Case                               | Engine     | Why                                                                        |
 | -------------------------------------- | ---------- | -------------------------------------------------------------------------- |
 | Small datasets (<1 GB), max speed      | `arrow`    | In-memory, lowest latency                                                  |
@@ -86,7 +92,7 @@ covered in acceleration. Engine constraints to keep in mind:
 
 - **`changes` (CDC)**: pair with a persistent accelerator (`mode: file`, or `postgres`) so a restart
   resumes instead of re-fetching. Every engine except append-only `arrow` requires `primary_key` plus an
-  `on_conflict` upsert on that key (example below). **Changed in v2.4.0-rc.1**: `cayenne` needs only
+  `on_conflict` upsert on that key (`on_conflict: {id: upsert}`). **Changed in v2.4.0-rc.1**: `cayenne` needs only
   `primary_key` and dedupes by it (newest `time_column` wins, else last arrival).
 - **`caching`**: survives restarts only with `mode: file` on `duckdb`, `sqlite`, or `cayenne`.
 - **`snapshot`** (Spice.ai Enterprise): needs a file-mode `duckdb`, `sqlite`, `cayenne`, or `turso` engine.
@@ -94,12 +100,10 @@ covered in acceleration. Engine constraints to keep in mind:
 ```yaml
 # CDC: native Postgres logical replication or MySQL binlog (v2.2.0+), no Kafka/Debezium
 acceleration:
-  engine: duckdb
+  engine: cayenne
   mode: file
   refresh_mode: changes
-  primary_key: id
-  on_conflict:
-    id: upsert
+  primary_key: id # before v2.4.0 (or on a non-Cayenne engine), also `on_conflict: {id: upsert}`
 ```
 
 ## Common Configurations
@@ -236,11 +240,11 @@ so set `storage_profile: ebs` explicitly on any network block storage outside AW
 
 ```yaml
 acceleration:
-  engine: duckdb
+  engine: cayenne
   mode: file
   storage_profile: ebs # amortize per-IO latency over larger flushes
   params:
-    duckdb_file: /mnt/ebs/analytics.db
+    cayenne_file_path: /mnt/ebs/analytics
 ```
 
 ## Constraints and Indexes
@@ -252,11 +256,11 @@ legacy `hash_index: enabled` param is ignored).
 ```yaml
 acceleration:
   enabled: true
-  engine: duckdb
-  primary_key: order_id # Creates non-null unique index
+  engine: cayenne
+  primary_key: order_id # Cayenne keeps one row per key
   indexes:
     customer_id: enabled # Single column index
-    '(created_at, status)': unique # Multi-column unique index
+    '(created_at, status)': enabled # Multi-column index (`unique` constrains only on non-Cayenne engines)
 ```
 
 ## Snapshots

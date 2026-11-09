@@ -284,6 +284,7 @@ Include relevant function signatures in your prompt **only when confirmed availa
 -- Text generation — ai(prompt) needs exactly one model configured; otherwise pass the model `name` from spicepod.yaml
 SELECT ai('Summarize this: ' || content) AS summary FROM docs;
 SELECT ai('Classify: ' || text, 'main_model') AS label FROM reviews;
+-- v2.4.0+: typed decisions with probabilities — ai_if, ai_probability, ai_classify, ai_score, ai_decide (see models)
 
 -- Embeddings — requires `embeddings:` in spicepod.yaml
 SELECT embed('hello world', 'my_embed_model') AS vec;

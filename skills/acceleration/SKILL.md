@@ -41,7 +41,7 @@ datasets:
     name: my_table
     acceleration:
       enabled: true
-      engine: duckdb # cayenne (default, v2.4.0-rc.1+; arrow before, and on Windows), arrow, duckdb, sqlite, postgres, turso
+      engine: cayenne # default (v2.4.0+; arrow before, and on native Windows); others deprecated (v2.5 removal)
       mode: memory # memory (default) or file
       refresh_check_interval: 1h
 ```
@@ -91,13 +91,11 @@ acceleration:
 # CDC: native Postgres logical replication (recommended for Postgres sources)
 acceleration:
   refresh_mode: changes
-  primary_key: id
-  on_conflict:
-    id: upsert
+  primary_key: id # before v2.4.0 (or on a non-Cayenne engine), also `on_conflict: {id: upsert}`
 
 # Read-only replica: reload only from the snapshot store, never from the source
 acceleration:
-  engine: duckdb
+  engine: cayenne
   mode: file
   refresh_mode: snapshot
   snapshots: enabled # or bootstrap_only
@@ -127,7 +125,7 @@ datasets:
       request_query_filters: enabled
     acceleration:
       enabled: true
-      engine: duckdb
+      engine: cayenne
       refresh_mode: caching
       params:
         caching_ttl: 5m              # default 30s; also accepted as caching_item_ttl (v2.3.0+)
@@ -160,7 +158,7 @@ change events to `/v1/datasets/{name}/cdc`. Kafka topics themselves use `refresh
 
 Pair CDC with a persistent accelerator (`mode: file`, or `postgres`) so a restart resumes instead of
 re-fetching. Every engine except append-only `arrow` needs `primary_key` plus an `on_conflict` upsert on
-that key (a map, as in the example above) — updates apply as upserts and deletes route by that key; see
+that key (a map: `on_conflict: {id: upsert}`) — updates apply as upserts and deletes route by that key; see
 connectors. **Changed in v2.4.0-rc.1**: `cayenne` needs only `primary_key` — it keeps one row per key
 (newest `time_column` wins, else last arrival) — and `on_conflict` is deprecated.
 
@@ -184,7 +182,7 @@ datasets:
     time_column: created_at
     acceleration:
       enabled: true
-      engine: duckdb
+      engine: cayenne
       mode: file
       refresh_mode: append
       refresh_check_interval: 1h
@@ -206,7 +204,7 @@ datasets:
     time_column: created_at # required by retention_period
     acceleration:
       enabled: true
-      engine: duckdb
+      engine: cayenne
       retention_check_enabled: true
       retention_period: 30d
       retention_check_interval: 1h
@@ -261,11 +259,11 @@ it is delivered) and be the sole writer of those source rows. `INSERT`/`UPDATE` 
 ```yaml
 acceleration:
   enabled: true
-  engine: duckdb
-  primary_key: order_id # Creates non-null unique index
+  engine: cayenne
+  primary_key: order_id # Cayenne keeps one row per key
   indexes:
     customer_id: enabled # Single column index
-    '(created_at, status)': unique # Multi-column unique index
+    '(created_at, status)': enabled # Multi-column index (`unique` constrains only on non-Cayenne engines)
 ```
 
 `indexes` apply on `duckdb`, `sqlite`, `turso`, and `postgres`. **Changed in v2.3.2**: `cayenne` builds
@@ -303,12 +301,12 @@ or `disabled` (default):
 ```yaml
 acceleration:
   enabled: true
-  engine: duckdb
+  engine: cayenne
   mode: file
   snapshots: enabled
   snapshots_trigger: refresh_complete # optional
   params:
-    duckdb_file: /nvme/my_table.db
+    cayenne_file_path: /nvme/my_table
 ```
 
 `snapshots_trigger` values vary by refresh mode:

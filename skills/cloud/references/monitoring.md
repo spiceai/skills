@@ -173,33 +173,17 @@ Done means the intended ID has the requested configuration, enabled state, and d
 Report evaluation limitations and untested destinations separately. A successful API call, preview,
 or test send alone is not end-to-end monitoring verification.
 
-## Enhancement rollout boundary
+## Check the deployed contract
 
-[Project alert enhancement #5634](https://github.com/spicehq/cloud/issues/5634) is the roadmap, not
-proof every acceptance item shipped. Checked against Cloud trunk `0369a2f54` and the live public
-OpenAPI on October 6, 2026:
+Monitor features roll out to Cloud environments at different times, so read the target
+environment's OpenAPI and the saved monitor spec before relying on a newer field or unit:
 
-- Merged: monitor PATCH [#5955](https://github.com/spicehq/cloud/pull/5955), percentage memory #5979,
-  dataset corrections #6018, pause cleanup #6012, multiple sinks #5984, instance health #6020,
-  and removal of template feature flags [#6066](https://github.com/spicehq/cloud/pull/6066).
-- Pending: automatic eight monitors and `default_alerts` on project creation/fork
-  [#6087](https://github.com/spicehq/cloud/pull/6087). Use manual setup and list actual monitors;
-  do not promise automatic defaults or send that field until the deployed API supports it.
-- Pending: failure-count units and classification gates
-  [#6088](https://github.com/spicehq/cloud/pull/6088). The checked production request-failure thresholds were rates.
-  Inspect saved units and the deployed contract before changing thresholds or running a drill
-  after rollout. Never reinterpret a saved failures/second threshold as a failure count.
-
-### Dev verification: October 7, 2026
-
-On `https://dev-api.spice.ai`, a temporary p99 monitor passed create, GET, same-ID PATCH, disable,
-re-enable, list, and delete. Omitted destinations were preserved; explicit empty member recipients
-stayed empty. Cleanup returned DELETE 200, GET 404, and an unchanged set of existing monitor IDs.
-This verified configuration CRUD, not firing, recovery, delivery, or destination-replacement PATCH.
-
-Dev OpenAPI now describes HTTP 5xx thresholds as estimated response **counts over the selected
-window**; saved rate-based conditions retain responses/second. Failure monitors default to zero
-sustain, other monitors to 300 seconds; explicit sustain values are preserved. Check the target
-environment's OpenAPI and saved spec before selecting units or defaults; Dev is not proof of a
-production rollout. Dev PATCH OpenAPI omits `targets`, so replacement of multiple destinations
-needs separate verification rather than inference from the creation schema.
+- Do not promise monitors that a project creates automatically. Set monitors up explicitly and list
+  the actual monitors on the project.
+- HTTP 5xx thresholds can be saved as a rate (responses/second) or as a count over the selected
+  window, depending on the API version that saved them. Inspect the saved units before changing a
+  threshold or running a drill, and never reinterpret a saved rate as a count.
+- Default sustain values and the PATCH schema for destinations can differ between environments.
+  Verify a destination-replacement PATCH with a GET rather than inferring it from the create schema.
+- A verified create, GET, PATCH, and DELETE proves configuration CRUD only, not firing, recovery,
+  or delivery.

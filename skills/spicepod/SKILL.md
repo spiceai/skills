@@ -141,7 +141,7 @@ datasets:
       pg_pass: ${ env:PG_PASS }
     acceleration:
       enabled: true
-      engine: duckdb
+      engine: cayenne
       refresh_check_interval: 5m
 
 models:
