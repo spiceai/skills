@@ -11,7 +11,7 @@ Text-to-SQL can use the runtime's configured model or an application-owned LLM.
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.1). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
+Written for **Spice v2.4.x** (checked against v2.4.2). The SQL dialect is Apache DataFusion's, and each Spice release line bundles a specific DataFusion version — check it before relying on newer syntax:
 
 | Spice | DataFusion | Dialect changes |
 | --- | --- | --- |
@@ -25,6 +25,8 @@ Written for **Spice v2.4.x** (checked against v2.4.1). The SQL dialect is Apache
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| Very deep or very large queries | Breaking in v2.4.2 (HTTP 400 or Flight `InvalidArgument` past 512 expression levels, 64 nested subqueries or chained CTEs, 4096 table references after CTE expansion, or 4096 grouping sets) | Flatten the query; see the [v2.4.2 release notes](https://github.com/spiceai/spiceai/releases/tag/v2.4.2) |
+| `flatten_json`, `json_tree`, `flatten_json_properties` on huge documents | Changed in v2.4.2 (output stops at 32 × `max_bytes` per document, no error) | Raise `max_bytes` |
 | `col =>` in `vector_search` / `text_search` | Renamed in v2.0.0 | `column =>` |
 | `fused_score` column from `rrf()` | Renamed in v2.0.0 | `_fused_score` |
 | S3 metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` (document tables keep `location`, `content`) |
@@ -494,5 +496,4 @@ for attempt in range(3):
 - [AI Functions](https://spiceai.org/docs/reference/sql/ai)
 - [Search Functions](https://spiceai.org/docs/reference/sql/search)
 - [JSON Functions](https://spiceai.org/docs/reference/sql/json)
-- [Scalar Functions](https://spiceai.org/docs/reference/sql/scalar_functions)
-- [Aggregate Functions](https://spiceai.org/docs/reference/sql/aggregate_functions)
+- [Scalar Functions](https://spiceai.org/docs/reference/sql/scalar_functions) and [Aggregate Functions](https://spiceai.org/docs/reference/sql/aggregate_functions)

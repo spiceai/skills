@@ -9,15 +9,17 @@ Data Connectors enable federated SQL queries across databases, data warehouses, 
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.1.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| `http`/`https` file dataset whose server redirects to a different private, loopback, or link-local host | Breaking in v2.4.2 (refused; redirects on the dataset's own host still work) | `SPICE_URL_TABLE_ALLOW_PRIVATE_HOSTS=true`; see the [v2.4.2 release notes](https://github.com/spiceai/spiceai/releases/tag/v2.4.2) |
+| Snowflake key-pair auth on v2.4.1 | Fixed in v2.4.2 (stuck at `Initializing` with a `CryptoProvider` error) | Upgrade to v2.4.2 |
 | `mysql_connection_string` with no pool settings | Breaking in v2.4.1 (1–5 connections, was 10–100; a non-integer or conflicting pool setting fails the dataset) | `mysql_pool_min` / `mysql_pool_max` (now applied with a connection string) |
 | MySQL connections held open indefinitely | Changed in v2.4.1 (replaced after `mysql_connection_max_lifetime`, default `5m`) | `mysql_connection_max_lifetime: 0s` to keep them open |
 | Iceberg REST catalog that vends a private or loopback storage endpoint (e.g. local Nessie + MinIO) | Breaking in v2.4.1 (refused) | `iceberg_s3_endpoint` and `iceberg_s3_region` in the Spicepod |
