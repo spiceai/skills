@@ -29,13 +29,13 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.12'
 
@@ -46,7 +46,7 @@ jobs:
         run: python3 scripts/prepare_release.py --tag "$RELEASE_TAG"
 
       - name: Preserve submission artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: spiceai-${{ env.RELEASE_TAG }}-distribution
           path: dist/*
