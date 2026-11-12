@@ -9,12 +9,12 @@ Spice federates SQL queries across 30+ data sources without ETL. Connect databas
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.1.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
@@ -23,6 +23,7 @@ Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime 
 | Durable write-back with `mode: memory`, retention, a multi-column key, or `DELETE`/`TRUNCATE` | Breaking in v2.3.0 (rejected) | `mode: file`, a single-column `primary_key`, no retention, writes in one `BEGIN; …; COMMIT;` |
 | Metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` |
 | `pg_replication_temporary_slot` | Deprecated in v2.2.0 (ignored) | Delete it |
+| Default replication slot name on an instance with no non-empty `SPICE_INSTANCE_ID`/`HOSTNAME`/`COMPUTERNAME` | Breaking in v2.4.0 (identity falls back to the host name, so a new slot is created) | Set `SPICE_INSTANCE_ID` per replica; drop the old slot with `pg_drop_replication_slot` ([PostgreSQL replication](https://spiceai.org/docs/features/cdc/postgres-replication)) |
 | ScyllaDB in the default build | Breaking in v2.3.0 | `--features scylladb` build, or Spice.ai Enterprise |
 
 ## Dataset interfaces

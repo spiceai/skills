@@ -13,12 +13,12 @@ Spice caches results from SQL queries (`/v1/sql`), search (`/v1/search`), and em
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.1.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
@@ -85,6 +85,7 @@ rather than trusting the configured value. Pingora has no `tiny_lfu`; asking for
 | `cache_key_type`             | `plan`  | `plan` = logical plan (matches semantically equivalent queries); `sql` = raw SQL string (faster, exact match only) |
 | `encoding`                   | `none`  | `none` or `zstd` (compresses cached results, 50-90% reduction)                                                     |
 | `stale_while_revalidate_ttl` | `0s`    | Serve stale entries while refreshing in background. `0s` = disabled                                                |
+| `warmup` (v2.4.0+)           | `disabled` | `on_first_refresh` records query shapes and replays them after a restart, before datasets report ready; needs `cache_key_type: plan` ([warmup](https://spiceai.org/docs/features/caching#warming-the-cache-after-a-restart)) |
 
 ## Choosing Parameters
 

@@ -11,7 +11,7 @@ Manage Spice.ai Cloud resources through the Management API (control plane) at `h
 
 ## Version Compatibility
 
-Written against the Spice.ai Cloud Management API checked on October 6, 2026, for projects running **Spice v2.4.x** (checked against v2.4.1). Two versions matter:
+Written against the Spice.ai Cloud Management API checked on October 6, 2026, for projects running **Spice v2.4.x** (checked against v2.4.2). Two versions matter:
 
 - **The project's runtime**: each deployment resolves the runtime from the project's `update_channel` (`stable`, `preview`, `nightly`) and `version` range unless `image_tag` pins it. Stable can trail the latest OSS release, so check `GET /v1/projects/{projectId}` and the [changelog](https://docs.spice.ai/changelog) before recommending a runtime feature. Cloud APIs have runtime minimums — the MCP API needs v2.0.0+ and `/v1/nsql` needs v2.1.0+.
 - **The API surface**: Cloud API changes are dated by the changelog month, not by a runtime release.
@@ -273,7 +273,7 @@ On PATCH `502`, saved configuration may have changed while backend update failed
 
 ### Cluster monitors
 
-Cluster monitors (`cluster_cpu`, `cluster_memory`, `cluster_availability`) are managed per cluster at `/v1/clusters/{clusterId}/monitors`, where `{clusterId}` is the `cluster_name` from `GET /v1/clusters` (e.g. `spicehq-main`). `GET` lists (`{"monitors":[...]}`) and `GET /{alertId}` gets one with `monitors:read` plus org membership; `POST` creates (`201`), `PATCH /{alertId}` updates the rule, destination, or `status` (`active`/`disabled`), and `DELETE /{alertId}` deletes (`200 {"ok":true}`) with `monitors:write` plus org admin. `{alertId}` is a UUID. Creation needs `name`, `templateId`, and `spec` with `op` and numeric `threshold` (same `window`/`sustainSecs`/`severity` defaults as project monitors); names are unique per cluster (`409`). The portal serves equivalent session-authenticated routes under `/api/orgs/{orgName}/clusters/{clusterId}/alerts`, not scriptable with `$SPICE_API_TOKEN`.
+Cluster monitors (`cluster_cpu`, `cluster_memory`, `cluster_availability`) are managed per cluster at `/v1/clusters/{clusterId}/monitors`, where `{clusterId}` is the `cluster_name` from `GET /v1/clusters` (e.g. `my-cluster`). `GET` lists (`{"monitors":[...]}`) and `GET /{alertId}` gets one with `monitors:read` plus org membership; `POST` creates (`201`), `PATCH /{alertId}` updates the rule, destination, or `status` (`active`/`disabled`), and `DELETE /{alertId}` deletes (`200 {"ok":true}`) with `monitors:write` plus org admin. `{alertId}` is a UUID. Creation needs `name`, `templateId`, and `spec` with `op` and numeric `threshold` (same `window`/`sustainSecs`/`severity` defaults as project monitors); names are unique per cluster (`409`). The portal serves equivalent session-authenticated routes under `/api/orgs/{orgName}/clusters/{clusterId}/alerts`, not scriptable with `$SPICE_API_TOKEN`.
 
 ## Secrets
 

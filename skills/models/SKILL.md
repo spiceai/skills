@@ -9,12 +9,12 @@ Model providers serve large language models (LLMs) through a unified OpenAI-comp
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.1). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.2). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.1.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.2.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
@@ -60,6 +60,7 @@ models:
 | Spice.ai (v2.2.0+)     | `spice.ai:openai/gpt-4o`                 | Release Candidate |
 | HuggingFace            | `hf:meta-llama/Llama-3-8B-Instruct`      | Release Candidate |
 | Local file             | `file:./models/llama.gguf`               | Release Candidate |
+| TypeSafe (v2.4.0+)     | `typesafe:jev` (decisions only)          | —                 |
 
 Prefix aliases: `huggingface:` = `hf:`; `spiceai:` = `spice.ai:` (model ids are `<provider>/<model>`).
 The `perplexity` provider is **Removed in v2.0.0**; ONNX/traditional ML models and `/v1/predict` are
@@ -183,6 +184,20 @@ curl -XPOST "http://localhost:8090/v1/nsql" \
   -H "Content-Type: application/json" \
   -d '{"query": "What was the highest tip any passenger gave?"}'
 ```
+
+### Decisions (v2.4.0+)
+
+Typed yes/no, label, and score answers with probabilities, in SQL (`ai_if`, `ai_probability`,
+`ai_classify`, `ai_score`, `ai_decide`, each taking `model => '<name>'`) or over the OpenAI-compatible
+`POST /v1/decisions`. Any chat model can answer (uncalibrated probabilities); a `typesafe:` model
+(`typesafe_api_key`) returns calibrated ones but serves only decisions — `/v1/chat/completions` returns `400`.
+
+```sql
+SELECT id, ai_classify(body, ['billing', 'technical'], model => 'jev') AS team FROM tickets;
+```
+
+See [Decisions](https://spiceai.org/docs/features/large-language-models/decisions) and
+[TypeSafe](https://spiceai.org/docs/components/models/typesafe).
 
 ### CLI
 
