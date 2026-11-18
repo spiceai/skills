@@ -9,15 +9,16 @@ Use Spice models from the CLI or OpenAI-compatible API, with tool use, conversat
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.3). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — offer `spice upgrade` or an alternative — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.3.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| Spice MCP server call to an unknown tool | Changed in v2.4.3 (HTTP 200 with JSON-RPC error `-32602`; was HTTP 400) | Check the JSON-RPC error, not the HTTP status |
 | `evals:` section, `/v1/evals` | Removed in v2.0.0 | Nothing — delete the section |
 | `websearch` tool (Perplexity) | Removed in v2.0.0 | `responses_api: enabled` + `openai_responses_tools: web_search` |
 | `spice chat --responses` | Removed in v2.0.0 | `POST /v1/responses` |
