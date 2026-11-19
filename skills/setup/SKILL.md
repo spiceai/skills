@@ -26,15 +26,17 @@ and results to stdout as JSON; it exits 1 when a step fails, with the reason and
 
 ## Version Compatibility
 
-Written for **Spice v2.4.x** (checked against v2.4.2). Check the user's runtime version before recommending configuration:
+Written for **Spice v2.4.x** (checked against v2.4.3). Check the user's runtime version before recommending configuration:
 
 - **Find it**: `spice version` (CLI and runtime), `spiced --version`, or the image tag (`spiceai/spiceai:<tag>`, Helm `image.tag`). Not the runtime version: `version: v2` in `spicepod.yaml` (manifest schema) or SQL `version()` (DataFusion).
 - **Markers**: unmarked content applies to v2.0.0 and later. Later additions are marked `(vX.Y.Z+)`; changes are marked **Removed**, **Deprecated**, **Changed**, or **Breaking in vX.Y.Z**.
 - **Older runtime**: don't recommend a newer feature — use configuration supported by that version or explain the user-managed upgrade prerequisite — and read that release line's docs, e.g. `https://spiceai.org/docs/v2.2/...` (`/docs/next/` tracks trunk, not a release). On v1.x, use the [v1.11 docs](https://spiceai.org/docs/v1.11) and the [v2.0 upgrade guide](https://spiceai.org/releases/v2.0-stable#upgrade-guide-from-v1x).
-- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.2.
+- **Newer runtime**: check the [release notes](https://spiceai.org/releases) for changes after v2.4.3.
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| Install script when it cannot get the expected sha256 (GitHub API failure or rate limit), or for v1.3.1 and older | Breaking in v2.4.3 (the install stops; a sha256 mismatch always stops it; `Install.ps1` failures now throw) | Set `GITHUB_TOKEN`; `SPICE_INSTALL_ALLOW_UNVERIFIED=1` installs with no check; see the [v2.4.3 release notes](https://github.com/spiceai/spiceai/releases/tag/v2.4.3) |
+| Buffered `/v1/sql` result (CSV, `text/plain`, `vnd.*`) larger than `runtime.query.memory_limit` | Breaking in v2.4.3 (HTTP 503; was HTTP 200 outside the limit) | Request JSON (streamed when the result has no union columns) |
 | `evals:` section, `/v1/evals` | Removed in v2.0.0 | Nothing — delete the section |
 | ONNX models, `/v1/predict` | Removed in v2.2.0 | An LLM provider (see models) |
 | `version: v1beta1` | Removed in v2.0.0 | `version: v2` (`v1` still loads, auto-migrated) |
