@@ -56,7 +56,7 @@ ACCOUNT_CONNECTORS = {
     "databricks", "snowflake", "dynamodb", "glue", "sharepoint", "spice.ai", "spiceai", "abfs",
     "gs", "gcs", "bigquery", "delta_lake", "redshift",
 }
-PUBLIC_BUCKETS = ("spiceai-public-datasets", "spiceai-demo-datasets")
+PUBLIC_BUCKETS = ("spice-datasets-gjezag77s0hu", "spiceai-demo-datasets")
 KNOWN_TOOLS = [
     "docker", "docker-compose", "make", "python", "python3", "pip", "pip3", "uv", "uvx", "pipx",
     "node", "npm", "npx", "yarn", "pnpm", "go", "cargo", "java", "javac", "mvn", "gradle", "sbt",
