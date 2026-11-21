@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.12'
 
@@ -31,7 +31,7 @@ jobs:
       - name: Build the marketplace submission preview
         run: make release-preview
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: spiceai-submission-preview
           path: dist/preview/*
