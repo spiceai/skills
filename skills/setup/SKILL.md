@@ -44,6 +44,7 @@ Written for **Spice v2.4.x** (checked against v2.4.3). Check the user's runtime 
 | Native Windows runtime (`spiced.exe`) | Removed in v2.0.0 | WSL |
 | OpenTelemetry port `50052` | Removed in v1.11.0 | The Flight port `50051` |
 | `spice connect <org>/<pod>` | Deprecated in v2.2.0 | `spice add <org>/<pod>` |
+| `spice install <version>` / `spice upgrade --version <version>` for a release older than the 30 newest | Fixed in v2.4.3 (`Release not found`) | Upgrade the CLI to v2.4.3 first |
 | `spice run -- --http <addr>` | Fails on every v2 CLI (the CLI already passes `--http`) | `spice run --http-endpoint <addr>` |
 | Browser `Origin` on `/v1/mcp` | Breaking in v2.3.1 (checked, else `403`) | List origins in `runtime.cors.allowed_origins` |
 

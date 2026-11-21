@@ -138,6 +138,10 @@ expired entries as fallback, so nothing expires them — pair it with a size, it
 runtime warns at startup otherwise). It also serves stale data when the HTTP connector returns a 429/5xx
 after exhausting `max_retries` (v2.3.0+).
 
+A query that names both cached and uncached keys (an `IN` list or `OR` on one key column) fetches the
+missing keys and obeys `max_request_partitions`; through v2.4.2 it returned only the cached rows
+([v2.4.3 release notes](https://github.com/spiceai/spiceai/releases/tag/v2.4.3)).
+
 `acceleration.enabled: false` turns the block off rather than parking it — the dataset federates every
 query — and the runtime names the settings it discards (v2.3.0+). Set `ready_state` on the dataset or
 view itself. **Deprecated in v2.3.0**: `acceleration.ready_state` still applies (it overrides the

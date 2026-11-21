@@ -22,6 +22,7 @@ Written for **Spice v2.4.x** (checked against v2.4.3). Check the user's runtime 
 
 | Old | Change | Use instead |
 | --- | --- | --- |
+| A parameter such as `$1` in a `text_search`, `vector_search`, or `rrf` argument | Fixed in v2.4.3 (failed with a placeholder error) | Upgrade to v2.4.3, or inline the value |
 | `/v1/search` with more than 512 `keywords` | Breaking in v2.4.2 (HTTP 400) | At most 512 keywords; see the [v2.4.2 release notes](https://github.com/spiceai/spiceai/releases/tag/v2.4.2) |
 | `vectors.engine: duckdb` | Deprecated in v2.4.0 (removal planned for v2.5) | `engine: cayenne` with no `vectors` block (Cayenne indexes embedding columns for `vector_search`); [migration guide](https://spiceai.org/docs/components/data-accelerators/cayenne/migration#migrating-the-duckdb-vector-engine) |
 | `google_api_key` on `from: google` embeddings | Breaking in v2.3.0 | Vertex AI settings (see models) |
