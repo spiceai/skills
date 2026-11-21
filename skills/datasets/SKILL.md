@@ -25,6 +25,7 @@ Written for **Spice v2.4.x** (checked against v2.4.3). Check the user's runtime 
 | `acceleration.ready_state` (datasets and views) | Deprecated in v2.3.0 | `ready_state` on the dataset or view |
 | Durable write-back with `mode: memory`, retention, a multi-column key, or `DELETE`/`TRUNCATE` | Breaking in v2.3.0 (rejected) | `mode: file`, a single-column `primary_key`, no retention, writes in one `BEGIN; …; COMMIT;` |
 | Metadata columns `location`, `last_modified`, `size` | Renamed in v2.0.0 | `_location`, `_last_modified`, `_size` |
+| `time_column: last_modified` | Fixed in v2.4.3 (failed with `time_column 'last_modified' was not found`; now uses `_last_modified` with a deprecation warning, `time_format` defaulting to `timestamptz`) | `time_column: _last_modified` |
 | `pg_replication_temporary_slot` | Deprecated in v2.2.0 (ignored) | Delete it |
 | Default replication slot name on an instance with no non-empty `SPICE_INSTANCE_ID`/`HOSTNAME`/`COMPUTERNAME` | Breaking in v2.4.0 (identity falls back to the host name, so a new slot is created) | Set `SPICE_INSTANCE_ID` per replica; drop the old slot with `pg_drop_replication_slot` ([PostgreSQL replication](https://spiceai.org/docs/features/cdc/postgres-replication)) |
 | ScyllaDB in the default build | Breaking in v2.3.0 | `--features scylladb` build, or Spice.ai Enterprise |
